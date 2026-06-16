@@ -65,6 +65,54 @@ type Props = {
   adapter: DashboardSurfaceAdapter;
 };
 
+function buildYamlDownloadFilename(name: string): string {
+  const base =
+    String(name || "subboost-config")
+      .trim()
+      .replace(/[\r\n]/g, " ")
+      .replace(/[<>:"/\\|?*]+/g, "")
+      .replace(/\s+/g, "_")
+      .replace(/\.(?:ya?ml)$/i, "")
+      .slice(0, 80) || "subboost-config";
+  return `${base}.yaml`;
+}
+
+function triggerBrowserDownload(href: string, filename: string) {
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = filename;
+  anchor.rel = "noopener noreferrer";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand("copy");
+    textarea.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function SubscriptionDashboardSurface({ adapter }: Props) {
   const { user, isLoading: userLoading, fetchUser } = useUserStore();
   const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
@@ -147,9 +195,33 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
   }, [subscriptions, user]);
 
   const copyToClipboard = async (subscriptionUrl: string, id: string) => {
-    await navigator.clipboard.writeText(subscriptionUrl);
+    const copied = await copyText(subscriptionUrl);
+    if (!copied) {
+      toast({ title: "复制失败，请手动复制订阅链接", variant: "destructive" });
+      return;
+    }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const downloadSubscription = async (subscription: Subscription) => {
+    const filename = buildYamlDownloadFilename(subscription.name);
+    try {
+      const response = await fetch(subscription.subscriptionUrl);
+      if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      triggerBrowserDownload(objectUrl, filename);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (error) {
+      console.error("Failed to fetch subscription YAML for download:", error);
+      triggerBrowserDownload(subscription.subscriptionUrl, filename);
+      toast({
+        title: "已改用浏览器直接下载",
+        description: "如果仍然打开新页面，请稍后刷新页面后再试。",
+        variant: "warning",
+      });
+    }
   };
 
   const deleteSubscription = async (id: string) => {
@@ -329,6 +401,7 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
                   editHref={editSubscriptionHref(sub)}
                   onCopy={copyToClipboard}
                   onDelete={deleteSubscription}
+                  onDownload={downloadSubscription}
                   onRefresh={refreshSubscription}
                   onSettings={openSubscriptionSettings}
                 />
@@ -420,6 +493,7 @@ function SubscriptionRow({
   editHref,
   onCopy,
   onDelete,
+  onDownload,
   onRefresh,
   onSettings,
 }: {
@@ -429,6 +503,7 @@ function SubscriptionRow({
   editHref: string;
   onCopy: (subscriptionUrl: string, id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onDownload: (sub: Subscription) => Promise<void>;
   onRefresh: (id: string) => Promise<void>;
   onSettings: (sub: Subscription) => void;
 }) {
@@ -514,12 +589,16 @@ function SubscriptionRow({
             </>
           )}
         </Button>
-        <a href={sub.subscriptionUrl} target="_blank" rel="noopener noreferrer">
-          <Button variant="ghost" size="sm" className="gap-0 sm:gap-2" title="下载订阅配置">
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">下载</span>
-          </Button>
-        </a>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void onDownload(sub)}
+          className="gap-0 sm:gap-2"
+          title="下载订阅配置"
+        >
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline">下载</span>
+        </Button>
         <Button
           variant="ghost"
           size="sm"

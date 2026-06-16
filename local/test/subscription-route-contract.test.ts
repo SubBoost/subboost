@@ -138,6 +138,7 @@ describe("local subscription routes", () => {
       params: Promise.resolve({ id: "token-1" }),
     });
     expect(pluralResponse.status).toBe(200);
+    expect(pluralResponse.headers.get("content-disposition")).toBe('attachment; filename="subboost-config.yaml"');
     expect(await pluralResponse.text()).toBe("mixed-port: 7890\n");
     expect(generateSubscriptionYaml).toHaveBeenCalledWith("token-1");
   });

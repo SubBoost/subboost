@@ -1,6 +1,6 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   captures: {} as Record<string, any>,
@@ -189,6 +189,39 @@ async function flushPromises() {
   await Promise.resolve();
 }
 
+function stubDocumentActions() {
+  const anchor = {
+    href: "",
+    download: "",
+    rel: "",
+    style: {} as Record<string, string>,
+    click: vi.fn(),
+    remove: vi.fn(),
+  };
+  const textarea = {
+    value: "",
+    style: {} as Record<string, string>,
+    setAttribute: vi.fn(),
+    select: vi.fn(),
+    remove: vi.fn(),
+  };
+  const appendChild = vi.fn();
+  const execCommand = vi.fn(() => true);
+  const createElement = vi.fn((tagName: string) => {
+    if (tagName === "a") return anchor;
+    if (tagName === "textarea") return textarea;
+    throw new Error(`Unexpected element: ${tagName}`);
+  });
+
+  vi.stubGlobal("document", {
+    createElement,
+    body: { appendChild },
+    execCommand,
+  });
+
+  return { anchor, textarea, appendChild, createElement, execCommand };
+}
+
 describe("SubscriptionDashboardSurface", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -206,6 +239,10 @@ describe("SubscriptionDashboardSurface", () => {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders loading, login prompt, empty state, stats, and quick actions", () => {
@@ -250,7 +287,8 @@ describe("SubscriptionDashboardSurface", () => {
   it("copies, deletes, refreshes, and opens settings for subscriptions", async () => {
     const { setters, adapter } = renderSurface(createAdapter(), { 0: [subscription, disabledSubscription], 1: false, 2: null, 3: null });
 
-    await mocks.captures.buttons[4].onClick();
+    await mocks.captures.buttons.find((props: any) => props.title === "复制订阅链接").onClick();
+    await flushPromises();
     expect(mocks.clipboardWriteText).toHaveBeenCalledWith("https://example.com/sub");
     expect(setters[2]).toHaveBeenCalledWith("sub-1");
     expect(setters[2]).toHaveBeenCalledWith(null);
@@ -281,6 +319,66 @@ describe("SubscriptionDashboardSurface", () => {
     expect(setters[5]).toHaveBeenCalledWith(disabledSubscription);
     expect(setters[8]).toHaveBeenCalledWith(false);
     expect(setters[9]).toHaveBeenCalledWith(24);
+  });
+
+  it("falls back to legacy copy for non-secure self-host origins", async () => {
+    const dom = stubDocumentActions();
+    vi.stubGlobal("navigator", {});
+    const { setters } = renderSurface(createAdapter(), { 0: [subscription], 1: false, 2: null, 3: null });
+
+    await mocks.captures.buttons.find((props: any) => props.title === "复制订阅链接").onClick();
+    await flushPromises();
+
+    expect(dom.createElement).toHaveBeenCalledWith("textarea");
+    expect(dom.textarea.value).toBe("https://example.com/sub");
+    expect(dom.textarea.select).toHaveBeenCalled();
+    expect(dom.execCommand).toHaveBeenCalledWith("copy");
+    expect(dom.textarea.remove).toHaveBeenCalled();
+    expect(setters[2]).toHaveBeenCalledWith("sub-1");
+    expect(mocks.toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  it("downloads subscription YAML with a yaml filename instead of opening a new tab", async () => {
+    const dom = stubDocumentActions();
+    const blob = new Blob(["mixed-port: 7890\n"], { type: "text/yaml" });
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, blob: vi.fn(async () => blob) }));
+    const createObjectURL = vi.fn(() => "blob:subboost-config");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+
+    renderSurface(createAdapter(), { 0: [subscription], 1: false, 2: null, 3: null });
+    await mocks.captures.buttons.find((props: any) => props.title === "下载订阅配置").onClick();
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledWith("https://example.com/sub");
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(dom.createElement).toHaveBeenCalledWith("a");
+    expect(dom.anchor.href).toBe("blob:subboost-config");
+    expect(dom.anchor.download).toBe("Primary.yaml");
+    expect(dom.anchor.rel).toBe("noopener noreferrer");
+    expect(dom.anchor.click).toHaveBeenCalled();
+    expect(dom.anchor.remove).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:subboost-config");
+  });
+
+  it("falls back to direct browser download when fetching the YAML fails", async () => {
+    const dom = stubDocumentActions();
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("cors");
+    }));
+
+    renderSurface(createAdapter(), { 0: [subscription], 1: false, 2: null, 3: null });
+    await mocks.captures.buttons.find((props: any) => props.title === "下载订阅配置").onClick();
+    await flushPromises();
+
+    expect(dom.anchor.href).toBe("https://example.com/sub");
+    expect(dom.anchor.download).toBe("Primary.yaml");
+    expect(dom.anchor.click).toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "已改用浏览器直接下载",
+      variant: "warning",
+    }));
   });
 
   it("guards cancelled delete and in-flight refresh failures", async () => {
