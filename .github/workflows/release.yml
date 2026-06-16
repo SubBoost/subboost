@@ -200,13 +200,14 @@ jobs:
             --image-tag "${IMAGE_NAME}:${GITHUB_REF_NAME}" \
             --base-url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
 
-      - name: Create GitHub Release
+      - name: Create draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --title "SubBoost ${GITHUB_REF_NAME}" \
             --notes-file docs/release-notes.md \
+            --draft \
             dist/release-assets/release.json \
             dist/release-assets/install.sh \
             dist/release-assets/docker-compose.image.yml \
