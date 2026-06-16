@@ -88,6 +88,16 @@ function triggerBrowserDownload(href: string, filename: string) {
   anchor.remove();
 }
 
+function buildSameOriginDownloadUrl(subscriptionUrl: string): string {
+  try {
+    const url = new URL(subscriptionUrl, window.location.href);
+    if (!url.pathname.includes("/api/subscription")) return subscriptionUrl;
+    return `${window.location.origin}${url.pathname}${url.search}`;
+  } catch {
+    return subscriptionUrl;
+  }
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
@@ -207,7 +217,7 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
   const downloadSubscription = async (subscription: Subscription) => {
     const filename = buildYamlDownloadFilename(subscription.name);
     try {
-      const response = await fetch(subscription.subscriptionUrl);
+      const response = await fetch(buildSameOriginDownloadUrl(subscription.subscriptionUrl));
       if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);

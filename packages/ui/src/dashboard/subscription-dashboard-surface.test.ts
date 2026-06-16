@@ -239,6 +239,12 @@ describe("SubscriptionDashboardSurface", () => {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
     });
+    vi.stubGlobal("window", {
+      location: {
+        href: "http://localhost/dashboard",
+        origin: "http://localhost",
+      },
+    });
   });
 
   afterEach(() => {
@@ -344,8 +350,11 @@ describe("SubscriptionDashboardSurface", () => {
     const fetchMock = vi.fn(async () => ({ ok: true, status: 200, blob: vi.fn(async () => blob) }));
     const createObjectURL = vi.fn(() => "blob:subboost-config");
     const revokeObjectURL = vi.fn();
+    class TestURL extends URL {}
+    TestURL.createObjectURL = createObjectURL;
+    TestURL.revokeObjectURL = revokeObjectURL;
     vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    vi.stubGlobal("URL", TestURL);
 
     renderSurface(createAdapter(), { 0: [subscription], 1: false, 2: null, 3: null });
     await mocks.captures.buttons.find((props: any) => props.title === "下载订阅配置").onClick();
@@ -377,6 +386,29 @@ describe("SubscriptionDashboardSurface", () => {
       title: "下载失败",
       variant: "destructive",
     }));
+  });
+
+  it("fetches cross-origin subscription links through the current origin for downloads", async () => {
+    const dom = stubDocumentActions();
+    const blob = new Blob(["mixed-port: 7890\n"], { type: "text/yaml" });
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, blob: vi.fn(async () => blob) }));
+    vi.stubGlobal("fetch", fetchMock);
+    class TestURL extends URL {}
+    TestURL.createObjectURL = vi.fn(() => "blob:subboost-config");
+    TestURL.revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", TestURL);
+
+    renderSurface(createAdapter(), {
+      0: [{ ...subscription, subscriptionUrl: "https://subscription.example.test/api/subscription/token-1?download=1" }],
+      1: false,
+      2: null,
+      3: null,
+    });
+    await mocks.captures.buttons.find((props: any) => props.title === "下载订阅配置").onClick();
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost/api/subscription/token-1?download=1");
+    expect(dom.anchor.download).toBe("Primary.yaml");
   });
 
   it("guards cancelled delete and in-flight refresh failures", async () => {
