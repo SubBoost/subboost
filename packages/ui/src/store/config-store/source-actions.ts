@@ -53,6 +53,11 @@ function toSubscriptionImportErrorInfo(error: unknown, fallbackMessage = "解析
   });
 }
 
+function mergeNodeSourceIds(existing: ParsedNode, sourceIds: Set<string>): ParsedNode {
+  const existingRecord = existing as unknown as Record<string, unknown>;
+  return { ...existingRecord, [SOURCE_IDS_KEY]: Array.from(sourceIds) } as unknown as ParsedNode;
+}
+
 export function createSourceActions(set: SetState, get: GetState, setAndGenerateConfig: SetAndGenerateConfig): SourceActions {
   return {
     // 设置订阅源
@@ -318,22 +323,22 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
             dialerProxyGroups: nextDialerProxyGroups,
             sources: state.sources.map((s) =>
               s.id === sourceId
-                  ? {
-                      ...s,
-                      parsing: false,
-                      parsed: true,
-                      nodeCount: result.nodes.length,
-                      subscriptionUserInfo: hasSubscriptionUserInfo(resolvedSubscriptionUserInfo)
-                        ? resolvedSubscriptionUserInfo
-                        : undefined,
-                      error: undefined,
-                      errorInfo: undefined,
-                      lastParsedContent:
-                        source.type === "url"
-                          ? (tryNormalizeSubscriptionUrlInput(currentSourceContent) ?? currentSourceContent)
-                          : currentSourceContent,
-                      lastParsedTag: currentTag || undefined,
-                      lastParsedNameTemplate: currentNameTemplate || undefined,
+                ? {
+                    ...s,
+                    parsing: false,
+                    parsed: true,
+                    nodeCount: result.nodes.length,
+                    subscriptionUserInfo: hasSubscriptionUserInfo(resolvedSubscriptionUserInfo)
+                      ? resolvedSubscriptionUserInfo
+                      : undefined,
+                    error: undefined,
+                    errorInfo: undefined,
+                    lastParsedContent:
+                      source.type === "url"
+                        ? (tryNormalizeSubscriptionUrlInput(currentSourceContent) ?? currentSourceContent)
+                        : currentSourceContent,
+                    lastParsedTag: currentTag || undefined,
+                    lastParsedNameTemplate: currentNameTemplate || undefined,
                   }
                 : s
             ),
@@ -553,10 +558,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
         }
         if (!changed) continue;
 
-        uniqueNodeMap.set(
-          key,
-          ({ ...(existing as unknown as Record<string, unknown>), [SOURCE_IDS_KEY]: Array.from(mergedSourceIds) } as unknown as ParsedNode)
-        );
+        uniqueNodeMap.set(key, mergeNodeSourceIds(existing, mergedSourceIds));
       }
       const uniqueNodes = Array.from(uniqueNodeMap.values());
 
