@@ -354,7 +354,7 @@ export function FilteredProxyGroupsSection({
 
                     {expandedFilteredGroups.has(group.id) && (
                       <div className="px-3 pt-3 pb-3 space-y-3 border-t border-white/10">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <div className="text-xs text-white/60">导入源</div>
                             <div className={FILTERED_SOURCE_LIST_HEIGHT_CLASS}>
@@ -433,46 +433,46 @@ export function FilteredProxyGroupsSection({
                               不选择表示匹配所有地区
                             </div>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <div className="text-xs text-white/60">包含正则（可选）</div>
-                            <Input
-                              value={group.includeRegex ?? ""}
-                              onChange={(e) =>
-                                updateFilteredProxyGroup(group.id, { includeRegex: e.target.value })
-                              }
-                              placeholder="例如: (IEPL|专线|家宽)"
-                              className="h-8 text-xs bg-white/10"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <div className="text-xs text-white/60">排除正则（可选）</div>
-                            <Input
-                              value={group.excludeRegex ?? ""}
-                              onChange={(e) =>
-                                updateFilteredProxyGroup(group.id, { excludeRegex: e.target.value })
-                              }
-                              placeholder="例如: (测试|过期)"
-                              className="h-8 text-xs bg-white/10"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <div className="text-xs text-white/60">类型</div>
-                            <ProxyGroupTypeMenu
-                              value={(group.groupType || "select") as ProxyGroupTypeMenuValue}
-                              strategy={group.strategy}
-                              onChange={({ groupType, strategy }) =>
-                                updateFilteredProxyGroup(group.id, {
-                                  groupType,
-                                  ...(groupType === "load-balance"
-                                    ? { strategy: strategy ?? group.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY }
-                                    : { strategy: undefined }),
-                                })
-                              }
-                              triggerClassName="h-8 text-xs bg-white/10 border-white/10"
-                            />
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <div className="text-xs text-white/60">包含正则（可选）</div>
+                              <Input
+                                value={group.includeRegex ?? ""}
+                                onChange={(e) =>
+                                  updateFilteredProxyGroup(group.id, { includeRegex: e.target.value })
+                                }
+                                placeholder="例如: (IEPL|专线|家宽)"
+                                className="h-8 text-xs bg-white/10"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-xs text-white/60">排除正则（可选）</div>
+                              <Input
+                                value={group.excludeRegex ?? ""}
+                                onChange={(e) =>
+                                  updateFilteredProxyGroup(group.id, { excludeRegex: e.target.value })
+                                }
+                                placeholder="例如: (测试|过期)"
+                                className="h-8 text-xs bg-white/10"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-xs text-white/60">类型</div>
+                              <ProxyGroupTypeMenu
+                                value={(group.groupType || "select") as ProxyGroupTypeMenuValue}
+                                strategy={group.strategy}
+                                onChange={({ groupType, strategy }) =>
+                                  updateFilteredProxyGroup(group.id, {
+                                    groupType,
+                                    ...(groupType === "load-balance"
+                                      ? { strategy: strategy ?? group.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY }
+                                      : { strategy: undefined }),
+                                  })
+                                }
+                                triggerClassName="h-8 text-xs bg-white/10 border-white/10"
+                              />
+                            </div>
                           </div>
                         </div>
 
