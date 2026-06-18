@@ -3,7 +3,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const DEFAULT_IMAGE_REPOSITORY = "ghcr.io/subboost/subboost";
+const DEFAULT_IMAGE_REPOSITORY = process.env.GITHUB_REPOSITORY_OWNER
+  ? `ghcr.io/${process.env.GITHUB_REPOSITORY_OWNER}/subboost`
+  : "ghcr.io/subboost/subboost";
 const DEFAULT_OUTPUT = path.join("dist", "release-assets");
 const MANAGER_ASSET_NAME = "subboost-manager";
 

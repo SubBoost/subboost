@@ -92,7 +92,7 @@ describe("user store", () => {
     expect(useUserStore.getState().user?.aiAssistantEnabled).toBe(true);
 
     await useUserStore.getState().logout();
-    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", { method: "POST", headers: {} });
     expect(useUserStore.getState().user).toBeNull();
 
     useUserStore.setState({ user: user(), error: "old" });

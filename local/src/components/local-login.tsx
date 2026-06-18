@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { hasAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
+import { setCsrfToken, withCsrfHeaders } from "@subboost/ui/lib/csrf";
 
 type AuthState = {
   setupRequired: boolean;
@@ -31,11 +32,12 @@ export function LocalLogin() {
 
   React.useEffect(() => {
     let cancelled = false;
-    void fetch("/api/auth/me", { cache: "no-store" })
+    void fetch("/api/auth/bootstrap", { cache: "no-store" })
       .then((response) => readJson<AuthState>(response))
       .then((nextAuth) => {
         if (!cancelled) {
           setAuth(nextAuth);
+          setCsrfToken((nextAuth as AuthState & { csrfToken?: string | null }).csrfToken ?? null);
           if (nextAuth.authenticated) window.location.href = getPostLoginHref();
         }
       })
@@ -61,10 +63,11 @@ export function LocalLogin() {
     try {
       const response = await fetch(setupRequired ? "/api/setup/admin" : "/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withCsrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ username, password, passwordConfirm }),
       });
-      const data = await readJson<{ error?: string }>(response);
+      const data = await readJson<{ error?: string; csrfToken?: string | null }>(response);
+      setCsrfToken(data.csrfToken ?? null);
       if (!response.ok) throw new Error(data.error || "登录失败");
       window.location.href = getPostLoginHref();
     } catch (submitError) {
@@ -82,7 +85,7 @@ export function LocalLogin() {
             <Image src="/logo.png" alt="SubBoost" width={64} height={64} className="rounded-2xl shadow-lg shadow-blue-500/25" />
           </Link>
           <h1 className="text-2xl font-bold mt-4 text-white">欢迎使用 SubBoost</h1>
-          <p className="text-white/50 mt-2">{setupRequired ? "初始化本地管理员账号" : "登录以使用订阅管理功能"}</p>
+          <p className="text-white/50 mt-2">{setupRequired ? "初始化第一个账号" : "登录以使用订阅管理功能"}</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 space-y-4">
@@ -91,7 +94,7 @@ export function LocalLogin() {
               <input
                 type="text"
                 autoComplete="username"
-                placeholder="管理员账号"
+                placeholder="账号"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 transition-colors"
@@ -136,7 +139,7 @@ export function LocalLogin() {
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 btn-primary"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {setupRequired ? "创建管理员" : "登录"}
+                {setupRequired ? "创建账号" : "登录"}
               </button>
             </form>
           ) : (

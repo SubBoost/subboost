@@ -3,13 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Eye, Home, Library, Settings2, User, type LucideIcon } from "lucide-react";
+import { Bot, Eye, Home, Settings2, User, type LucideIcon } from "lucide-react";
 import { cn } from "@subboost/ui/lib/utils";
 import { zeroRightClassName } from "react-remove-scroll-bar";
 import { useUserStore } from "@subboost/ui/store/user-store";
 
 type MobileNavItem = {
-  id: "config" | "preview" | "ai" | "dashboard" | "home" | "templates";
+  id: "config" | "preview" | "ai" | "dashboard" | "home";
   href: string;
   label: string;
   icon: LucideIcon;
@@ -27,7 +27,6 @@ const defaultMobileNavItems: MobileNavItem[] = [
 const localMobileNavItems: MobileNavItem[] = [
   { id: "home", href: "/", label: "首页", icon: Home },
   { id: "dashboard", href: "/dashboard", label: "订阅", icon: User, authOnly: true },
-  { id: "templates", href: "/templates", label: "模板", icon: Library },
 ];
 
 export function MobileNav({ mode = "default" }: { mode?: "default" | "local" }) {

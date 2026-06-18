@@ -19,6 +19,7 @@ type TemplateActions = Pick<
   | "setEnabledProxyGroups"
   | "toggleProxyGroup"
   | "applyTemplateConfig"
+  | "importTemplateConfig"
 >;
 
 function normalizeHiddenProxyGroups(value: unknown): string[] {
@@ -179,6 +180,14 @@ export function createTemplateActions(
               : state.ruleProviderBaseUrl,
         };
       });
+    },
+
+    // 导入配置文件时复用同一套应用逻辑
+    importTemplateConfig: (config: SubBoostTemplateConfig) => {
+      if (!config || typeof config !== "object") return;
+      const state = _get();
+      state.applyTemplateConfig(config);
+      set({ appliedTemplateId: null });
     },
   };
 }

@@ -117,7 +117,6 @@ describe("Header", () => {
     expect(html).toContain("online");
     expect(html).toContain("在线入口");
     expect(html).toContain("首页");
-    expect(html).toContain("模板库");
     expect(html).toContain("FAQ");
     expect(html).not.toContain("我的订阅");
     expect(html).toContain("menu-icon");

@@ -16,7 +16,24 @@ model LocalAdmin {
   lastLoginAt  DateTime?
 
   subscriptions Subscription[]
+  sessions      LocalSession[]
   templates      LocalTemplate[]
+}
+
+model LocalSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  ownerId    String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+
+  owner LocalAdmin @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([expiresAt])
 }
 
 model LocalTemplate {

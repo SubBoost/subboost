@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_NAME: ghcr.io/subboost/subboost
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/subboost
 
 jobs:
   meta:

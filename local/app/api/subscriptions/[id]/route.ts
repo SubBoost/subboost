@@ -18,7 +18,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   return updateSubscriptionResponse(request, id);
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(request: Request, { params }: RouteContext) {
   const { id } = await params;
-  return deleteSubscriptionResponse(id);
+  return deleteSubscriptionResponse(request, id);
 }

@@ -184,9 +184,9 @@ describe("HomeSurface", () => {
       subscription: { loginHref: "/login" },
       loadSubscription: mocks.loadSubscription,
       loginHref: "/service-login",
-      templateUploadHref: "/templates/upload",
       recordConfigDownload: vi.fn(),
-      onTemplateUploadOpen: vi.fn(),
+      onConfigImport: vi.fn(),
+      onConfigExport: vi.fn(),
       renderNotice: ({ user, showAiColumn }: any) => `notice:${user.id}:${showAiColumn}`,
       renderAnnouncement: vi.fn(),
       renderSaveRequirementDialog: ({ open }: any) => `save:${open}`,
@@ -221,8 +221,8 @@ describe("HomeSurface", () => {
       hasValidSources: true,
       handleGenerate: mocks.handleGenerate,
       handleDownload: mocks.handleDownload,
-      templateUploadHref: "/templates/upload",
-      onTemplateUploadOpen: adapter.onTemplateUploadOpen,
+      onConfigImport: adapter.onConfigImport,
+      onConfigExport: adapter.onConfigExport,
     });
     expect(mocks.fetchUser).toHaveBeenCalled();
     expect(mocks.setConfigDraftUserScope).toHaveBeenCalledWith("user-1");

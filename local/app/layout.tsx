@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "@subboost/ui/styles/globals.css";
-import { Footer } from "@subboost/ui/components/layout/footer";
 import { MobileNav } from "@subboost/ui/components/layout/mobile-nav";
 import { ScrollLockStabilizer } from "@subboost/ui/components/layout/scroll-lock-stabilizer";
 import { ConfirmDialogHost } from "@subboost/ui/components/ui/confirm-dialog";
@@ -48,7 +47,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="min-h-screen bg-gradient-radial flex flex-col">
           <LocalHeader />
           <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          <Footer mode="local" buildVersion={buildVersion} />
           <MobileNav mode="local" />
         </div>
         <Toaster />

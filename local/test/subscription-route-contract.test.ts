@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getCurrentAdmin } from "@local/lib/auth";
+import { validateCsrfToken } from "@local/lib/session";
 import {
   createSubscription,
   deleteSubscription,
@@ -18,6 +19,10 @@ import * as pluralRefreshRoute from "../app/api/subscriptions/[id]/refresh/route
 
 vi.mock("@local/lib/auth", () => ({
   getCurrentAdmin: vi.fn(),
+}));
+
+vi.mock("@local/lib/session", () => ({
+  validateCsrfToken: vi.fn(),
 }));
 
 vi.mock("@local/lib/subscription-service", () => ({
@@ -77,7 +82,7 @@ const fullConfigPayload = {
 function jsonRequest(url: string, body: unknown): Request {
   return new Request(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-subboost-csrf": "csrf-token" },
     body: JSON.stringify(body),
   });
 }
@@ -89,6 +94,7 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getCurrentAdmin).mockResolvedValue(admin);
+  vi.mocked(validateCsrfToken).mockResolvedValue(true);
   vi.mocked(createSubscription).mockResolvedValue(subscription as never);
   vi.mocked(deleteSubscription).mockResolvedValue(true);
   vi.mocked(generateSubscriptionYaml).mockResolvedValue({
@@ -158,6 +164,39 @@ describe("local subscription routes", () => {
     expect(pluralResponse.headers.get("profile-update-interval")).toBe("24");
     expect(await pluralResponse.text()).toBe("mixed-port: 7890\n");
     expect(generateSubscriptionYaml).toHaveBeenCalledWith("token-1");
+  });
+
+  it("rejects csrf failures for write routes", async () => {
+    vi.mocked(validateCsrfToken).mockResolvedValue(false);
+    const params = { params: Promise.resolve({ id: "sub-1" }) };
+
+    const createResponse = await pluralCollectionRoute.POST(jsonRequest("http://local.test/api/subscriptions", fullConfigPayload));
+    const updateResponse = await pluralItemRoute.PUT(
+      jsonRequest("http://local.test/api/subscriptions/sub-1", { ...fullConfigPayload, name: "Renamed" }),
+      params
+    );
+    const deleteResponse = await pluralItemRoute.DELETE(
+      new Request("http://local.test/api/subscriptions/sub-1", {
+        method: "DELETE",
+        headers: { "x-subboost-csrf": "csrf-token" },
+      }),
+      params
+    );
+    const refreshResponse = await pluralRefreshRoute.POST(
+      new Request("http://local.test/api/subscriptions/sub-1/refresh", {
+        method: "POST",
+        headers: { "x-subboost-csrf": "csrf-token" },
+      }),
+      params
+    );
+
+    for (const response of [createResponse, updateResponse, deleteResponse, refreshResponse]) {
+      expect(response.status).toBe(403);
+      await expect(readJson(response)).resolves.toEqual({
+        error: "CSRF validation failed.",
+        code: "FORBIDDEN",
+      });
+    }
   });
 
   it("rejects unauthenticated protected subscription routes before service calls", async () => {

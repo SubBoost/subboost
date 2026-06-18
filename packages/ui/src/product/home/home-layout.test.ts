@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   yamlHighlight: undefined as any,
   interactions: {
     modeChanged: vi.fn(),
-    templateUploadOpened: vi.fn(),
   },
 }));
 
@@ -175,6 +174,7 @@ describe("HomeLayout", () => {
     mocks.links = [];
     mocks.subscriptionDialog = undefined;
     mocks.yamlHighlight = undefined;
+    vi.stubGlobal("window", { location: { href: "" } });
   });
 
   it("renders the empty preview state and disabled primary actions", () => {
@@ -221,10 +221,11 @@ describe("HomeLayout", () => {
     });
   });
 
-  it("wires advanced edit actions, upload tracking, and YAML preview", () => {
+  it("wires advanced edit actions, config transfer actions, and YAML preview", () => {
     const handleGenerate = vi.fn();
     const handleDownload = vi.fn();
-    const onTemplateUploadOpen = vi.fn();
+    const onConfigImport = vi.fn();
+    const onConfigExport = vi.fn();
     const subscription = createSubscription({
       subscriptionDialog: true,
       subscriptionUrl: "https://example.com/sub",
@@ -253,8 +254,8 @@ describe("HomeLayout", () => {
         handleGenerate,
         handleDownload,
         subscription,
-        onTemplateUploadOpen,
-        templateUploadHref: "/templates?upload=1",
+        onConfigImport,
+        onConfigExport,
       })
     );
 
@@ -267,10 +268,12 @@ describe("HomeLayout", () => {
     mocks.buttons[1].onClick();
     mocks.buttons[2].onClick();
     mocks.buttons[3].onClick();
+    mocks.buttons[4].onClick();
+    mocks.buttons[5].onClick();
 
     expect(handleGenerate).toHaveBeenCalledWith("advanced");
-    expect(onTemplateUploadOpen).toHaveBeenCalled();
-    expect(mocks.interactions.templateUploadOpened).toHaveBeenCalledWith({ entry: "home" });
+    expect(onConfigImport).toHaveBeenCalled();
+    expect(onConfigExport).toHaveBeenCalled();
     expect(handleDownload).toHaveBeenCalledWith("advanced");
     expect(subscription.handleGenerateSubscription).toHaveBeenCalledWith("advanced");
     expect(mocks.subscriptionDialog).toMatchObject({

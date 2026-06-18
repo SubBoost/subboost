@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { readSession } from "./session";
+import { isSetupRequired as readSetupRequired } from "./local-user-service";
 
 export type CurrentAdmin = {
   id: string;
@@ -9,14 +10,12 @@ export type CurrentAdmin = {
 export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
   const session = await readSession();
   if (!session) return null;
-  const admin = await prisma.localAdmin.findUnique({
-    where: { id: session.adminId },
+  return prisma.localAdmin.findUnique({
+    where: { id: session.userId },
     select: { id: true, username: true },
   });
-  return admin;
 }
 
 export async function isSetupRequired(): Promise<boolean> {
-  const count = await prisma.localAdmin.count();
-  return count === 0;
+  return readSetupRequired();
 }

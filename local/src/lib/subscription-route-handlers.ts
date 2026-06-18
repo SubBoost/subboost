@@ -1,4 +1,4 @@
-import { withCurrentAdmin } from "@local/lib/api-auth";
+import { withCurrentAdmin, withCurrentAdminAndCsrf } from "@local/lib/api-auth";
 import { apiError, json, readJsonBody } from "@local/lib/http";
 import {
   createSubscription,
@@ -18,7 +18,7 @@ export async function listSubscriptionsResponse() {
 }
 
 export async function createSubscriptionResponse(request: Request) {
-  return withCurrentAdmin(async (admin) => {
+  return withCurrentAdminAndCsrf(request, async (admin) => {
     const body = await readJsonBody(request);
     if (!body) return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
 
@@ -40,7 +40,7 @@ export async function getSubscriptionResponse(id: string) {
 }
 
 export async function updateSubscriptionResponse(request: Request, id: string) {
-  return withCurrentAdmin(async (admin) => {
+  return withCurrentAdminAndCsrf(request, async (admin) => {
     const body = await readJsonBody(request);
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
@@ -56,16 +56,16 @@ export async function updateSubscriptionResponse(request: Request, id: string) {
   });
 }
 
-export async function deleteSubscriptionResponse(id: string) {
-  return withCurrentAdmin(async (admin) => {
+export async function deleteSubscriptionResponse(request: Request, id: string) {
+  return withCurrentAdminAndCsrf(request, async (admin) => {
     const deleted = await deleteSubscription(admin.id, id);
     if (!deleted) return apiError("Subscription not found.", "NOT_FOUND", 404);
     return json({ success: true });
   });
 }
 
-export async function refreshSubscriptionResponse(id: string) {
-  return withCurrentAdmin(async (admin) => {
+export async function refreshSubscriptionResponse(request: Request, id: string) {
+  return withCurrentAdminAndCsrf(request, async (admin) => {
     const result = await refreshSubscription(admin.id, id);
     if (!result) return apiError("Subscription not found.", "NOT_FOUND", 404);
     if (!result.ok) return json(result.response.body, result.response.status);

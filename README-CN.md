@@ -4,7 +4,7 @@
   <h1>SubBoost</h1>
   <p>
     <img src="https://img.shields.io/badge/platform-Linux%20%2B%20Docker-lightgrey.svg" alt="平台：Linux + Docker">
-    <img src="https://img.shields.io/badge/version-2.4.0-green.svg" alt="版本 2.4.0">
+    <img src="https://img.shields.io/badge/version-2.4.1-green.svg" alt="版本 2.4.1">
     <a href="https://subboost.org"><img src="https://img.shields.io/badge/app-subboost.org-brightgreen.svg" alt="在线入口"></a>
     <a href="https://docs.subboost.org"><img src="https://img.shields.io/badge/docs-subboost.org-blue.svg" alt="文档"></a>
     <img src="https://img.shields.io/badge/image-GHCR-blue.svg" alt="GHCR 镜像">

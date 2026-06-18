@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   LayoutDashboard,
-  Library,
   HelpCircle,
   Menu,
   X,
@@ -41,7 +40,6 @@ type NavItem = {
 const sharedNavItems: NavItem[] = [
   { href: "/", label: "首页", icon: Home },
   { href: "/dashboard", label: "我的订阅", icon: LayoutDashboard, authOnly: true },
-  { href: "/templates", label: "模板库", icon: Library },
 ];
 
 const defaultNavItems: NavItem[] = [

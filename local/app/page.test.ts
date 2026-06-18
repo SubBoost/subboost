@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   readJsonResponse: vi.fn(),
   readSourceImportResponse: vi.fn(),
+  withCsrfHeaders: vi.fn((headers?: HeadersInit) => headers ?? {}),
 }));
 
 vi.mock("@subboost/ui/product/home/home-surface", () => ({
@@ -13,12 +14,62 @@ vi.mock("@subboost/ui/product/client-response", () => ({
   readJsonResponse: mocks.readJsonResponse,
   readSourceImportResponse: mocks.readSourceImportResponse,
 }));
+vi.mock("@subboost/ui/lib/csrf", () => ({
+  withCsrfHeaders: mocks.withCsrfHeaders,
+}));
 
-import Page from "./page";
+import { localHomeAdapter } from "./home-adapter";
 
-function adapter() {
-  const element = Page() as React.ReactElement<{ adapter: any }>;
-  return element.props.adapter;
+type RequiredHomeAdapter = {
+  sourceImport: {
+    importSource: NonNullable<NonNullable<typeof localHomeAdapter.productApi>["sourceImport"]>["importSource"];
+  };
+  rules: {
+    getTotalRules: NonNullable<NonNullable<NonNullable<typeof localHomeAdapter.productApi>["rules"]>["getTotalRules"]>;
+    searchRules: NonNullable<NonNullable<NonNullable<typeof localHomeAdapter.productApi>["rules"]>["searchRules"]>;
+    loadCnCandidateRules: NonNullable<
+      NonNullable<NonNullable<typeof localHomeAdapter.productApi>["rules"]>["loadCnCandidateRules"]
+    >;
+  };
+  loadSubscription: NonNullable<typeof localHomeAdapter.loadSubscription>;
+  subscription: {
+    saveSubscription: NonNullable<NonNullable<typeof localHomeAdapter.subscription>["saveSubscription"]>;
+  };
+};
+
+function requireHomeAdapter() {
+  const productApi = localHomeAdapter.productApi;
+  const sourceImport = productApi?.sourceImport;
+  const rules = productApi?.rules;
+  const loadSubscription = localHomeAdapter.loadSubscription;
+  const subscription = localHomeAdapter.subscription;
+  const importSource = sourceImport?.importSource;
+  const getTotalRules = rules?.getTotalRules;
+  const searchRules = rules?.searchRules;
+  const loadCnCandidateRules = rules?.loadCnCandidateRules;
+  const saveSubscription = subscription?.saveSubscription;
+
+  expect(importSource).toBeDefined();
+  expect(getTotalRules).toBeDefined();
+  expect(searchRules).toBeDefined();
+  expect(loadCnCandidateRules).toBeDefined();
+  expect(loadSubscription).toBeDefined();
+  expect(saveSubscription).toBeDefined();
+
+  return {
+    sourceImport: {
+      importSource: importSource!,
+    },
+    rules: {
+      getTotalRules: getTotalRules!,
+      searchRules: searchRules!,
+      loadCnCandidateRules: loadCnCandidateRules!,
+    },
+    loadSubscription: loadSubscription!,
+    subscription: {
+      saveSubscription: saveSubscription!,
+    },
+  } satisfies RequiredHomeAdapter;
 }
 
 describe("local home page adapter", () => {
@@ -28,21 +79,22 @@ describe("local home page adapter", () => {
   });
 
   it("calls local APIs and normalizes default response fields", async () => {
-    const localAdapter = adapter();
+    const adapter = requireHomeAdapter();
 
     mocks.readSourceImportResponse.mockResolvedValueOnce({ content: 123, headers: null, parseResult: { nodes: [] } });
-    await expect(localAdapter.productApi.sourceImport.importSource({ url: "https://example.test/sub" })).resolves.toEqual({
+    await expect(adapter.sourceImport.importSource({ url: "https://example.test/sub" })).resolves.toEqual({
       content: "",
       headers: {},
       parseResult: { nodes: [] },
     });
     expect(fetch).toHaveBeenCalledWith("/api/source-import", expect.objectContaining({ method: "POST" }));
+    expect(mocks.withCsrfHeaders).toHaveBeenCalledWith({ "Content-Type": "application/json" });
 
     mocks.readJsonResponse.mockResolvedValueOnce({ totalRules: "bad" });
-    await expect(localAdapter.productApi.rules.getTotalRules()).resolves.toBe(0);
+    await expect(adapter.rules.getTotalRules()).resolves.toBe(0);
 
     mocks.readJsonResponse.mockResolvedValueOnce({ totalRules: "bad" });
-    await expect(localAdapter.productApi.rules.searchRules({ keyword: "hk", page: 2, size: 5 })).resolves.toEqual({
+    await expect(adapter.rules.searchRules({ keyword: "hk", page: 2, size: 5 })).resolves.toEqual({
       items: [],
       totalRules: 0,
       totalMatched: undefined,
@@ -50,23 +102,23 @@ describe("local home page adapter", () => {
     });
 
     mocks.readJsonResponse.mockResolvedValueOnce({});
-    await expect(localAdapter.productApi.rules.loadCnCandidateRules({ moduleIds: [], excludedRuleKeys: [] })).resolves.toEqual([]);
+    await expect(adapter.rules.loadCnCandidateRules({ moduleIds: [], excludedRuleKeys: [] })).resolves.toEqual([]);
 
     mocks.readJsonResponse.mockResolvedValueOnce({ items: [{ id: "candidate" }] });
-    await expect(
-      localAdapter.productApi.rules.loadCnCandidateRules({ moduleIds: ["cn"], excludedRuleKeys: ["auto:rule"] })
-    ).resolves.toEqual([{ id: "candidate" }]);
+    await expect(adapter.rules.loadCnCandidateRules({ moduleIds: ["cn"], excludedRuleKeys: ["auto:rule"] })).resolves.toEqual([
+      { id: "candidate" },
+    ]);
     expect((fetch as any).mock.calls.at(-1)[0]).toContain("modules=cn");
     expect((fetch as any).mock.calls.at(-1)[0]).toContain("excluded=auto%3Arule");
 
-    await localAdapter.loadSubscription("space id");
+    await adapter.loadSubscription("space id");
     expect((fetch as any).mock.calls.at(-1)[0]).toBe("/api/subscriptions/space%20id");
 
-    await localAdapter.subscription.saveSubscription({ isEditing: false, subscriptionId: null, payload: { name: "new" } });
+    await adapter.subscription.saveSubscription({ isEditing: false, subscriptionId: null, payload: { name: "new" } });
     expect((fetch as any).mock.calls.at(-1)[0]).toBe("/api/subscriptions");
     expect((fetch as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ method: "POST" }));
 
-    await localAdapter.subscription.saveSubscription({ isEditing: true, subscriptionId: "sub/1", payload: { name: "edit" } });
+    await adapter.subscription.saveSubscription({ isEditing: true, subscriptionId: "sub/1", payload: { name: "edit" } });
     expect((fetch as any).mock.calls.at(-1)[0]).toBe("/api/subscriptions/sub%2F1");
     expect((fetch as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ method: "PUT" }));
   });

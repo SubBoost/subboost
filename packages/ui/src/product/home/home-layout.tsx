@@ -84,8 +84,8 @@ type Props = {
     user: User | null;
   }) => React.ReactNode;
   saveRequirementSlot?: React.ReactNode;
-  templateUploadHref?: string | null;
-  onTemplateUploadOpen?: () => void;
+  onConfigImport?: () => void;
+  onConfigExport?: () => void;
 };
 
 const DESKTOP_PANEL_MIN_HEIGHT_CLASS = "lg:min-h-[39rem]";
@@ -108,8 +108,8 @@ export function HomeLayout({
   noticeSlot,
   renderAnnouncement,
   saveRequirementSlot,
-  templateUploadHref = "/templates?upload=1",
-  onTemplateUploadOpen,
+  onConfigImport,
+  onConfigExport,
 }: Props) {
   const [configTab, setConfigTab] = React.useState<"quick" | "advanced">(editSubscriptionId ? "advanced" : "quick");
   const interactions = useProductInteractionAdapter();
@@ -222,20 +222,17 @@ export function HomeLayout({
                     </>
                   )}
                 </Button>
-                {user && templateUploadHref && (
-                  <Link href={templateUploadHref}>
-                    <Button
-                      variant="outline"
-                      className="h-10 gap-2"
-                      onClick={() => {
-                        onTemplateUploadOpen?.();
-                        interactions.templateUploadOpened?.({ entry: "home" });
-                      }}
-                    >
+                {user && (
+                  <>
+                    <Button variant="outline" className="h-10 gap-2" onClick={onConfigImport}>
                       <Upload className="h-4 w-4" />
-                      上传模板
+                      导入配置
                     </Button>
-                  </Link>
+                    <Button variant="outline" className="h-10 gap-2" onClick={onConfigExport}>
+                      <Download className="h-4 w-4" />
+                      导出配置
+                    </Button>
+                  </>
                 )}
               </CardFooter>
             </Card>

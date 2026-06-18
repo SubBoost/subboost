@@ -1,48 +1,11 @@
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-subboost}
-      POSTGRES_USER: ${POSTGRES_USER:-subboost}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-    volumes:
-      - subboost-local-db:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   app:
     image: ${SUBBOOST_IMAGE:?set SUBBOOST_IMAGE}
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "${SUBBOOST_PORT:-3000}:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
-      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
       APP_URL: ${APP_URL:-http://localhost:3000}
-
-  cron:
-    image: curlimages/curl:8.11.1
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_started
-    environment:
-      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
-    command:
-      [
-        "sh",
-        "-c",
-        "i=0; while true; do if [ $$i -le 0 ]; then echo \"[local-cron] $(date -Iseconds) POST /api/cron/update-rule-index\"; curl -fsS -X POST -H \"Authorization: Bearer $${CRON_SECRET}\" http://app:3000/api/cron/update-rule-index || true; i=10; fi; echo \"[local-cron] $(date -Iseconds) POST /api/cron/update-subscriptions\"; curl -fsS -X POST -H \"Authorization: Bearer $${CRON_SECRET}\" http://app:3000/api/cron/update-subscriptions || true; i=$$((i - 1)); sleep 360; done"
-      ]
-
-volumes:
-  subboost-local-db:

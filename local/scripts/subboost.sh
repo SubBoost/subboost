@@ -259,8 +259,7 @@ status_cmd() {
   say ""
   say "服务状态:"
   say "应用: $(service_status_text app)"
-  say "数据库: $(service_status_text db)"
-  say "定时任务: $(service_status_text cron)"
+  say "数据库: 外部 PostgreSQL"
   say ""
   say "健康检查: $(health_status_text)"
   say "备份目录: $BACKUP_DIR"
@@ -309,6 +308,7 @@ logs_cmd() {
 backup_cmd() {
   load_env
   sudo_do mkdir -p "$BACKUP_DIR"
+  command -v pg_dump >/dev/null 2>&1 || die "pg_dump command is missing"
   local stamp db_tmp db_out env_out
   local -a sql_backups env_backups
   local i
@@ -316,7 +316,7 @@ backup_cmd() {
   db_tmp="$BACKUP_DIR/subboost-$stamp.sql.gz.partial"
   db_out="$BACKUP_DIR/subboost-$stamp.sql.gz"
   env_out="$BACKUP_DIR/subboost-$stamp.env"
-  compose exec -T db pg_dump -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}" | gzip -c | sudo_do tee "$db_tmp" >/dev/null
+  pg_dump "$DATABASE_URL" | gzip -c | sudo_do tee "$db_tmp" >/dev/null
   sudo_do mv "$db_tmp" "$db_out"
   sudo_do install -m 600 "$ENV_FILE" "$env_out"
 
@@ -348,7 +348,7 @@ doctor_cmd() {
   [ -d "$SUBBOOST_HOME" ] || die "Missing $SUBBOOST_HOME"
   [ -f "$ENV_FILE" ] || die "Missing $ENV_FILE"
   [ -f "$COMPOSE_FILE" ] || die "Missing $COMPOSE_FILE"
-  for key in SUBBOOST_IMAGE POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL ENCRYPTION_KEY JWT_SECRET CRON_SECRET APP_URL SUBBOOST_PORT; do
+  for key in SUBBOOST_IMAGE DATABASE_URL ENCRYPTION_KEY JWT_SECRET APP_URL SUBBOOST_PORT; do
     grep -q "^$key=" "$ENV_FILE" || die "Missing $key in $ENV_FILE"
   done
   compose config >/dev/null

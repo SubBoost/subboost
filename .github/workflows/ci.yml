@@ -1,22 +1,30 @@
 name: CI
 
 on:
-  workflow_dispatch:
-  pull_request:
   push:
     branches:
       - main
-      - "ryan/**"
+  pull_request:
 
 jobs:
-  check:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v6
         with:
           node-version: "22.19.0"
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test:unit
-      - run: npm run check:local-app
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Local app check
+        run: npm run check:local-app

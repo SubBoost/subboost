@@ -82,6 +82,10 @@ vi.mock("lucide-react", () => ({
 vi.mock("@subboost/ui/store/config-store/auth-handoff", () => ({
   hasAuthConfigHandoff: vi.fn(() => false),
 }));
+vi.mock("@subboost/ui/lib/csrf", () => ({
+  setCsrfToken: vi.fn(),
+  withCsrfHeaders: (headers: HeadersInit = {}) => headers,
+}));
 
 import { LocalLogin } from "./local-login";
 import { hasAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
@@ -150,7 +154,7 @@ describe("local login component", () => {
     const { setters } = renderLogin({}, true);
     await flushPromises();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/auth/me", { cache: "no-store" });
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/auth/bootstrap", { cache: "no-store" });
     expect(setters[0]).toHaveBeenCalledWith({ setupRequired: false, authenticated: true });
     expect(win.location.href).toBe("/");
   });
@@ -165,8 +169,8 @@ describe("local login component", () => {
       3: "different",
     });
 
-    expect(html).toContain("初始化本地管理员账号");
-    expect(html).toContain("创建管理员");
+    expect(html).toContain("初始化第一个账号");
+    expect(html).toContain("创建账号");
     expect(mocks.inputs.find((input) => input.placeholder === "确认密码")).toEqual(
       expect.objectContaining({ autoComplete: "new-password" }),
     );
@@ -187,7 +191,7 @@ describe("local login component", () => {
       4: false,
     });
 
-    mocks.inputs.find((input) => input.placeholder === "管理员账号").onChange({ target: { value: "root" } });
+    mocks.inputs.find((input) => input.placeholder === "账号").onChange({ target: { value: "root" } });
     mocks.inputs.find((input) => input.placeholder === "密码").onChange({ target: { value: "next" } });
     mocks.buttons.find((button) => button.type === "button").onClick();
     await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });

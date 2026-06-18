@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  bcryptCompare: vi.fn(),
+  createInitialAdmin: vi.fn(),
   clearSessionCookieOptions: vi.fn(() => ({ maxAge: 0, path: "/" })),
+  clearCsrfCookieOptions: vi.fn(() => ({ maxAge: 0, path: "/" })),
+  csrfCookieOptions: vi.fn(() => ({ path: "/" })),
+  createSession: vi.fn(async () => ({ token: "session-token", csrfToken: "csrf-token" })),
   getCurrentAdmin: vi.fn(),
   isSetupRequired: vi.fn(),
+  listLocalUsers: vi.fn(),
+  readCsrfToken: vi.fn(async () => "csrf-token"),
   prisma: {
     $queryRaw: vi.fn(),
-    localAdmin: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-    },
     localTemplate: {
       count: vi.fn(),
     },
@@ -19,11 +20,15 @@ const mocks = vi.hoisted(() => ({
     },
   },
   sessionCookieOptions: vi.fn(() => ({ httpOnly: true, path: "/" })),
-  signSession: vi.fn(async () => "signed-session"),
+  verifyLocalUser: vi.fn(),
+  revokeSession: vi.fn(),
+  readSession: vi.fn(),
 }));
 
-vi.mock("bcryptjs", () => ({
-  default: { compare: mocks.bcryptCompare },
+vi.mock("@local/lib/local-user-service", () => ({
+  createInitialAdmin: mocks.createInitialAdmin,
+  listLocalUsers: mocks.listLocalUsers,
+  verifyLocalUser: mocks.verifyLocalUser,
 }));
 
 vi.mock("@local/lib/auth", () => ({
@@ -37,9 +42,15 @@ vi.mock("@local/lib/prisma", () => ({
 
 vi.mock("@local/lib/session", () => ({
   clearSessionCookieOptions: mocks.clearSessionCookieOptions,
+  clearCsrfCookieOptions: mocks.clearCsrfCookieOptions,
+  createSession: mocks.createSession,
+  CSRF_COOKIE: "subboost-local-csrf",
+  csrfCookieOptions: mocks.csrfCookieOptions,
   SESSION_COOKIE: "subboost-local-session",
+  readSession: mocks.readSession,
+  readCsrfToken: mocks.readCsrfToken,
+  revokeSession: mocks.revokeSession,
   sessionCookieOptions: mocks.sessionCookieOptions,
-  signSession: mocks.signSession,
 }));
 
 async function readJson(response: Response) {
@@ -53,12 +64,10 @@ describe("local auth and health routes", () => {
 
   it("logs in a valid local admin and sets the session cookie", async () => {
     const { POST } = await import("./login/route");
-    mocks.prisma.localAdmin.findUnique.mockResolvedValueOnce({
+    mocks.verifyLocalUser.mockResolvedValueOnce({
       id: "admin-1",
       username: "admin",
-      passwordHash: "hash",
     });
-    mocks.bcryptCompare.mockResolvedValueOnce(true);
 
     const response = await POST(
       new Request("https://local.test/api/auth/login", {
@@ -71,12 +80,9 @@ describe("local auth and health routes", () => {
       status: 200,
       body: { success: true, user: { id: "admin-1", username: "admin" } },
     });
-    expect(mocks.prisma.localAdmin.update).toHaveBeenCalledWith({
-      where: { id: "admin-1" },
-      data: { lastLoginAt: expect.any(Date) },
-    });
-    expect(mocks.signSession).toHaveBeenCalledWith({ adminId: "admin-1", username: "admin" });
-    expect(response.headers.get("set-cookie")).toContain("subboost-local-session=signed-session");
+    expect(mocks.createSession).toHaveBeenCalledWith({ userId: "admin-1", username: "admin" });
+    expect(response.headers.get("set-cookie")).toContain("subboost-local-session=session-token");
+    expect(response.headers.get("set-cookie")).toContain("subboost-local-csrf=csrf-token");
   });
 
   it("rejects invalid JSON or invalid credentials", async () => {
@@ -87,7 +93,7 @@ describe("local auth and health routes", () => {
       body: { error: "Invalid JSON body.", code: "BAD_REQUEST" },
     });
 
-    mocks.prisma.localAdmin.findUnique.mockResolvedValueOnce(null);
+    mocks.verifyLocalUser.mockResolvedValueOnce(null);
     await expect(
       readJson(
         await POST(
@@ -105,11 +111,14 @@ describe("local auth and health routes", () => {
 
   it("logs out by clearing the session cookie", async () => {
     const { POST } = await import("./logout/route");
+    mocks.readSession.mockResolvedValueOnce({ sessionId: "sess-1", userId: "admin-1", username: "admin" });
 
     const response = await POST();
 
     expect(await readJson(response)).toEqual({ status: 200, body: { success: true } });
     expect(response.headers.get("set-cookie")).toContain("subboost-local-session=");
+    expect(response.headers.get("set-cookie")).toContain("subboost-local-csrf=");
+    expect(mocks.revokeSession).toHaveBeenCalledWith("sess-1");
   });
 
   it("returns the current admin snapshot and anonymous setup state", async () => {
@@ -135,7 +144,7 @@ describe("local auth and health routes", () => {
 
     response = await GET();
     payload = await response.json();
-    expect(payload).toEqual({ setupRequired: true, authenticated: false, user: null });
+    expect(payload).toEqual({ setupRequired: true, authenticated: false, csrfToken: "csrf-token", user: null });
   });
 
   it("reports live and ready health states", async () => {

@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   homeAdapter: null as any,
   readJsonResponse: vi.fn(),
   readSourceImportResponse: vi.fn(),
-  templateAdapter: null as any,
   userState: {
     fetchUser: vi.fn(),
     logout: vi.fn(),
@@ -19,6 +18,8 @@ vi.mock("lucide-react", () => ({
   LogOut: () => React.createElement("span", null, "LogOut"),
   ServerCog: () => React.createElement("span", null, "ServerCog"),
   ShieldCheck: () => React.createElement("span", null, "ShieldCheck"),
+  UserPlus: () => React.createElement("span", null, "UserPlus"),
+  Users: () => React.createElement("span", null, "Users"),
 }));
 
 vi.mock("@subboost/ui/components/ui/button", () => ({
@@ -55,18 +56,10 @@ vi.mock("@subboost/ui/store/user-store", () => ({
   useUserStore: () => mocks.userState,
 }));
 
-vi.mock("@subboost/ui/templates/template-library-surface", () => ({
-  TemplateLibrarySurface: (props: any) => {
-    mocks.templateAdapter = props.adapter;
-    return React.createElement("main", null, "TemplateLibrarySurface");
-  },
-}));
-
 import DashboardPage from "./dashboard/page";
 import SettingsPage from "./dashboard/settings/page";
 import manifest from "./manifest";
 import HomePage from "./page";
-import TemplatesPage from "./templates/page";
 
 describe("local app pages and adapters", () => {
   beforeEach(() => {
@@ -74,7 +67,6 @@ describe("local app pages and adapters", () => {
     vi.unstubAllGlobals();
     mocks.dashboardAdapter = null;
     mocks.homeAdapter = null;
-    mocks.templateAdapter = null;
     mocks.userState = {
       fetchUser: vi.fn(),
       logout: vi.fn(),
@@ -169,40 +161,17 @@ describe("local app pages and adapters", () => {
       stepHours: 0.1,
       requireIntegerHours: false,
     });
-    expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201", { method: "DELETE" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/subscriptions/sub%201",
+      expect.objectContaining({ method: "DELETE", headers: {} })
+    );
     expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201/refresh", expect.objectContaining({ method: "POST" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201", expect.objectContaining({ method: "PUT" }));
   });
 
-  it("connects the template library adapter to local template routes", async () => {
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    mocks.readJsonResponse
-      .mockResolvedValueOnce({ templates: [{ id: "tpl-1" }] })
-      .mockResolvedValueOnce({ template: { kind: "yaml", config: {} } })
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({});
-
-    renderToStaticMarkup(React.createElement(TemplatesPage));
-    const adapter = mocks.templateAdapter;
-
-    await expect(adapter.loadTemplates("my")).resolves.toEqual([{ id: "tpl-1" }]);
-    fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
-    await expect(adapter.loadTemplateDetail("missing")).resolves.toBeNull();
-    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 200 }));
-    await expect(adapter.loadTemplateDetail("tpl 1")).resolves.toEqual({ kind: "yaml", config: {} });
-    await expect(adapter.uploadTemplate({ name: "Tpl" })).resolves.toBeUndefined();
-    await expect(adapter.deleteTemplate("tpl 1")).resolves.toBeUndefined();
-
-    expect(fetchMock).toHaveBeenCalledWith("/api/templates?type=my", { cache: "no-store" });
-    expect(fetchMock).toHaveBeenCalledWith("/api/templates/tpl%201", { cache: "no-store" });
-    expect(fetchMock).toHaveBeenCalledWith("/api/templates", expect.objectContaining({ method: "POST" }));
-    expect(fetchMock).toHaveBeenCalledWith("/api/templates?id=tpl%201", { method: "DELETE" });
-  });
-
   it("renders local settings for anonymous and authenticated states", () => {
     let html = renderToStaticMarkup(React.createElement(SettingsPage));
-    expect(html).toContain("未登录");
+    expect(html).toContain("账户设置");
     expect(html).toContain("/api/health/live");
 
     mocks.userState = {
@@ -211,7 +180,7 @@ describe("local app pages and adapters", () => {
       user: { username: "admin", subscriptionCount: 2, quota: { maxSubscriptions: 9999 } },
     };
     html = renderToStaticMarkup(React.createElement(SettingsPage));
-    expect(html).toContain("admin");
-    expect(html).toContain("2 / 9999");
+    expect(html).toContain("当前账号");
+    expect(html).toContain("创建账号");
   });
 });

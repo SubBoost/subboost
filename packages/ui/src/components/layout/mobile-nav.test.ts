@@ -132,7 +132,6 @@ describe("MobileNav", () => {
   it("renders local navigation for guests and authenticated users", () => {
     let result = renderMobileNav({ mode: "local" });
     expect(result.html).toContain("首页");
-    expect(result.html).toContain("模板");
     expect(result.html).not.toContain("订阅");
 
     mocks.pathname = "/dashboard/settings";

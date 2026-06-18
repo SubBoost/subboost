@@ -15,3 +15,11 @@ export function getAppUrl(): string {
 export function isHttpsAppUrl(): boolean {
   return getAppUrl().startsWith("https://");
 }
+
+export function getAppOrigin(): string | null {
+  try {
+    return new URL(getAppUrl()).origin;
+  } catch {
+    return null;
+  }
+}

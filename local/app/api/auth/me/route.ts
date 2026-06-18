@@ -1,6 +1,7 @@
 import { getCurrentAdmin, isSetupRequired } from "@local/lib/auth";
 import { json } from "@local/lib/http";
 import { prisma } from "@local/lib/prisma";
+import { readCsrfToken } from "@local/lib/session";
 
 export async function GET() {
   const [setupRequired, admin] = await Promise.all([isSetupRequired(), getCurrentAdmin()]);
@@ -11,18 +12,20 @@ export async function GET() {
       ])
     : [0, 0];
   const now = new Date().toISOString();
+  const csrfToken = await readCsrfToken();
   return json({
     setupRequired,
     authenticated: Boolean(admin),
+    csrfToken,
     user: admin
       ? {
           id: admin.id,
           username: admin.username,
           name: admin.username,
           avatarUrl: null,
-          trustLevel: 4,
+          trustLevel: 1,
           aiAssistantEnabled: false,
-          isAdmin: false,
+          isAdmin: true,
           isBanned: false,
           active: true,
           silenced: false,

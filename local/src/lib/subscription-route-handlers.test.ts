@@ -20,9 +20,13 @@ const mocks = vi.hoisted(() => ({
   refreshSubscription: vi.fn(),
   updateSubscription: vi.fn(),
   withCurrentAdmin: vi.fn(),
+  withCurrentAdminAndCsrf: vi.fn(),
 }));
 
-vi.mock("@local/lib/api-auth", () => ({ withCurrentAdmin: mocks.withCurrentAdmin }));
+vi.mock("@local/lib/api-auth", () => ({
+  withCurrentAdmin: mocks.withCurrentAdmin,
+  withCurrentAdminAndCsrf: mocks.withCurrentAdminAndCsrf,
+}));
 vi.mock("@local/lib/http", () => ({
   apiError: mocks.apiError,
   json: mocks.json,
@@ -43,6 +47,9 @@ describe("local subscription route handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.withCurrentAdmin.mockImplementation(async (handler: (admin: { id: string }) => unknown) =>
+      handler({ id: "admin-1" })
+    );
+    mocks.withCurrentAdminAndCsrf.mockImplementation(async (_request: Request, handler: (admin: { id: string }) => unknown) =>
       handler({ id: "admin-1" })
     );
     mocks.json.mockImplementation((body: unknown, status = 200) => ({ body, status }));
@@ -137,26 +144,26 @@ describe("local subscription route handlers", () => {
 
   it("deletes and refreshes subscriptions", async () => {
     mocks.deleteSubscription.mockResolvedValueOnce(false);
-    await expect(deleteSubscriptionResponse("missing")).resolves.toEqual({
+    await expect(deleteSubscriptionResponse(request, "missing")).resolves.toEqual({
       message: "Subscription not found.",
       code: "NOT_FOUND",
       status: 404,
     });
 
     mocks.deleteSubscription.mockResolvedValueOnce(true);
-    await expect(deleteSubscriptionResponse("sub-1")).resolves.toEqual({ body: { success: true }, status: 200 });
+    await expect(deleteSubscriptionResponse(request, "sub-1")).resolves.toEqual({ body: { success: true }, status: 200 });
 
     mocks.refreshSubscription.mockResolvedValueOnce(null);
-    await expect(refreshSubscriptionResponse("missing")).resolves.toEqual({
+    await expect(refreshSubscriptionResponse(request, "missing")).resolves.toEqual({
       message: "Subscription not found.",
       code: "NOT_FOUND",
       status: 404,
     });
 
     mocks.refreshSubscription.mockResolvedValueOnce({ ok: false, response: { body: { error: "bad" }, status: 502 } });
-    await expect(refreshSubscriptionResponse("sub-1")).resolves.toEqual({ body: { error: "bad" }, status: 502 });
+    await expect(refreshSubscriptionResponse(request, "sub-1")).resolves.toEqual({ body: { error: "bad" }, status: 502 });
 
     mocks.refreshSubscription.mockResolvedValueOnce({ ok: true, body: { nodeCount: 2 } });
-    await expect(refreshSubscriptionResponse("sub-1")).resolves.toEqual({ body: { nodeCount: 2 }, status: 200 });
+    await expect(refreshSubscriptionResponse(request, "sub-1")).resolves.toEqual({ body: { nodeCount: 2 }, status: 200 });
   });
 });

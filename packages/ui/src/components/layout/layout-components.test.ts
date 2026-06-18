@@ -76,7 +76,6 @@ describe("shared layout components", () => {
 
     expect(html).toContain("SubBoost");
     expect(html).toContain("首页");
-    expect(html).toContain("模板库");
     expect(html).toContain("FAQ");
     expect(html).not.toContain("我的订阅");
     expect(html).toContain("UserMenu:none");
@@ -148,6 +147,5 @@ describe("shared layout components", () => {
     html = renderToStaticMarkup(React.createElement(MobileNav, { mode: "local" }));
     expect(html).toContain("首页");
     expect(html).toContain("订阅");
-    expect(html).toContain("模板");
   });
 });

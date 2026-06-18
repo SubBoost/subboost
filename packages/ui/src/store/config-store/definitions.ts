@@ -313,6 +313,7 @@ export interface ConfigActions {
 
   // 应用模板配置
   applyTemplateConfig: (config: SubBoostTemplateConfig) => void;
+  importTemplateConfig: (config: SubBoostTemplateConfig) => void;
 
   // 分流代理组名称覆盖
   setProxyGroupNameOverride: (moduleId: string, displayName: string) => void;

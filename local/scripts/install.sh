@@ -7,6 +7,7 @@ DEFAULT_RELEASE_URL="https://github.com/SubBoost/subboost/releases/latest/downlo
 DEFAULT_COMPOSE_URL="https://github.com/SubBoost/subboost/releases/latest/download/docker-compose.image.yml"
 DEFAULT_MANAGER_URL="https://github.com/SubBoost/subboost/releases/latest/download/subboost-manager"
 DEFAULT_IMAGE="ghcr.io/subboost/subboost:latest"
+DEFAULT_DATABASE_URL="postgresql://subboost:change-me@127.0.0.1:5432/subboost?schema=public"
 
 SUBBOOST_HOME="${SUBBOOST_HOME:-$DEFAULT_HOME}"
 SUBBOOST_BIN="${SUBBOOST_BIN:-$DEFAULT_BIN}"
@@ -579,19 +580,16 @@ main() {
   set_env_value SUBBOOST_RELEASE_URL "$SUBBOOST_RELEASE_URL"
   set_env_value SUBBOOST_COMPOSE_URL "$compose_url"
   set_env_value SUBBOOST_MANAGER_URL "$manager_url"
-  ensure_env_value POSTGRES_DB "subboost"
-  ensure_env_value POSTGRES_USER "subboost"
-  ensure_env_value POSTGRES_PASSWORD "$(random_hex 18)"
   ensure_env_value ENCRYPTION_KEY "$(random_hex 32)"
   ensure_env_value JWT_SECRET "$(random_hex 32)"
-  ensure_env_value CRON_SECRET "$(random_hex 32)"
+  ensure_env_value DATABASE_URL "${DATABASE_URL:-$DEFAULT_DATABASE_URL}"
 
-  local db_name db_user db_pass database_url current_url current_port default_host default_url input_url selected_port final_url recommended_port
-  db_name="$(env_value POSTGRES_DB)"
-  db_user="$(env_value POSTGRES_USER)"
-  db_pass="$(env_value POSTGRES_PASSWORD)"
-  database_url="postgresql://$db_user:$db_pass@db:5432/$db_name?schema=public"
-  ensure_env_value DATABASE_URL "$database_url"
+  local current_url current_port default_host default_url input_url selected_port final_url recommended_port database_url_input
+
+  if [ "$existing_env" = "0" ] || [ -z "$(env_value DATABASE_URL || true)" ]; then
+    database_url_input="$(prompt "请输入 PostgreSQL 连接串 [${DATABASE_URL:-$DEFAULT_DATABASE_URL}]: " "${DATABASE_URL:-$DEFAULT_DATABASE_URL}")"
+    set_env_value DATABASE_URL "$database_url_input"
+  fi
 
   current_port="${SUBBOOST_PORT:-$(env_value SUBBOOST_PORT || true)}"
   current_url="${APP_URL:-$(env_value APP_URL || true)}"

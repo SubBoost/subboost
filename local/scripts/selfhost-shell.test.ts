@@ -3,9 +3,11 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 const publicRoot = path.resolve(__dirname, "../..");
+const SHELL_TEST_TIMEOUT_MS = 20_000;
 
 function runBash(script: string) {
-  return spawnSync("bash", ["-lc", "setsid bash -s"], {
+  const command = process.platform === "darwin" ? "bash -s" : "setsid bash -s";
+  return spawnSync("bash", ["-lc", command], {
     cwd: publicRoot,
     encoding: "utf8",
     input: script,
@@ -31,7 +33,7 @@ describe("self-host shell scripts", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("value=default-value");
     expect(result.stderr).not.toContain("/dev/tty");
-  });
+  }, SHELL_TEST_TIMEOUT_MS);
 
   it("does not report Doctor OK when health checks fail", () => {
     const script = `
@@ -40,13 +42,9 @@ describe("self-host shell scripts", () => {
       trap 'rm -rf "$home"' EXIT
       cat > "$home/.env" <<'ENV'
 SUBBOOST_IMAGE=image
-POSTGRES_DB=subboost
-POSTGRES_USER=subboost
-POSTGRES_PASSWORD=password
 DATABASE_URL=postgresql://subboost:password@db:5432/subboost?schema=public
 ENCRYPTION_KEY=key
 JWT_SECRET=jwt
-CRON_SECRET=cron
 APP_URL=http://127.0.0.1:31000
 SUBBOOST_PORT=31000
 ENV
@@ -63,8 +61,6 @@ ENV
             "compose version"*) return 0 ;;
             *" config") return 0 ;;
             *" ps -q app") printf 'app-id\\n'; return 0 ;;
-            *" ps -q db") printf 'db-id\\n'; return 0 ;;
-            *" ps -q cron") printf 'cron-id\\n'; return 0 ;;
           esac
         fi
         if [ "$1" = "inspect" ]; then
@@ -93,7 +89,7 @@ ENV
     expect(result.stdout).toContain("健康检查: 异常");
     expect(result.stdout).not.toContain("Doctor: OK");
     expect(result.stdout).toContain("ERROR: Health check failed: app is not responding.");
-  });
+  }, SHELL_TEST_TIMEOUT_MS);
 
   it("reports Doctor OK only after health checks pass", () => {
     const script = `
@@ -102,13 +98,9 @@ ENV
       trap 'rm -rf "$home"' EXIT
       cat > "$home/.env" <<'ENV'
 SUBBOOST_IMAGE=image
-POSTGRES_DB=subboost
-POSTGRES_USER=subboost
-POSTGRES_PASSWORD=password
 DATABASE_URL=postgresql://subboost:password@db:5432/subboost?schema=public
 ENCRYPTION_KEY=key
 JWT_SECRET=jwt
-CRON_SECRET=cron
 APP_URL=http://127.0.0.1:31000
 SUBBOOST_PORT=31000
 ENV
@@ -125,8 +117,6 @@ ENV
             "compose version"*) return 0 ;;
             *" config") return 0 ;;
             *" ps -q app") printf 'app-id\\n'; return 0 ;;
-            *" ps -q db") printf 'db-id\\n'; return 0 ;;
-            *" ps -q cron") printf 'cron-id\\n'; return 0 ;;
           esac
         fi
         if [ "$1" = "inspect" ]; then
@@ -146,7 +136,7 @@ ENV
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("健康检查: 正常");
     expect(result.stdout).toContain("Doctor: OK");
-  });
+  }, SHELL_TEST_TIMEOUT_MS);
 
   it("waits for health before reporting update status", () => {
     const script = `
@@ -155,13 +145,9 @@ ENV
       trap 'rm -rf "$home"' EXIT
       cat > "$home/.env" <<'ENV'
 SUBBOOST_IMAGE=image
-POSTGRES_DB=subboost
-POSTGRES_USER=subboost
-POSTGRES_PASSWORD=password
 DATABASE_URL=postgresql://subboost:password@db:5432/subboost?schema=public
 ENCRYPTION_KEY=key
 JWT_SECRET=jwt
-CRON_SECRET=cron
 APP_URL=http://127.0.0.1:31000
 SUBBOOST_PORT=31000
 ENV
@@ -181,8 +167,6 @@ ENV
             *" up -d --remove-orphans") return 0 ;;
             *" up -d --no-deps --force-recreate app") return 0 ;;
             *" ps -q app") printf 'app-id\\n'; return 0 ;;
-            *" ps -q db") printf 'db-id\\n'; return 0 ;;
-            *" ps -q cron") printf 'cron-id\\n'; return 0 ;;
           esac
         fi
         if [ "$1" = "inspect" ]; then
@@ -215,7 +199,7 @@ ENV
     expect(result.stdout).toContain("健康检查: 正常");
     expect(result.stdout).not.toContain("健康检查: 异常");
     expect(result.stdout).toContain("curl_count=7");
-  });
+  }, SHELL_TEST_TIMEOUT_MS);
 
   it("updates exact env keys without removing similarly prefixed names", () => {
     const script = `
@@ -246,7 +230,7 @@ ENV
     expect(result.stdout).toContain("SUBBOOST_PORT_EXTRA=keep");
     expect(result.stdout).toContain("SUBBOOST_PORT=31000");
     expect(result.stdout).not.toContain("SUBBOOST_PORT=3000");
-  });
+  }, SHELL_TEST_TIMEOUT_MS);
 
   it("prunes old backups without parsing ls output", () => {
     const script = `
@@ -259,11 +243,14 @@ ENV
       export SUBBOOST_HOME="$home"
       source local/scripts/subboost.sh
       sudo_do() { "$@"; }
-      load_env() { :; }
-      compose() { printf 'dump'; }
+      load_env() {
+        set -a
+        . "$ENV_FILE"
+        set +a
+      }
+      pg_dump() { printf 'dump'; }
       cat > "$ENV_FILE" <<'ENV'
-POSTGRES_DB=subboost
-POSTGRES_USER=subboost
+DATABASE_URL=postgresql://subboost:password@db:5432/subboost?schema=public
 ENV
       for i in $(seq -w 1 12); do
         : > "$BACKUP_DIR/subboost-20240101T0000\${i}Z.sql.gz"
@@ -283,5 +270,5 @@ ENV
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("sql=10 env=10");
-  });
+  }, SHELL_TEST_TIMEOUT_MS);
 });

@@ -112,7 +112,7 @@ describe("local lib helpers", () => {
     mocks.readSession.mockResolvedValueOnce(null);
     await expect(getCurrentAdmin()).resolves.toBeNull();
 
-    mocks.readSession.mockResolvedValueOnce({ adminId: "admin-1" });
+    mocks.readSession.mockResolvedValueOnce({ sessionId: "sess-1", userId: "admin-1", username: "root" });
     mocks.prisma.localAdmin.findUnique.mockResolvedValueOnce({ id: "admin-1", username: "root" });
     await expect(getCurrentAdmin()).resolves.toEqual({ id: "admin-1", username: "root" });
     expect(mocks.prisma.localAdmin.findUnique).toHaveBeenCalledWith({

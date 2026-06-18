@@ -1,34 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  hash: vi.fn(),
   readJsonBody: vi.fn(),
   apiError: vi.fn((message: string, code: string, status: number) => new Response(JSON.stringify({ error: message, code }), { status })),
-  getStringField: vi.fn((body: Record<string, unknown>, key: string) => (typeof body[key] === "string" ? String(body[key]).trim() : "")),
-  count: vi.fn(),
-  create: vi.fn(),
-  signSession: vi.fn(),
-  sessionCookieOptions: vi.fn(),
+  createInitialAdmin: vi.fn(),
+  createSession: vi.fn(),
+  sessionCookieOptions: vi.fn(() => ({ httpOnly: true, path: "/" })),
+  csrfCookieOptions: vi.fn(() => ({ path: "/" })),
 }));
 
-vi.mock("bcryptjs", () => ({ default: { hash: mocks.hash } }));
 vi.mock("@local/lib/http", () => ({
   apiError: mocks.apiError,
-  getStringField: mocks.getStringField,
   readJsonBody: mocks.readJsonBody,
 }));
-vi.mock("@local/lib/prisma", () => ({
-  prisma: {
-    localAdmin: {
-      count: mocks.count,
-      create: mocks.create,
-    },
-  },
+
+vi.mock("@local/lib/local-user-service", () => ({
+  createInitialAdmin: mocks.createInitialAdmin,
 }));
+
 vi.mock("@local/lib/session", () => ({
-  SESSION_COOKIE: "subboost_local_session",
-  signSession: mocks.signSession,
+  createSession: mocks.createSession,
   sessionCookieOptions: mocks.sessionCookieOptions,
+  csrfCookieOptions: mocks.csrfCookieOptions,
+  SESSION_COOKIE: "subboost_local_session",
+  CSRF_COOKIE: "subboost_local_csrf",
 }));
 
 import { POST } from "./route";
@@ -40,51 +35,50 @@ async function readJson(response: Response) {
 describe("local setup admin route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.count.mockResolvedValue(0);
-    mocks.hash.mockResolvedValue("hash");
-    mocks.create.mockResolvedValue({ id: "admin-1", username: "ry" });
-    mocks.signSession.mockResolvedValue("signed-session");
-    mocks.sessionCookieOptions.mockReturnValue({ httpOnly: true, path: "/" });
+    mocks.createInitialAdmin.mockResolvedValue({ id: "admin-1", username: "ry" });
+    mocks.createSession.mockResolvedValue({ token: "session-token", csrfToken: "csrf-token" });
   });
 
-  it("rejects invalid JSON, existing admins, and invalid credentials", async () => {
+  it("rejects invalid json and surfaces service errors", async () => {
     mocks.readJsonBody.mockResolvedValueOnce(null);
     expect(await readJson(await POST(new Request("https://local.test/api/setup/admin")))).toMatchObject({
       status: 400,
       body: { error: "Invalid JSON body.", code: "BAD_REQUEST" },
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ username: "ry", password: "long-password", passwordConfirm: "long-password" });
-    mocks.count.mockResolvedValueOnce(1);
+    mocks.readJsonBody.mockResolvedValueOnce({ username: "ry", password: "bad", passwordConfirm: "bad" });
+    mocks.createInitialAdmin.mockRejectedValueOnce(new Error("系统已初始化，请直接登录。"));
     expect(await readJson(await POST(new Request("https://local.test/api/setup/admin")))).toMatchObject({
       status: 409,
-      body: { error: "Administrator already exists.", code: "CONFLICT" },
+      body: { error: "系统已初始化，请直接登录。", code: "CONFLICT" },
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ username: "ry", password: "short", passwordConfirm: "short" });
+    mocks.readJsonBody.mockResolvedValueOnce({ username: "ry", password: "bad", passwordConfirm: "bad" });
+    mocks.createInitialAdmin.mockRejectedValueOnce(new Error("密码长度至少为 12 位。"));
     expect(await readJson(await POST(new Request("https://local.test/api/setup/admin")))).toMatchObject({
       status: 400,
-      body: { error: "Invalid administrator credentials.", code: "BAD_REQUEST" },
+      body: { error: "密码长度至少为 12 位。", code: "BAD_REQUEST" },
     });
   });
 
-  it("creates the first local admin and sets the session cookie", async () => {
+  it("creates the first local admin and sets session and csrf cookies", async () => {
     mocks.readJsonBody.mockResolvedValue({
       username: " ry ",
-      password: "long-password",
-      passwordConfirm: "long-password",
+      password: "very-secret-password",
+      passwordConfirm: "very-secret-password",
     });
 
     const result = await readJson(await POST(new Request("https://local.test/api/setup/admin")));
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({ success: true, user: { id: "admin-1", username: "ry" } });
-    expect(mocks.hash).toHaveBeenCalledWith("long-password", 12);
-    expect(mocks.create).toHaveBeenCalledWith({
-      data: { username: "ry", passwordHash: "hash", lastLoginAt: expect.any(Date) },
-      select: { id: true, username: true },
+    expect(mocks.createInitialAdmin).toHaveBeenCalledWith({
+      username: " ry ",
+      password: "very-secret-password",
+      passwordConfirm: "very-secret-password",
     });
-    expect(mocks.signSession).toHaveBeenCalledWith({ adminId: "admin-1", username: "ry" });
-    expect(result.headers.get("set-cookie")).toContain("subboost_local_session=signed-session");
+    expect(mocks.createSession).toHaveBeenCalledWith({ userId: "admin-1", username: "ry" });
+    expect(result.headers.get("set-cookie")).toContain("subboost_local_session=session-token");
+    expect(result.headers.get("set-cookie")).toContain("subboost_local_csrf=csrf-token");
   });
 });

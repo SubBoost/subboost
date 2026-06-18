@@ -35,13 +35,13 @@ export type HomeSurfaceAdapter = {
   subscription?: HomeSubscriptionAdapter;
   loadSubscription?: (id: string) => Promise<Response>;
   loginHref?: string;
-  templateUploadHref?: string | null;
   recordConfigDownload?: (templateId: string | null) => void;
   onAuthenticatedUserReady?: (context: { user: User }) => void;
-  onTemplateUploadOpen?: () => void;
   renderNotice?: (context: { user: User | null; showAiColumn: boolean }) => React.ReactNode;
   renderAnnouncement?: (context: AnnouncementContext) => React.ReactNode;
   renderSaveRequirementDialog?: (props: SaveRequirementDialogProps) => React.ReactNode;
+  onConfigImport?: () => void;
+  onConfigExport?: () => void;
 };
 
 type Props = {
@@ -219,8 +219,8 @@ function HomeSurfaceInner({ adapter }: Props) {
         onOpenChange: subscription.setSaveRequirementDialog,
         onAccept: subscription.handleAcceptSaveRequirement,
       })}
-      templateUploadHref={adapter?.templateUploadHref}
-      onTemplateUploadOpen={adapter?.onTemplateUploadOpen}
+      onConfigImport={adapter?.onConfigImport}
+      onConfigExport={adapter?.onConfigExport}
     />
   );
 }

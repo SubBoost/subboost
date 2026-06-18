@@ -6,6 +6,7 @@ import {
 import { readJsonResponse } from "@subboost/ui/product/client-response";
 import type { RefreshSubscriptionResponse, Subscription } from "@subboost/ui/dashboard/dashboard-types";
 import { LOCAL_AUTO_UPDATE_POLICY } from "@local/lib/auto-update-policy";
+import { withCsrfHeaders } from "@subboost/ui/lib/csrf";
 
 function resolveLocalDashboardDownloadUrl(subscription: Subscription): string {
   try {
@@ -20,9 +21,8 @@ function resolveLocalDashboardDownloadUrl(subscription: Subscription): string {
 const localDashboardAdapter: DashboardSurfaceAdapter = {
   loginHref: "/login",
   newSubscriptionHref: "/?newSubscription=1",
-  templatesHref: "/templates",
   settingsHref: "/dashboard/settings",
-  settingsDescription: "查看本地管理员和运行状态",
+  settingsDescription: "管理账号和运行状态",
   autoUpdateIntervalPolicy: LOCAL_AUTO_UPDATE_POLICY,
   fetchSubscriptions: async () => {
     const response = await fetch("/api/subscriptions");
@@ -30,13 +30,16 @@ const localDashboardAdapter: DashboardSurfaceAdapter = {
     return Array.isArray(data.subscriptions) ? data.subscriptions : [];
   },
   deleteSubscription: async (id) => {
-    const response = await fetch(`/api/subscriptions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const response = await fetch(`/api/subscriptions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: withCsrfHeaders(),
+    });
     await readJsonResponse<{ error?: string }>(response, "删除失败");
   },
   refreshSubscription: async (id) => {
     const response = await fetch(`/api/subscriptions/${encodeURIComponent(id)}/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
     });
     const data = await readJsonResponse<RefreshSubscriptionResponse>(response, "刷新失败");
     return data;
@@ -44,7 +47,7 @@ const localDashboardAdapter: DashboardSurfaceAdapter = {
   updateSubscriptionSettings: async (id, payload) => {
     const response = await fetch(`/api/subscriptions/${encodeURIComponent(id)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: withCsrfHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload),
     });
     await readJsonResponse<{ error?: string }>(response, "保存失败");
