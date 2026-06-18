@@ -43,7 +43,12 @@ function pickUrlFetchParseResult(fetched: Awaited<ReturnType<typeof fetchUrlCont
   return fetched.parseResult ?? null;
 }
 
-function toSubscriptionImportErrorInfo(error: unknown, fallbackMessage = "解析失败"): SubscriptionImportErrorInfo {
+const DEFAULT_PARSE_FAILURE_MESSAGE = "解析失败";
+
+function toSubscriptionImportErrorInfo(
+  error: unknown,
+  fallbackMessage = DEFAULT_PARSE_FAILURE_MESSAGE
+): SubscriptionImportErrorInfo {
   if (isSubscriptionImportError(error)) return error.info;
   const message = error instanceof Error ? error.message : fallbackMessage;
   return createSubscriptionImportErrorInfo({
