@@ -4,18 +4,24 @@ import { buildGeneratedRuleEntries, resolveAppliedRuleOrder } from "@subboost/co
 import { initialState } from "../definitions";
 import { createProxyGroupActions } from "./proxy-group-actions";
 
-function createHarness(overrides: Record<string, unknown> = {}) {
-  let state = {
+type HarnessState = typeof initialState & {
+  enabledProxyGroups?: string[];
+  hiddenProxyGroups?: string[];
+  proxyGroupOrder?: string[];
+};
+
+function createHarness(overrides: Partial<HarnessState> = {}) {
+  let state: HarnessState = {
     ...structuredClone(initialState),
     ...overrides,
-  } as any;
+  };
 
-  const applyPatch = (patch: any) => {
+  const applyPatch = (patch?: Partial<HarnessState> | HarnessState) => {
     if (!patch || patch === state) return;
     state = { ...state, ...patch };
   };
 
-  const setAndGenerateConfig = (updater: any) => {
+  const setAndGenerateConfig = (updater: (current: HarnessState) => Partial<HarnessState> | void) => {
     applyPatch(updater(state));
   };
 
@@ -31,7 +37,14 @@ describe("createProxyGroupActions", () => {
   it("normalizes proxy group display order", () => {
     const { actions, getState } = createHarness();
 
-    actions.setProxyGroupOrder([" module:ai ", "", "module:ai", "filtered:fast", 123 as unknown as string]);
+    actions.setProxyGroupOrder([
+      " module:ai ",
+      "",
+      "module:ai",
+      "filtered:fast",
+      // Intentionally force a non-string runtime value to verify invalid input is ignored.
+      123 as unknown as string,
+    ]);
 
     expect(getState().proxyGroupOrder).toEqual(["module:ai", "filtered:fast"]);
 
