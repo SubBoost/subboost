@@ -40,6 +40,7 @@ async function readJson(response: Response) {
 describe("local setup admin route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.SUBBOOST_LAN_MODE;
     mocks.count.mockResolvedValue(0);
     mocks.hash.mockResolvedValue("hash");
     mocks.create.mockResolvedValue({ id: "admin-1", username: "ry" });
@@ -98,5 +99,20 @@ describe("local setup admin route", () => {
     });
     expect(mocks.signSession).toHaveBeenCalledWith({ adminId: "admin-1", username: "ry" });
     expect(result.headers.get("set-cookie")).toContain("subboost_local_session=signed-session");
+  });
+
+  it("refuses to create an admin while LAN mode is enabled", async () => {
+    process.env.SUBBOOST_LAN_MODE = "true";
+    try {
+      const result = await readJson(await POST(new Request("https://local.test/api/setup/admin")));
+      expect(result.status).toBe(403);
+      expect(result.body).toMatchObject({ code: "FORBIDDEN" });
+      // 守卫应在任何读取/计数/写入之前生效。
+      expect(mocks.readJsonBody).not.toHaveBeenCalled();
+      expect(mocks.count).not.toHaveBeenCalled();
+      expect(mocks.create).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.SUBBOOST_LAN_MODE;
+    }
   });
 });

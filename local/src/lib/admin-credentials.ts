@@ -6,6 +6,7 @@ export const LOCAL_ADMIN_CREDENTIAL_MESSAGES = {
   usernameRequired: "请输入管理员账号",
   passwordMinLength: `密码至少需要 ${LOCAL_ADMIN_PASSWORD_MIN_LENGTH} 个字符`,
   passwordMismatch: "两次输入的密码不一致，请重新确认",
+  lanModeSetupDisabled: "局域网模式下默认管理员由系统自动管理，已禁用创建管理员账号接口",
 } as const;
 
 type LocalAdminCredentialInput = {

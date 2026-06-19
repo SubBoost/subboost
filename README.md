@@ -39,6 +39,20 @@
 - Deployment docs: [Advanced deployment - compiles from source, slower with higher requirements](https://docs.subboost.org/deploy/advanced)
 - Configuration guide: [Clash configuration simple enough for a paramecium: configure precise routing and chained proxies from the UI in one click](https://ryanvan.com/t/topic/59?u=ryan)
 
+### LAN mode (no login)
+
+When self-hosting on a trusted private network, you can enable LAN mode: it skips login/authentication and auto-provisions a default admin account, so there is no account to create and no login step. In LAN mode every visitor shares this single default admin (any existing login session is ignored), and the admin-setup endpoint is disabled. Set this in your deployment `.env`:
+
+```env
+SUBBOOST_LAN_MODE=true
+# Optional: customize the default admin username (defaults to admin)
+# SUBBOOST_LAN_ADMIN_USERNAME=admin
+# Optional: set a password so the account stays usable if LAN mode is later turned off
+# SUBBOOST_LAN_ADMIN_PASSWORD=
+```
+
+> ⚠️ LAN mode fully disables authentication. Use it only on a trusted private network and never expose the service to the internet. It is disabled by default. Note: subscription links (`/api/subscriptions/<token>/config.yaml`) are already token-based and require no login regardless of this switch.
+
 ## Development Notes
 
 Developers can start a local development environment from source:

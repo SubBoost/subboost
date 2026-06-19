@@ -2,10 +2,16 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { getLocalAdminSetupCredentialError, LOCAL_ADMIN_CREDENTIAL_MESSAGES } from "@local/lib/admin-credentials";
 import { apiError, getStringField, readJsonBody } from "@local/lib/http";
+import { isLanMode } from "@local/lib/lan-mode";
 import { prisma } from "@local/lib/prisma";
 import { sessionCookieOptions, signSession, SESSION_COOKIE } from "@local/lib/session";
 
 export async function POST(request: Request) {
+  // 局域网模式：默认管理员由系统自动创建，禁止任何人在此抢先创建自定义管理员账号。
+  if (isLanMode()) {
+    return apiError(LOCAL_ADMIN_CREDENTIAL_MESSAGES.lanModeSetupDisabled, "FORBIDDEN", 403);
+  }
+
   const body = await readJsonBody(request);
   if (!body) return apiError(LOCAL_ADMIN_CREDENTIAL_MESSAGES.invalidJson, "BAD_REQUEST", 400);
 

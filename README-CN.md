@@ -39,6 +39,20 @@
 - 部署文档：[高级部署 - 编译源码构建，速度慢配置要求高](https://docs.subboost.org/deploy/advanced)
 - 配置教程：[草履虫也能学会的 Clash 配置：UI 界面一键配置精确分流、链式代理](https://ryanvan.com/t/topic/59?u=ryan)
 
+### 局域网模式（免登录）
+
+在可信内网自托管时，可开启局域网模式：跳过登录鉴权，自动使用一个默认管理员账号，无需创建账号或登录。局域网模式下所有访客共用这一个默认管理员（忽略任何已有登录会话），并禁用创建管理员接口。在部署的 `.env` 中设置：
+
+```env
+SUBBOOST_LAN_MODE=true
+# 可选：自定义默认管理员用户名（默认 admin）
+# SUBBOOST_LAN_ADMIN_USERNAME=admin
+# 可选：给默认管理员设置密码，便于以后关闭局域网模式后仍能登录
+# SUBBOOST_LAN_ADMIN_PASSWORD=
+```
+
+> ⚠️ 局域网模式会彻底关闭鉴权，请仅在可信内网使用，切勿将本服务暴露到公网。默认关闭。注意：订阅链接（`/api/subscriptions/<token>/config.yaml`）本就无需登录、凭 token 访问，不受此开关影响。
+
 ## 开发说明
 
 开发者可以从源码启动本地开发环境：

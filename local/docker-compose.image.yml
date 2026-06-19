@@ -28,6 +28,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
       APP_URL: ${APP_URL:-http://localhost:3000}
+      # 局域网模式：免登录 + 自动默认管理员。仅限可信内网，勿暴露公网。默认关闭。
+      SUBBOOST_LAN_MODE: ${SUBBOOST_LAN_MODE:-false}
+      SUBBOOST_LAN_ADMIN_USERNAME: ${SUBBOOST_LAN_ADMIN_USERNAME:-}
+      SUBBOOST_LAN_ADMIN_PASSWORD: ${SUBBOOST_LAN_ADMIN_PASSWORD:-}
 
   cron:
     image: curlimages/curl:8.11.1
