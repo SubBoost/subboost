@@ -149,8 +149,8 @@ describe("local app pages and adapters", () => {
     const adapter = mocks.dashboardAdapter;
     vi.stubGlobal("window", {
       location: {
-        href: "http://23.80.90.37:31401/dashboard",
-        origin: "http://23.80.90.37:31401",
+        href: "http://local.subboost.test:31401/dashboard",
+        origin: "http://local.subboost.test:31401",
       },
     });
 
@@ -162,7 +162,7 @@ describe("local app pages and adapters", () => {
       adapter.resolveDownloadUrl({
         subscriptionUrl: "http://localhost:3001/api/subscriptions/token-1/config.yaml",
       })
-    ).toBe("http://23.80.90.37:31401/api/subscriptions/token-1/config.yaml");
+    ).toBe("http://local.subboost.test:31401/api/subscriptions/token-1/config.yaml");
     expect(adapter.autoUpdateIntervalPolicy).toEqual({
       defaultHours: 12,
       minHours: 0.1,
