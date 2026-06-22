@@ -9,14 +9,14 @@
     "./app-version": "./src/app-version.ts",
     "./cron-auth": "./src/cron-auth.ts",
     "./crypto": "./src/crypto/index.ts",
-    "./crypto/*": "./src/crypto/*",
+    "./crypto/*": "./src/crypto/*.ts",
     "./http": "./src/http.ts",
     "./rules": "./src/rules/index.ts",
-    "./rules/*": "./src/rules/*",
+    "./rules/*": "./src/rules/*.ts",
     "./templates": "./src/templates/index.ts",
-    "./templates/*": "./src/templates/*",
+    "./templates/*": "./src/templates/*.ts",
     "./subscription": "./src/subscription/index.ts",
-    "./subscription/*": "./src/subscription/*"
+    "./subscription/*": "./src/subscription/*.ts"
   },
   "dependencies": {
     "@subboost/core": "file:../core"
