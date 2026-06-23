@@ -43,7 +43,9 @@ describe("subscription config utils", () => {
           {
             id: "media",
             name: "Media",
-            emoji: "M",
+            emoji: "",
+            memberSource: "filtered-nodes",
+            includeInGroupMembers: false,
             groupType: "load-balance",
             strategy: "bad",
           },
@@ -115,6 +117,9 @@ describe("subscription config utils", () => {
     });
     expect(options.customProxyGroups?.[0]).toMatchObject({
       id: "media",
+      emoji: "",
+      memberSource: "filtered-nodes",
+      includeInGroupMembers: false,
       strategy: "consistent-hashing",
     });
     expect(options.customRuleSets?.[0]).toMatchObject({

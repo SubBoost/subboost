@@ -137,6 +137,7 @@ describe("validateSubBoostTemplateConfig custom groups", () => {
               id: "custom",
               name: "Custom",
               emoji: "C",
+              memberSource: "filtered-nodes",
               groupType: "load-balance",
               strategy: "bad" as never,
             },
@@ -144,6 +145,35 @@ describe("validateSubBoostTemplateConfig custom groups", () => {
         })
       )
     ).toEqual({ ok: false, error: "customProxyGroups.strategy 无效" });
+
+    expectInvalid(
+      {
+        customProxyGroups: [
+          {
+            id: "custom",
+            name: "Custom",
+            emoji: "C",
+            memberSource: "bad" as never,
+            groupType: "select",
+          },
+        ],
+      },
+      "customProxyGroups.memberSource 无效"
+    );
+    expectInvalid(
+      {
+        customProxyGroups: [
+          {
+            id: "custom",
+            name: "Custom",
+            emoji: "C",
+            includeInGroupMembers: "yes" as never,
+            groupType: "select",
+          },
+        ],
+      },
+      "customProxyGroups.includeInGroupMembers 必须是布尔值"
+    );
 
     const removedField = `filtered${"ProxyGroups"}`;
     expectInvalid({ [removedField]: [] } as never, `模板配置包含已移除字段: ${removedField}`);

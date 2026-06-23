@@ -180,7 +180,7 @@ function normalizeCustomProxyGroups(value: unknown): CustomProxyGroup[] {
         ? item.groupType
         : null;
 
-    if (!id || !name || !emoji || !groupType) continue;
+    if (!id || !name || !groupType) continue;
 
     const strategy =
       groupType === "load-balance"
@@ -191,6 +191,9 @@ function normalizeCustomProxyGroups(value: unknown): CustomProxyGroup[] {
 
     const enabled = item.enabled === false ? false : undefined;
     const description = toTrimmedString(item.description);
+    const memberSource = item.memberSource === "filtered-nodes" ? "filtered-nodes" : undefined;
+    const includeInGroupMembers =
+      typeof item.includeInGroupMembers === "boolean" ? item.includeInGroupMembers : undefined;
     const advanced = normalizeProxyGroupAdvancedConfig(item.advanced);
     out.push({
       id,
@@ -198,6 +201,8 @@ function normalizeCustomProxyGroups(value: unknown): CustomProxyGroup[] {
       emoji,
       ...(enabled === false ? { enabled: false } : {}),
       ...(description ? { description } : {}),
+      ...(memberSource ? { memberSource } : {}),
+      ...(includeInGroupMembers !== undefined ? { includeInGroupMembers } : {}),
       groupType,
       ...(strategy ? { strategy } : {}),
       ...(Object.keys(advanced).length > 0 ? { advanced } : {}),

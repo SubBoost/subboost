@@ -138,6 +138,9 @@ export function createCustomActions(
           emoji: group.emoji,
           ...(group.enabled === false ? { enabled: false } : {}),
           ...(typeof group.description === "string" ? { description: group.description.trim() } : {}),
+          ...(group.memberSource === "filtered-nodes" ? { memberSource: "filtered-nodes" as const } : {}),
+          includeInGroupMembers:
+            typeof group.includeInGroupMembers === "boolean" ? group.includeInGroupMembers : true,
           groupType: group.groupType,
           ...(group.groupType === "load-balance" && group.strategy ? { strategy: group.strategy } : {}),
           ...(group.advanced ? { advanced: normalizeProxyGroupAdvancedConfig(group.advanced) } : {}),

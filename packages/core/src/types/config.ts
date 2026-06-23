@@ -275,6 +275,8 @@ export interface CustomProxyGroup {
   emoji: string;
   enabled?: boolean;
   description?: string;
+  memberSource?: "filtered-nodes";
+  includeInGroupMembers?: boolean;
   groupType: ProxyGroupGroupType;
   strategy?: LoadBalanceStrategy;
   advanced?: ProxyGroupAdvancedConfig;

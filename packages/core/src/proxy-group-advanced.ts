@@ -303,7 +303,6 @@ export function resolveProxyGroupMembers(options: ResolveProxyGroupMembersOption
       if (typeof rawName !== "string") continue;
       const member = buildMemberFromName(rawName, { nodeNameSet, moduleNameToId, customNameToId });
       if (!member || seen.has(member.key)) continue;
-      if (options.self && member.name === options.self.name) continue;
       if (options.self && member.key === `${options.self.kind}:${options.self.id}`) continue;
       seen.add(member.key);
       out.push(member);
@@ -323,7 +322,6 @@ export function resolveProxyGroupMembers(options: ResolveProxyGroupMembersOption
       customGroupsById,
     });
     if (!member || candidateMap.has(member.key)) continue;
-    if (options.self && member.name === options.self.name) continue;
     if (options.self && member.key === `${options.self.kind}:${options.self.id}`) continue;
     candidateMap.set(member.key, member);
   }

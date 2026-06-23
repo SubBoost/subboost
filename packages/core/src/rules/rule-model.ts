@@ -101,6 +101,9 @@ function normalizeCustomProxyGroups(value: unknown): CustomProxyGroup[] {
     const emoji = toTrimmedString(rawGroup.emoji);
     const enabled = rawGroup.enabled === false ? false : undefined;
     const description = toTrimmedString(rawGroup.description);
+    const memberSource = rawGroup.memberSource === "filtered-nodes" ? "filtered-nodes" : undefined;
+    const includeInGroupMembers =
+      typeof rawGroup.includeInGroupMembers === "boolean" ? rawGroup.includeInGroupMembers : undefined;
     const groupType = toTrimmedString(rawGroup.groupType);
     if (!id || !name) continue;
     if (
@@ -120,6 +123,8 @@ function normalizeCustomProxyGroups(value: unknown): CustomProxyGroup[] {
       emoji,
       ...(enabled === false ? { enabled: false } : {}),
       ...(description ? { description } : {}),
+      ...(memberSource ? { memberSource } : {}),
+      ...(includeInGroupMembers !== undefined ? { includeInGroupMembers } : {}),
       groupType,
       ...(groupType === "load-balance"
         ? {

@@ -73,6 +73,14 @@ function getEnabledCustomProxyGroups(customProxyGroups: CustomProxyGroup[]): Cus
   return customProxyGroups.filter((group) => group && group.enabled !== false);
 }
 
+function usesFilteredNodeMembers(group: CustomProxyGroup): boolean {
+  return group.memberSource === "filtered-nodes";
+}
+
+function isIncludedInGroupMembers(group: CustomProxyGroup): boolean {
+  return group.includeInGroupMembers === true;
+}
+
 function customTargetIsDisabled(
   target: CustomRuleSet["target"],
   customProxyGroups: CustomProxyGroup[]
@@ -140,6 +148,8 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
   const filteredNodeNames = nodeNames.filter((n) => !isSubscriptionInfoNodeName(n));
   const groups: ProxyGroup[] = [];
   const processedModules = new Set<string>();
+  const leadingCustomProxyGroups = activeCustomProxyGroups.filter(usesFilteredNodeMembers);
+  const inlineCustomProxyGroups = activeCustomProxyGroups.filter((group) => !usesFilteredNodeMembers(group));
 
   const enabledSet = new Set(enabledModules);
   // 默认顺序（影响 Clash 初始选中项）：节点选择 → 自动选择 → DIRECT → REJECT → 其它节点
@@ -155,6 +165,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     ])
   );
   const customGroupNames = activeCustomProxyGroups
+    .filter(isIncludedInGroupMembers)
     .map((group) => (typeof group.name === "string" ? group.name.trim() : ""))
     .filter(Boolean);
   const policyTargets = (...targets: unknown[]) => {
@@ -170,9 +181,23 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
   const fallbackTargets = (...targets: unknown[]) => policyTargets(...targets, "DIRECT", "REJECT");
   const selectTarget = enabledModuleTarget("select");
   const autoTarget = enabledModuleTarget("auto");
-  const baseProxies = selectTarget
-    ? fallbackTargets(selectTarget, autoTarget, "DIRECT", "REJECT", ...customGroupNames, ...filteredNodeNames)
-    : fallbackTargets(autoTarget, ...customGroupNames, ...filteredNodeNames, "DIRECT", "REJECT");
+  const moduleBaseProxies = selectTarget
+    ? fallbackTargets(
+        selectTarget,
+        autoTarget,
+        "DIRECT",
+        "REJECT",
+        ...customGroupNames,
+        ...filteredNodeNames
+      )
+    : fallbackTargets(
+        autoTarget,
+        ...customGroupNames,
+        ...filteredNodeNames,
+        "DIRECT",
+        "REJECT"
+      );
+  const customBaseProxies = moduleBaseProxies;
   const availableMemberProxyNames = fallbackTargets(
     "DIRECT",
     "REJECT",
@@ -201,7 +226,8 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     name: string,
     groupType: ProxyGroupGroupType,
     proxies: string[],
-    strategy?: LoadBalanceStrategy
+    strategy?: LoadBalanceStrategy,
+    extraFields: Record<string, unknown> = providerUse
   ): ProxyGroup =>
     buildTypedProxyGroup({
       name,
@@ -210,7 +236,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
       testUrl,
       testInterval,
       strategy,
-      extraFields: providerUse,
+      extraFields,
       urlTestLazy: false,
     });
 
@@ -222,7 +248,13 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     switch (groupType) {
       case "select":
         if (module.id === "select") {
-          const defaultProxies = fallbackTargets(autoTarget, "DIRECT", "REJECT", ...customGroupNames, ...nodeNames);
+          const defaultProxies = fallbackTargets(
+            autoTarget,
+            "DIRECT",
+            "REJECT",
+            ...customGroupNames,
+            ...nodeNames
+          );
           groups.push({
             name: moduleName,
             type: "select",
@@ -235,7 +267,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
             ...providerUse,
           });
         } else {
-          const defaultProxies = baseProxies.filter((target) => target !== moduleName);
+          const defaultProxies = moduleBaseProxies.filter((target) => target !== moduleName);
           groups.push({
             name: moduleName,
             type: "select",
@@ -304,9 +336,14 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
 
       case "direct-first":
         {
-          const defaultProxies = fallbackTargets("DIRECT", "REJECT", selectTarget, autoTarget, ...customGroupNames, ...filteredNodeNames).filter(
-            (target) => target !== moduleName
-          );
+          const defaultProxies = fallbackTargets(
+            "DIRECT",
+            "REJECT",
+            ...customGroupNames,
+            selectTarget,
+            autoTarget,
+            ...filteredNodeNames
+          ).filter((target) => target !== moduleName);
           groups.push({
             name: moduleName,
             type: "select",
@@ -331,6 +368,27 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
       });
 
+    if (usesFilteredNodeMembers(customGroup)) {
+      if (customGroup.groupType === "url-test" || customGroup.groupType === "fallback") {
+        return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames), undefined, {});
+      }
+      if (customGroup.groupType === "load-balance") {
+        return createGeneratedProxyGroup(
+          customGroup.name,
+          customGroup.groupType,
+          resolveCustom(filteredNodeNames),
+          customGroup.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY,
+          {}
+        );
+      }
+      return {
+        name: customGroup.name,
+        type: "select",
+        proxies: customGroup.groupType === "reject-first"
+          ? resolveCustom(["REJECT", "DIRECT", ...filteredNodeNames])
+          : resolveCustom(["DIRECT", "REJECT", ...filteredNodeNames]),
+      };
+    }
     if (customGroup.groupType === "url-test") {
       return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames));
     }
@@ -350,7 +408,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
         type: "select",
         proxies: resolveCustom(
-          fallbackTargets("DIRECT", "REJECT", selectTarget, autoTarget, ...customGroupNames, ...filteredNodeNames).filter(
+          fallbackTargets("DIRECT", "REJECT", selectTarget, autoTarget, ...filteredNodeNames).filter(
             (target) => target !== customGroup.name
           )
         ),
@@ -362,7 +420,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
         type: "select",
         proxies: resolveCustom(
-          fallbackTargets("REJECT", "DIRECT", selectTarget, ...customGroupNames).filter(
+          fallbackTargets("REJECT", "DIRECT", selectTarget).filter(
             (target) => target !== customGroup.name
           )
         ),
@@ -372,18 +430,22 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     return {
       name: customGroup.name,
       type: "select",
-      proxies: resolveCustom(baseProxies.filter((target) => target !== customGroup.name)),
+      proxies: resolveCustom(customBaseProxies.filter((target) => target !== customGroup.name)),
       ...providerUse,
     };
   };
+
+  for (const customGroup of leadingCustomProxyGroups) {
+    groups.push(createCustomProxyGroup(customGroup));
+  }
 
   // 按 PROXY_GROUP_ORDER 顺序生成代理组
   let insertedCustom = false;
   for (const moduleId of PROXY_GROUP_ORDER) {
     // 自定义分流组插入位置：在 🍏 苹果服务 与 📲 电报消息之间
-    if (!insertedCustom && moduleId === "ai" && activeCustomProxyGroups.length > 0) {
+    if (!insertedCustom && moduleId === "ai" && inlineCustomProxyGroups.length > 0) {
       insertedCustom = true;
-      for (const customGroup of activeCustomProxyGroups) {
+      for (const customGroup of inlineCustomProxyGroups) {
         groups.push(createCustomProxyGroup(customGroup));
       }
     }
@@ -406,8 +468,8 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
   }
 
   // 若未命中插入点（例如未来移除 private），则追加到末尾
-  if (!insertedCustom && activeCustomProxyGroups.length > 0) {
-    for (const customGroup of activeCustomProxyGroups) {
+  if (!insertedCustom && inlineCustomProxyGroups.length > 0) {
+    for (const customGroup of inlineCustomProxyGroups) {
       groups.push(createCustomProxyGroup(customGroup));
     }
   }

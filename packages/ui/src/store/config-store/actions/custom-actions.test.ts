@@ -84,6 +84,9 @@ describe("custom config-store actions", () => {
     actions.addCustomProxyGroup({ name: "Old Group", emoji: "🧩", groupType: "select" });
     const groupId = getState().customProxyGroups[0].id;
     expect(groupId).toBe("custom-group-1767225600000");
+    expect(getState().customProxyGroups[0]).toEqual(
+      expect.objectContaining({ includeInGroupMembers: true })
+    );
 
     actions.updateCustomProxyGroup(groupId, {
       name: "New Group",

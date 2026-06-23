@@ -324,12 +324,22 @@ function parseCustomProxyGroups(value: unknown): { ok: true; value: CustomProxyG
     if (!groupType.ok) return groupType;
     const strategy = parseOptionalLoadBalanceStrategy(item.strategy, "customProxyGroups.strategy");
     if (!strategy.ok) return strategy;
+    if (item.memberSource !== undefined && item.memberSource !== "filtered-nodes") {
+      return invalid("customProxyGroups.memberSource 无效");
+    }
+    if (item.includeInGroupMembers !== undefined && typeof item.includeInGroupMembers !== "boolean") {
+      return invalid("customProxyGroups.includeInGroupMembers 必须是布尔值");
+    }
     const description = typeof item.description === "string" ? item.description.trim() : "";
     out.push({
       id: id.value,
       name: name.value,
       emoji: emoji.value,
       ...(description ? { description } : {}),
+      ...(item.memberSource === "filtered-nodes" ? { memberSource: "filtered-nodes" as const } : {}),
+      ...(typeof item.includeInGroupMembers === "boolean"
+        ? { includeInGroupMembers: item.includeInGroupMembers }
+        : {}),
       groupType: groupType.value,
       ...(groupType.value === "load-balance"
         ? { strategy: strategy.value ?? DEFAULT_LOAD_BALANCE_STRATEGY }

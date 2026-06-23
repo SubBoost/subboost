@@ -141,6 +141,52 @@ describe("proxy group generator", () => {
     });
   });
 
+  it("keeps filtered-node custom groups node-scoped while exposing them as policy members", () => {
+    const groups = generateProxyGroups({
+      nodes: [node("Node A"), node("Node B"), node("Filtered")],
+      proxyProviderNames: ["remote"],
+      enabledModules: ["select", "auto", "private"],
+      ruleProviderBaseUrl: "https://rules.example.com",
+      testUrl: "https://probe.example.com/204",
+      testInterval: 120,
+      customProxyGroups: [
+        {
+          id: "filtered",
+          name: "Filtered",
+          emoji: "",
+          memberSource: "filtered-nodes",
+          includeInGroupMembers: true,
+          groupType: "select",
+          advanced: { includeRegex: "Node A|Filtered" },
+        },
+        { ...customGroup("normal", "select"), includeInGroupMembers: true },
+      ],
+    });
+
+    expect(groups[0]?.name).toBe("Filtered");
+    expect(groups.find((group) => group.name === "Filtered")?.proxies).toEqual([
+      "DIRECT",
+      "REJECT",
+      "Node A",
+      "Filtered",
+    ]);
+    expect(groups.find((group) => group.name === "Filtered")).not.toHaveProperty("use");
+    expect(groups.find((group) => group.name === "Filtered")?.proxies).not.toContain("Custom normal");
+    expect(groups.find((group) => group.name === "Filtered")?.proxies).not.toContain("🚀 节点选择");
+    expect(groups.find((group) => group.name === "Custom normal")?.proxies).toContain("Filtered");
+    expect(groups.find((group) => group.name === "Custom normal")?.proxies).not.toContain("Custom normal");
+    expect(groups.find((group) => group.name === "Custom normal")).toMatchObject({ use: ["remote"] });
+    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).toContain("Filtered");
+    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).toContain("Custom normal");
+    expect(groups.find((group) => group.name === "🏠 私有网络")?.proxies.slice(0, 5)).toEqual([
+      "DIRECT",
+      "REJECT",
+      "Filtered",
+      "Custom normal",
+      "🚀 节点选择",
+    ]);
+  });
+
   it("omits disabled custom groups from groups, providers, names, and custom rules", () => {
     const disabledGroup = { ...customGroup("disabled", "select"), enabled: false };
     const groups = generateProxyGroups({

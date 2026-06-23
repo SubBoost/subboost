@@ -239,7 +239,7 @@ describe("generateClashConfig", () => {
     expect(config["proxy-groups"]?.find((group) => group.name === "Broken Chain")).toBeUndefined();
   });
 
-  it("preserves explicit fingerprints and removes invalid dialer-proxy references", () => {
+  it("normalizes base YAML client fingerprints and removes invalid dialer-proxy references", () => {
     const config = generateClashConfig({
       nodes: [
         {
@@ -289,6 +289,9 @@ describe("generateClashConfig", () => {
           targetNodes: ["Plain VMess"],
         },
       ],
+      userConfig: {
+        dnsYaml: "global-client-fingerprint: chrome",
+      },
     });
 
     const plain = config.proxies?.find((proxy) => proxy.name === "Plain VMess");
@@ -298,8 +301,8 @@ describe("generateClashConfig", () => {
 
     expect(plain).not.toHaveProperty("client-fingerprint");
     expect(plain).not.toHaveProperty("dialer-proxy");
-    expect(trojan).not.toHaveProperty("client-fingerprint");
-    expect(anytls).not.toHaveProperty("client-fingerprint");
+    expect(trojan).toMatchObject({ "client-fingerprint": "chrome" });
+    expect(anytls).toMatchObject({ "client-fingerprint": "chrome" });
     expect(preset).toMatchObject({ "client-fingerprint": "safari" });
     expect(config["proxy-groups"]?.find((group) => group.name === "Disabled")).toBeUndefined();
   });

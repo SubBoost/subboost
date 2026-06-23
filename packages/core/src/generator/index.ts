@@ -210,6 +210,10 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
   assertNoGeneratedSectionsInBaseConfig(baseConfig);
   const baseConfigRecord = baseConfig as unknown as Record<string, unknown>;
   const shouldUseDefaultBaseSections = !hasExplicitBaseConfigYaml;
+  const baseConfigClientFingerprint =
+    typeof baseConfigRecord["global-client-fingerprint"] === "string" && baseConfigRecord["global-client-fingerprint"].trim()
+      ? String(baseConfigRecord["global-client-fingerprint"]).trim()
+      : undefined;
 
   // 输出前做一次轻量标准化：避免 YAML 数字样式字段被下游（Clash）当成 number 解析
   // 特别是 Reality short-id（有些机场会给纯数字，如 7053 / 7250）
@@ -217,9 +221,23 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     if (!node || typeof node !== "object") return node;
     const typed = node as unknown as Record<string, unknown>;
     const type = typeof typed.type === "string" ? typed.type : "";
+    const hasClientFingerprint =
+      typeof typed["client-fingerprint"] === "string" && Boolean(String(typed["client-fingerprint"]).trim());
+    const supportsClientFingerprint = type === "vmess" || type === "vless" || type === "trojan" || type === "anytls";
+    const shouldApplyBaseFingerprint =
+      Boolean(baseConfigClientFingerprint) &&
+      supportsClientFingerprint &&
+      !hasClientFingerprint &&
+      (type === "trojan" ||
+        type === "anytls" ||
+        (typeof typed.tls === "boolean" && typed.tls) ||
+        (type === "vless" && Boolean(typed["reality-opts"])));
+    const nextBase = shouldApplyBaseFingerprint
+      ? { ...typed, "client-fingerprint": baseConfigClientFingerprint }
+      : typed;
 
-    if (type !== "vless") return node;
-    return normalizeMihomoVlessForGeneration(typed) as unknown as ParsedNode;
+    if (type !== "vless") return nextBase as unknown as ParsedNode;
+    return normalizeMihomoVlessForGeneration(nextBase) as unknown as ParsedNode;
   });
 
   // Mihomo 不支持的协议不能进入最终 YAML，否则一个无效节点会拖垮整份订阅。

@@ -59,6 +59,8 @@ describe("validateSubBoostTemplateConfig", () => {
             id: "custom",
             name: "Custom",
             emoji: "",
+            memberSource: "filtered-nodes",
+            includeInGroupMembers: false,
             groupType: "load-balance",
           },
         ],
@@ -116,6 +118,8 @@ describe("validateSubBoostTemplateConfig", () => {
       id: "custom",
       name: "Custom",
       emoji: "",
+      memberSource: "filtered-nodes",
+      includeInGroupMembers: false,
       groupType: "load-balance",
       strategy: DEFAULT_LOAD_BALANCE_STRATEGY,
     });
