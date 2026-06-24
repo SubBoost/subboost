@@ -332,7 +332,7 @@ export function ProxyGroupsAddedRuleSets({
                           )
                         }
                       />
-                      <span className="text-[10px] text-white/50">
+                      <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">
                         no-resolve
                       </span>
                     </div>

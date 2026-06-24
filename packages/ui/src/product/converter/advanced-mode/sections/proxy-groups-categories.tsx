@@ -290,8 +290,8 @@ export function ProxyGroupsCategories() {
 
   return (
     <>
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_96px]">
-        <div className="space-y-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-3">
+        <div className="min-w-0 space-y-1">
           <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>
             <label className={PROXY_GROUP_SECTION_LABEL_CLASS}>规则集 URL</label>
           </div>
@@ -302,11 +302,11 @@ export function ProxyGroupsCategories() {
             <span className="block truncate">{ruleProviderBaseUrl}</span>
           </div>
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>
             <label className="text-xs text-amber-300">高级模式</label>
           </div>
-          <div className="flex h-9 items-center justify-center gap-1 rounded-md border border-white/10 bg-white/5 px-2">
+          <div className="flex h-9 w-full items-center justify-center gap-1 rounded-md border border-white/10 bg-white/5 px-2">
             <span className="text-[10px] text-white/65">
               {proxyGroupAdvancedModeEnabled ? "已开启" : "未开启"}
             </span>

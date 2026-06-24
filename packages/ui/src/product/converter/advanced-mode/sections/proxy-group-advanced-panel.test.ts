@@ -122,6 +122,7 @@ describe("ProxyGroupAdvancedPanel", () => {
     expect(html).toContain("DIRECT");
     expect(html).toContain("rules-content");
     expect(html).toContain("还没有分流规则");
+    expect(html).toContain("max-h-52 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar");
     expect(mocks.inputs.map((input) => input.value)).toEqual(["Source", "Japan"]);
 
     mocks.inputs[0].onChange({ target: { value: "IEPL" } });
@@ -196,6 +197,55 @@ describe("ProxyGroupAdvancedPanel", () => {
     expect(html).toContain("#2 YAML 配置");
     expect(html).toContain("#3 节点链接");
     expect(html).toContain("暂无已启用的节点或代理组");
+  });
+
+  it("previews enabled members for a disabled built-in proxy group", () => {
+    mocks.store = {
+      ...mocks.store,
+      enabledProxyGroups: [],
+      customProxyGroups: [],
+      proxyGroupAdvanced: {},
+    };
+
+    const html = renderToStaticMarkup(
+      React.createElement(ProxyGroupAdvancedPanel, {
+        target: { kind: "module", id: "auto", name: "⚡ Auto" },
+        advanced: {},
+        onChange: vi.fn(),
+        rulesCount: 0,
+        rulesContent: null,
+      }),
+    );
+
+    expect(html).toContain("US Source");
+    expect(html).toContain("Japan Source");
+    expect(html).toContain("max-h-52 overflow-y-auto pr-1 custom-scrollbar flex flex-wrap gap-1.5");
+    expect(html).not.toContain("暂无已启用的节点或代理组");
+  });
+
+  it("previews enabled members for a disabled custom proxy group", () => {
+    mocks.store = {
+      ...mocks.store,
+      enabledProxyGroups: [],
+      customProxyGroups: [
+        { id: "media", name: "Media", emoji: "", groupType: "select", enabled: false },
+      ],
+      proxyGroupAdvanced: {},
+    };
+
+    const html = renderToStaticMarkup(
+      React.createElement(ProxyGroupAdvancedPanel, {
+        target: { kind: "custom", id: "media", name: "Media" },
+        advanced: {},
+        onChange: vi.fn(),
+        rulesCount: 0,
+        rulesContent: null,
+      }),
+    );
+
+    expect(html).toContain("US Source");
+    expect(html).toContain("Japan Source");
+    expect(html).not.toContain("暂无已启用的节点或代理组");
   });
 
   it("normalizes advanced member helpers without rendering the panel", () => {

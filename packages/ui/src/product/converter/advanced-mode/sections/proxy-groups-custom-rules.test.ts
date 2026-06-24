@@ -242,6 +242,7 @@ describe("ProxyGroupsCustomRules", () => {
     expect(html).toContain(RULE_HEADER_ROW_CLASS);
     expect(html).toContain(RULE_EDIT_PRIMARY_GROUP_CLASS);
     expect(html).toContain(RULE_EDIT_TRAILING_CONTROLS_CLASS);
+    expect(html).toContain("proxy-group-rule-no-resolve-label");
     expect(RULE_EDIT_TRAILING_CONTROLS_CLASS).toContain(
       "proxy-group-custom-rule-editor-trailing",
     );

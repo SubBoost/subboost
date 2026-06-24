@@ -323,6 +323,7 @@ describe("ProxyGroupsAddedRuleSets", () => {
     expect(html).toContain(RULE_EDIT_PRIMARY_FIELD_CLASS);
     expect(html).toContain(RULE_EDIT_TRAILING_CONTROLS_CLASS);
     expect(html).toContain(RULE_EDIT_ACTIONS_CLASS);
+    expect(html).toContain("proxy-group-rule-no-resolve-label");
     expect(mocks.captures.inputs).toHaveLength(0);
     expect(mocks.captures.selects).toHaveLength(1);
     expect(RULE_TARGET_SELECT_TRIGGER_CLASS).toContain("w-[120px]");

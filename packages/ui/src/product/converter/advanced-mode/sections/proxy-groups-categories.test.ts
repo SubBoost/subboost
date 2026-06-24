@@ -263,7 +263,12 @@ describe("ProxyGroupsCategories", () => {
     renderCategories({ 0: new Set(["core"]) });
 
     expect(mocks.captures.inputs).toHaveLength(0);
-    expect(renderCategories({ 0: new Set(["core"]) }).html).toContain("https://rules.example/base/");
+    const html = renderCategories({ 0: new Set(["core"]) }).html;
+    expect(html).toContain("https://rules.example/base/");
+    expect(html).toContain("grid-cols-[minmax(0,1fr)_96px]");
+    expect(html).not.toContain("md:grid-cols-[minmax(0,1fr)_96px]");
+    expect(html).toContain("min-w-0 space-y-1");
+    expect(html).toContain("h-9 w-full");
     expect(mocks.store.setRuleProviderBaseUrl).not.toHaveBeenCalled();
 
     expect(mocks.captures.moduleCards).toHaveLength(1);

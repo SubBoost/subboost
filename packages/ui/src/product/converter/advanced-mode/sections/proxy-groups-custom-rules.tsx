@@ -296,7 +296,7 @@ export function ProxyGroupsCustomRules() {
                 checked={newRuleNoResolve}
                 onCheckedChange={setNewRuleNoResolve}
               />
-              <span className="text-[10px] text-white/50">no-resolve</span>
+              <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">no-resolve</span>
             </div>
             <Button
               type="button"
@@ -414,7 +414,7 @@ export function ProxyGroupsCustomRules() {
                             )
                           }
                         />
-                        <span className="text-[10px] text-white/50">
+                        <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">
                           no-resolve
                         </span>
                       </div>

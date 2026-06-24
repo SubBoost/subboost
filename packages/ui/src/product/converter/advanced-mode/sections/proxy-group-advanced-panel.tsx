@@ -182,6 +182,16 @@ export function ProxyGroupAdvancedPanel({
     () => customProxyGroups.filter((group) => group.enabled !== false),
     [customProxyGroups],
   );
+  const previewEnabledProxyGroups = React.useMemo(() => {
+    if (target.kind !== "module" || enabledProxyGroups.includes(target.id)) return enabledProxyGroups;
+    return [...enabledProxyGroups, target.id];
+  }, [enabledProxyGroups, target.id, target.kind]);
+  const previewCustomProxyGroups = React.useMemo(() => {
+    if (target.kind !== "custom") return customProxyGroups;
+    return customProxyGroups.map((group) =>
+      group.id === target.id && group.enabled === false ? { ...group, enabled: true } : group,
+    );
+  }, [customProxyGroups, target.id, target.kind]);
 
   const activeNodes = React.useMemo(
     () => nodes.filter((node) => !isSubscriptionInfoNodeName(node.name)),
@@ -202,11 +212,11 @@ export function ProxyGroupAdvancedPanel({
     if (nodes.length === 0) return [];
     const generated = generateProxyGroups({
       nodes,
-      enabledModules: enabledProxyGroups,
+      enabledModules: previewEnabledProxyGroups,
       ruleProviderBaseUrl,
       testUrl,
       testInterval,
-      customProxyGroups: activeCustomProxyGroups,
+      customProxyGroups: previewCustomProxyGroups,
       customRuleSets,
       proxyGroupAdvanced,
       builtinRuleEdits,
@@ -215,11 +225,11 @@ export function ProxyGroupAdvancedPanel({
     return generated.find((group) => group.name === target.name)?.proxies ?? [];
   }, [
     nodes,
-    enabledProxyGroups,
+    previewEnabledProxyGroups,
     ruleProviderBaseUrl,
     testUrl,
     testInterval,
-    activeCustomProxyGroups,
+    previewCustomProxyGroups,
     customRuleSets,
     proxyGroupAdvanced,
     builtinRuleEdits,
@@ -325,7 +335,7 @@ export function ProxyGroupAdvancedPanel({
       <div className="grid gap-0 md:grid-cols-[1fr_1fr_1fr]">
         <div className="p-3">
           <div className={ADVANCED_PANEL_TITLE_CLASS}>导入源</div>
-          <div className="space-y-1.5">
+          <div className="max-h-52 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar">
             {sourceOptions.length === 0 ? (
               <div className="text-[11px] text-white/35">暂无可匹配的导入源</div>
             ) : (
@@ -453,7 +463,7 @@ export function ProxyGroupAdvancedPanel({
           {excludedMembers.length === 0 ? (
             <div className="text-[11px] text-white/35">暂无未启用的节点或代理组</div>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="max-h-52 overflow-y-auto pr-1 custom-scrollbar flex flex-wrap gap-1.5">
               {excludedMembers.map((member) => {
                 return (
                   <button
