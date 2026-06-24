@@ -150,6 +150,71 @@ ENV
     expect(result.stdout).toContain("Doctor: OK");
   });
 
+  it("loads SUBBOOST_PORT from .env before doctor health checks", () => {
+    const script = `
+      set -Eeuo pipefail
+      home="$(mktemp -d)"
+      trap 'rm -rf "$home"' EXIT
+      cat > "$home/.env" <<'ENV'
+SUBBOOST_IMAGE=image
+POSTGRES_DB=subboost
+POSTGRES_USER=subboost
+POSTGRES_PASSWORD=password
+DATABASE_URL=postgresql://subboost:password@db:5432/subboost?schema=public
+ENCRYPTION_KEY=key
+JWT_SECRET=jwt
+CRON_SECRET=cron
+APP_URL=http://127.0.0.1:31041
+SUBBOOST_PORT=31041
+ENV
+      : > "$home/docker-compose.yml"
+      export SUBBOOST_SCRIPT_SOURCE_ONLY=1
+      export SUBBOOST_HOME="$home"
+      export SUBBOOST_DOCTOR_HEALTH_ATTEMPTS=1
+      export SUBBOOST_DOCTOR_HEALTH_INTERVAL_SECONDS=0
+      unset SUBBOOST_PORT APP_URL
+      source local/scripts/subboost.sh
+      docker() {
+        if [ "$1" = "info" ]; then return 0; fi
+        if [ "$1" = "compose" ]; then
+          case "$*" in
+            "compose version"*) return 0 ;;
+            *" config") return 0 ;;
+            *" ps -q app") printf 'app-id\\n'; return 0 ;;
+            *" ps -q db") printf 'db-id\\n'; return 0 ;;
+            *" ps -q cron") printf 'cron-id\\n'; return 0 ;;
+          esac
+        fi
+        if [ "$1" = "inspect" ]; then
+          case "$*" in
+            *".State.Status"*) printf 'running\\n'; return 0 ;;
+            *".State.Health"*) printf 'healthy\\n'; return 0 ;;
+          esac
+        fi
+        return 0
+      }
+      curl_urls="$home/curl-urls"
+      : > "$curl_urls"
+      curl() {
+        printf '%s\\n' "$*" >> "$curl_urls"
+        case "$*" in
+          *"http://127.0.0.1:31041/api/health/"*) return 0 ;;
+        esac
+        return 1
+      }
+      doctor_cmd
+      cat "$curl_urls"
+    `;
+
+    const result = runBash(script);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Doctor: OK");
+    expect(result.stdout).toContain("http://127.0.0.1:31041/api/health/live");
+    expect(result.stdout).toContain("http://127.0.0.1:31041/api/health/ready");
+    expect(result.stdout).not.toContain("http://127.0.0.1:3000/api/health");
+  });
+
   it("waits for health before reporting update status", () => {
     const script = `
       set -Eeuo pipefail
