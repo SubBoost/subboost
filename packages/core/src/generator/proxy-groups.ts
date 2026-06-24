@@ -197,7 +197,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         "DIRECT",
         "REJECT"
       );
-  const customBaseProxies = moduleBaseProxies;
+  const customBaseProxies = fallbackTargets("DIRECT", "REJECT", ...filteredNodeNames);
   const availableMemberProxyNames = fallbackTargets(
     "DIRECT",
     "REJECT",
@@ -252,7 +252,6 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
             autoTarget,
             "DIRECT",
             "REJECT",
-            ...customGroupNames,
             ...nodeNames
           );
           groups.push({
@@ -408,7 +407,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
         type: "select",
         proxies: resolveCustom(
-          fallbackTargets("DIRECT", "REJECT", selectTarget, autoTarget, ...filteredNodeNames).filter(
+          fallbackTargets("DIRECT", "REJECT", ...filteredNodeNames).filter(
             (target) => target !== customGroup.name
           )
         ),
@@ -420,7 +419,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
         type: "select",
         proxies: resolveCustom(
-          fallbackTargets("REJECT", "DIRECT", selectTarget).filter(
+          fallbackTargets("REJECT", "DIRECT", ...filteredNodeNames).filter(
             (target) => target !== customGroup.name
           )
         ),

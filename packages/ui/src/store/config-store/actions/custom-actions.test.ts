@@ -85,7 +85,7 @@ describe("custom config-store actions", () => {
     const groupId = getState().customProxyGroups[0].id;
     expect(groupId).toBe("custom-group-1767225600000");
     expect(getState().customProxyGroups[0]).toEqual(
-      expect.objectContaining({ includeInGroupMembers: true })
+      expect.objectContaining({ includeInGroupMembers: false })
     );
 
     actions.updateCustomProxyGroup(groupId, {

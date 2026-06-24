@@ -141,7 +141,55 @@ describe("proxy group generator", () => {
     });
   });
 
-  it("keeps filtered-node custom groups node-scoped while exposing them as policy members", () => {
+  it("defaults ordinary custom groups to node-only members without adding them to node select", () => {
+    const groups = generateProxyGroups({
+      nodes: [node("Node A"), node("Node B")],
+      enabledModules: ["select", "auto"],
+      ruleProviderBaseUrl: "https://rules.example.com",
+      testUrl: "https://probe.example.com/204",
+      testInterval: 120,
+      customProxyGroups: [
+        customGroup("one", "select"),
+        customGroup("two", "select"),
+        customGroup("direct", "direct-first"),
+        customGroup("reject", "reject-first"),
+      ],
+    });
+
+    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).toEqual([
+      "⚡ 自动选择",
+      "DIRECT",
+      "REJECT",
+      "Node A",
+      "Node B",
+    ]);
+    expect(groups.find((group) => group.name === "Custom one")?.proxies).toEqual([
+      "DIRECT",
+      "REJECT",
+      "Node A",
+      "Node B",
+    ]);
+    expect(groups.find((group) => group.name === "Custom two")?.proxies).toEqual([
+      "DIRECT",
+      "REJECT",
+      "Node A",
+      "Node B",
+    ]);
+    expect(groups.find((group) => group.name === "Custom direct")?.proxies).toEqual([
+      "DIRECT",
+      "REJECT",
+      "Node A",
+      "Node B",
+    ]);
+    expect(groups.find((group) => group.name === "Custom reject")?.proxies).toEqual([
+      "REJECT",
+      "DIRECT",
+      "Node A",
+      "Node B",
+    ]);
+  });
+
+  it("keeps filtered-node custom groups node-scoped while exposing them as non-select policy members", () => {
     const groups = generateProxyGroups({
       nodes: [node("Node A"), node("Node B"), node("Filtered")],
       proxyProviderNames: ["remote"],
@@ -152,7 +200,7 @@ describe("proxy group generator", () => {
       customProxyGroups: [
         {
           id: "filtered",
-          name: "Filtered",
+          name: "Filtered Group",
           emoji: "",
           memberSource: "filtered-nodes",
           includeInGroupMembers: true,
@@ -163,25 +211,26 @@ describe("proxy group generator", () => {
       ],
     });
 
-    expect(groups[0]?.name).toBe("Filtered");
-    expect(groups.find((group) => group.name === "Filtered")?.proxies).toEqual([
+    expect(groups[0]?.name).toBe("Filtered Group");
+    expect(groups.find((group) => group.name === "Filtered Group")?.proxies).toEqual([
       "DIRECT",
       "REJECT",
       "Node A",
       "Filtered",
     ]);
-    expect(groups.find((group) => group.name === "Filtered")).not.toHaveProperty("use");
-    expect(groups.find((group) => group.name === "Filtered")?.proxies).not.toContain("Custom normal");
-    expect(groups.find((group) => group.name === "Filtered")?.proxies).not.toContain("🚀 节点选择");
-    expect(groups.find((group) => group.name === "Custom normal")?.proxies).toContain("Filtered");
+    expect(groups.find((group) => group.name === "Filtered Group")).not.toHaveProperty("use");
+    expect(groups.find((group) => group.name === "Filtered Group")?.proxies).not.toContain("Custom normal");
+    expect(groups.find((group) => group.name === "Filtered Group")?.proxies).not.toContain("🚀 节点选择");
+    expect(groups.find((group) => group.name === "Custom normal")?.proxies).not.toContain("Filtered Group");
+    expect(groups.find((group) => group.name === "Custom normal")?.proxies).not.toContain("🚀 节点选择");
     expect(groups.find((group) => group.name === "Custom normal")?.proxies).not.toContain("Custom normal");
     expect(groups.find((group) => group.name === "Custom normal")).toMatchObject({ use: ["remote"] });
-    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).toContain("Filtered");
-    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).toContain("Custom normal");
+    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).not.toContain("Filtered Group");
+    expect(groups.find((group) => group.name === "🚀 节点选择")?.proxies).not.toContain("Custom normal");
     expect(groups.find((group) => group.name === "🏠 私有网络")?.proxies?.slice(0, 5)).toEqual([
       "DIRECT",
       "REJECT",
-      "Filtered",
+      "Filtered Group",
       "Custom normal",
       "🚀 节点选择",
     ]);
