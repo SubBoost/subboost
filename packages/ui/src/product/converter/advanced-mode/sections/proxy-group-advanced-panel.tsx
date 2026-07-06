@@ -106,6 +106,15 @@ export function withMember(list: readonly ProxyGroupMemberRef[] | undefined, mem
   return [...withoutMember(list, key), member];
 }
 
+function isNodeMember(member: ResolvedMember): boolean {
+  return member.kind === "node";
+}
+
+function isRuleGroupMember(member: ResolvedMember): boolean {
+  // 规则组区域承载所有非节点成员，包括内置/自定义组以及 DIRECT/REJECT。
+  return member.kind !== "node";
+}
+
 const PROTECTED_INSERT_KEYS = new Set([
   "direct:DIRECT",
   "reject:REJECT",
@@ -275,6 +284,17 @@ export function ProxyGroupAdvancedPanel({
     return candidateMembers.filter((member) => !included.has(member.key));
   }, [candidateMembers, includedMembers]);
 
+  const includedNodeMembers = React.useMemo(() => includedMembers.filter(isNodeMember), [includedMembers]);
+  const includedRuleGroupMembers = React.useMemo(
+    () => includedMembers.filter(isRuleGroupMember),
+    [includedMembers],
+  );
+  const excludedNodeMembers = React.useMemo(() => excludedMembers.filter(isNodeMember), [excludedMembers]);
+  const excludedRuleGroupMembers = React.useMemo(
+    () => excludedMembers.filter(isRuleGroupMember),
+    [excludedMembers],
+  );
+
   const sourceOptions = React.useMemo(() => {
     const sourceIdsInNodes = new Set<string>();
     for (const node of activeNodes) {
@@ -328,6 +348,110 @@ export function ProxyGroupAdvancedPanel({
       });
     },
     [excludedRefs, extraRefs, includedMembers, onChange],
+  );
+
+  const clearMembers = React.useCallback((members: ResolvedMember[]) => {
+    if (members.length === 0) return;
+
+    const includedKeys = new Set(members.map((member) => member.key));
+    const nextExcludedMembers = [...excludedRefs];
+    const excludedKeys = new Set(excludedRefs.map(getProxyGroupMemberKey));
+
+    for (const member of members) {
+      if (excludedKeys.has(member.key)) continue;
+      excludedKeys.add(member.key);
+      nextExcludedMembers.push(member.ref);
+    }
+
+    onChange({
+      // 清空当前列表时同步清掉手动加入和排序，避免旧配置把成员重新带回。
+      extraMembers: extraRefs.filter(
+        (member) => !includedKeys.has(getProxyGroupMemberKey(member)),
+      ),
+      excludedMembers: nextExcludedMembers,
+      memberOrder: normalizeList(advanced.memberOrder).filter(
+        (member) => !includedKeys.has(getProxyGroupMemberKey(member)),
+      ),
+    });
+  }, [advanced.memberOrder, excludedRefs, extraRefs, onChange]);
+
+  const clearIncludedNodeMembers = React.useCallback(() => {
+    clearMembers(includedNodeMembers);
+  }, [clearMembers, includedNodeMembers]);
+
+  const clearIncludedRuleGroupMembers = React.useCallback(() => {
+    clearMembers(includedRuleGroupMembers);
+  }, [clearMembers, includedRuleGroupMembers]);
+
+  const renderIncludedMembers = (members: ResolvedMember[], emptyMessage: string) => (
+    members.length === 0 ? (
+      <div className="rounded border border-white/10 bg-white/[0.03] px-3 py-3 text-[11px] text-white/35">
+        {emptyMessage}
+      </div>
+    ) : (
+      <div className="max-h-52 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
+        {members.map((member) => (
+          <div
+            key={member.key}
+            draggable
+            onDragStart={() => setDraggingKey(member.key)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => {
+              if (draggingKey) moveMember(draggingKey, member.key);
+              setDraggingKey(null);
+            }}
+            onDragEnd={() => setDraggingKey(null)}
+            className={cn(
+              "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs",
+              draggingKey === member.key && "opacity-50",
+            )}
+          >
+            <span className="flex h-5 w-4 cursor-grab items-center justify-center">
+              <DragHandle />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-white/75" title={memberLabel(member)}>
+                {memberLabel(member)}
+              </div>
+              <div className="text-[10px] text-white/35">{memberKindLabel(member)}</div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-white/35 hover:text-red-300"
+              title="排除"
+              onClick={() => disableMember(member)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    )
+  );
+
+  const renderExcludedMembers = (members: ResolvedMember[], emptyMessage: string) => (
+    members.length === 0 ? (
+      <div className="text-[11px] text-white/35">{emptyMessage}</div>
+    ) : (
+      <div className="max-h-52 overflow-y-auto pr-1 custom-scrollbar flex flex-wrap gap-1.5">
+        {members.map((member) => {
+          return (
+            <button
+              key={member.key}
+              type="button"
+              className="inline-flex max-w-full items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/55 transition-colors hover:border-emerald-400/30 hover:bg-emerald-500/10 hover:text-emerald-100"
+              title={memberLabel(member)}
+              onClick={() => enableMember(member)}
+            >
+              <Plus className="h-3 w-3" />
+              <span className="truncate">{memberLabel(member)}</span>
+            </button>
+          );
+        })}
+      </div>
+    )
   );
 
   return (
@@ -407,79 +531,54 @@ export function ProxyGroupAdvancedPanel({
       <div className="p-3">
         <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
           <div className="text-[11px] font-medium text-white/50">已启用节点</div>
-          <CountBadge>{includedMembers.length} 个</CountBadge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] text-white/35 hover:text-red-300 disabled:pointer-events-none disabled:opacity-35"
+            title="清空节点"
+            disabled={includedNodeMembers.length === 0}
+            onClick={clearIncludedNodeMembers}
+          >
+            清空节点
+          </Button>
+          <CountBadge>{includedNodeMembers.length} 个</CountBadge>
         </div>
-        {includedMembers.length === 0 ? (
-          <div className="rounded border border-white/10 bg-white/[0.03] px-3 py-3 text-[11px] text-white/35">
-            暂无已启用的节点或代理组
-          </div>
-        ) : (
-          <div className="max-h-52 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
-            {includedMembers.map((member) => (
-              <div
-                key={member.key}
-                draggable
-                onDragStart={() => setDraggingKey(member.key)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => {
-                  if (draggingKey) moveMember(draggingKey, member.key);
-                  setDraggingKey(null);
-                }}
-                onDragEnd={() => setDraggingKey(null)}
-                className={cn(
-                  "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs",
-                  draggingKey === member.key && "opacity-50",
-                )}
-              >
-                <span className="flex h-5 w-4 cursor-grab items-center justify-center">
-                  <DragHandle />
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-white/75" title={memberLabel(member)}>
-                    {memberLabel(member)}
-                  </div>
-                  <div className="text-[10px] text-white/35">{memberKindLabel(member)}</div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-white/35 hover:text-red-300"
-                  title="排除"
-                  onClick={() => disableMember(member)}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+        {renderIncludedMembers(includedNodeMembers, "暂无已启用的节点")}
 
         <div className="mt-3">
           <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
             <div className="text-[11px] font-medium text-white/50">未启用节点</div>
-            <CountBadge>{excludedMembers.length} 个</CountBadge>
+            <CountBadge>{excludedNodeMembers.length} 个</CountBadge>
           </div>
-          {excludedMembers.length === 0 ? (
-            <div className="text-[11px] text-white/35">暂无未启用的节点或代理组</div>
-          ) : (
-            <div className="max-h-52 overflow-y-auto pr-1 custom-scrollbar flex flex-wrap gap-1.5">
-              {excludedMembers.map((member) => {
-                return (
-                  <button
-                    key={member.key}
-                    type="button"
-                    className="inline-flex max-w-full items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/55 transition-colors hover:border-emerald-400/30 hover:bg-emerald-500/10 hover:text-emerald-100"
-                    title={memberLabel(member)}
-                    onClick={() => enableMember(member)}
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span className="truncate">{memberLabel(member)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {renderExcludedMembers(excludedNodeMembers, "暂无未启用的节点")}
+        </div>
+
+        <div className="mt-3">
+          <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
+            <div className="text-[11px] font-medium text-white/50">已启用规则组</div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-5 px-1.5 text-[10px] text-white/35 hover:text-red-300 disabled:pointer-events-none disabled:opacity-35"
+              title="清空规则组"
+              disabled={includedRuleGroupMembers.length === 0}
+              onClick={clearIncludedRuleGroupMembers}
+            >
+              清空规则组
+            </Button>
+            <CountBadge>{includedRuleGroupMembers.length} 个</CountBadge>
+          </div>
+          {renderIncludedMembers(includedRuleGroupMembers, "暂无已启用的规则组")}
+        </div>
+
+        <div className="mt-3">
+          <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
+            <div className="text-[11px] font-medium text-white/50">未启用规则组</div>
+            <CountBadge>{excludedRuleGroupMembers.length} 个</CountBadge>
+          </div>
+          {renderExcludedMembers(excludedRuleGroupMembers, "暂无未启用的规则组")}
         </div>
       </div>
 

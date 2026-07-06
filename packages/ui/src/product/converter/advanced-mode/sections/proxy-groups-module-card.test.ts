@@ -150,7 +150,7 @@ describe("ProxyGroupsModuleCard", () => {
 
     expect(html).toContain("Gemini Display");
     expect(html).toContain("AI description");
-    expect(html).toContain("3 规则");
+    expect(html).toContain("3 分流规则");
     expect(html).toContain("Gemini 分流说明");
     expect(html).toContain("rules-panel");
     expect(mocks.panels[0]).toEqual(expect.objectContaining({ module: baseModule, cnIpNoResolve: true }));
@@ -271,15 +271,18 @@ describe("ProxyGroupsModuleCard", () => {
         props({
           module: { ...baseModule, id: "manual", description: "手动选择代理节点" },
           display: { full: "手动选择" },
+          memberStats: { nodeCount: 1, ruleSetCount: 1 },
         })
       )
     );
 
     expect(html).toContain("手动选择代理节点");
     expect(html).toContain('text-indigo-300">手动选择代理节点');
-    expect(html).toContain('text-emerald-300">3 规则');
+    expect(html).toContain('text-emerald-300">3 分流规则');
+    expect(html).toContain("1 节点");
+    expect(html).toContain("1 规则集");
     expect(html).not.toContain('title="手动选择代理节点');
-    expect(html).not.toContain('title="3 规则');
+    expect(html).not.toContain('title="3 分流规则');
 
     const overrideHtml = renderToStaticMarkup(
       React.createElement(
@@ -305,7 +308,7 @@ describe("ProxyGroupsModuleCard", () => {
         })
       )
     );
-    expect(emptyDescriptionHtml).toContain("0 规则");
+    expect(emptyDescriptionHtml).toContain("0 分流规则");
     expect(emptyDescriptionHtml).not.toContain("AI description");
   });
 });

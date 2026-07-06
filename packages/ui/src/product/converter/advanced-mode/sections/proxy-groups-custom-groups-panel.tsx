@@ -36,14 +36,14 @@ import {
   toProxyGroupNameDraft,
   type ProxyGroupNameDraft,
 } from "./proxy-group-name-editor";
-import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
+import { ProxyGroupsModuleCard, type ProxyGroupMemberStats } from "./proxy-groups-module-card";
 
 export function ProxyGroupsCustomGroupsPanel({
   advancedMode = false,
-  nodeCounts,
+  memberStats,
 }: {
   advancedMode?: boolean;
-  nodeCounts?: Map<string, number>;
+  memberStats?: Map<string, ProxyGroupMemberStats>;
 }) {
   const {
     enabledProxyGroups,
@@ -253,7 +253,7 @@ export function ProxyGroupsCustomGroupsPanel({
             );
             const totalRules = groupRuleSets.length + manualRules.length;
             const description = group.description?.trim() || "自定义代理组";
-            const nodeCount = nodeCounts?.get(group.name) ?? 0;
+            const groupMemberStats = memberStats?.get(group.name);
 
             const toggleExpand = () => {
               setExpandedCustomGroups((prev) => {
@@ -424,7 +424,7 @@ export function ProxyGroupsCustomGroupsPanel({
                 }
                 rulesCountOverride={totalRules}
                 advancedMode={advancedMode}
-                nodeCount={nodeCount}
+                memberStats={groupMemberStats}
                 renderAdvancedContent={(content, count) => (
                   <ProxyGroupAdvancedPanel
                     target={{ kind: "custom", id: group.id, name: group.name }}

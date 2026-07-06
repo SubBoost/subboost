@@ -173,7 +173,7 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ memberOrder: expect.any(Array) }));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        excludedMembers: expect.arrayContaining([expect.objectContaining({ kind: "direct" })]),
+        excludedMembers: expect.arrayContaining([expect.objectContaining({ name: "US Source" })]),
       }),
     );
     expect(onChange).toHaveBeenCalledWith(
@@ -181,8 +181,83 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
         extraMembers: expect.arrayContaining([expect.objectContaining({ kind: "reject" })]),
       }),
     );
-    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("direct:DIRECT");
+    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("node:US Source");
     expect(mocks.stateSetters[0]).toHaveBeenCalledWith(null);
+  });
+
+  it("clears enabled nodes from advanced member config", () => {
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: {
+        extraMembers: [
+          { kind: "node", name: "Japan Source" },
+          { kind: "node", name: "Extra Node" },
+        ],
+        excludedMembers: [{ kind: "reject" }],
+        memberOrder: [
+          { kind: "direct" },
+          { kind: "node", name: "Extra Node" },
+          { kind: "node", name: "Japan Source" },
+        ],
+      },
+      onChange,
+      rulesCount: 0,
+      rulesContent: null,
+    });
+    const clearButton = flattenElements(tree).find(
+      (element) => element.type === "button" && element.props.title === "清空节点",
+    );
+
+    expect(clearButton?.props.disabled).toBe(false);
+    clearButton?.props.onClick();
+
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [{ kind: "node", name: "Extra Node" }],
+      excludedMembers: [
+        { kind: "reject" },
+        { kind: "node", name: "US Source" },
+        { kind: "node", name: "Japan Source" },
+      ],
+      memberOrder: [{ kind: "direct" }, { kind: "node", name: "Extra Node" }],
+    });
+  });
+
+  it("clears enabled rule groups from advanced member config", () => {
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: {
+        extraMembers: [
+          { kind: "direct" },
+          { kind: "node", name: "Extra Node" },
+        ],
+        excludedMembers: [{ kind: "reject" }],
+        memberOrder: [
+          { kind: "direct" },
+          { kind: "node", name: "US Source" },
+          { kind: "node", name: "Extra Node" },
+        ],
+      },
+      onChange,
+      rulesCount: 0,
+      rulesContent: null,
+    });
+    const clearButton = flattenElements(tree).find(
+      (element) => element.type === "button" && element.props.title === "清空规则组",
+    );
+
+    expect(clearButton?.props.disabled).toBe(false);
+    clearButton?.props.onClick();
+
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [{ kind: "node", name: "Extra Node" }],
+      excludedMembers: [{ kind: "reject" }, { kind: "direct" }],
+      memberOrder: [
+        { kind: "node", name: "US Source" },
+        { kind: "node", name: "Extra Node" },
+      ],
+    });
   });
 
   it("ignores member drops without a real move target", () => {
@@ -203,7 +278,7 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
 
     vi.clearAllMocks();
     mocks.stateSetters = [];
-    mocks.draggingKey = "direct:DIRECT";
+    mocks.draggingKey = "node:US Source";
     tree = ProxyGroupAdvancedPanel({
       target: { kind: "custom", id: "media", name: "Media" },
       advanced: {},

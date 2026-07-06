@@ -33,6 +33,11 @@ import {
   type ProxyGroupTypeMenuValue,
 } from "./proxy-group-type-menu";
 
+export type ProxyGroupMemberStats = {
+  nodeCount: number;
+  ruleSetCount: number;
+};
+
 function ModuleHintPopover({ moduleId }: { moduleId: string }) {
   const isGemini = moduleId === "gemini";
   const label = isGemini ? "Gemini 分流说明" : "谷歌学术分流说明";
@@ -141,7 +146,7 @@ export function ProxyGroupsModuleCard({
   rulesContentOverride,
   rulesCountOverride,
   advancedMode = false,
-  nodeCount = 0,
+  memberStats = { nodeCount: 0, ruleSetCount: 0 },
   renderAdvancedContent,
 }: {
   module: ProxyGroupModule;
@@ -191,7 +196,7 @@ export function ProxyGroupsModuleCard({
   rulesContentOverride?: React.ReactNode;
   rulesCountOverride?: number;
   advancedMode?: boolean;
-  nodeCount?: number;
+  memberStats?: ProxyGroupMemberStats;
   renderAdvancedContent?: (rulesContent: React.ReactNode, rulesCount: number) => React.ReactNode;
 }) {
   const effectiveRules = getEffectiveModuleRuleItems(module, ruleSetsByTarget, hiddenPresetRuleIds);
@@ -213,8 +218,11 @@ export function ProxyGroupsModuleCard({
       : getProxyGroupTypeLabel(effectiveGroupType);
   const summaryItems = [
     { label: description ?? module.description ?? "", tone: "accent" as const },
-    { label: `${totalRules} 规则`, tone: "success" as const },
-    { label: `${nodeCount} 节点`, tone: "muted" as const },
+    { label: `${totalRules} 分流规则`, tone: "success" as const },
+    { label: `${memberStats.nodeCount} 节点`, tone: "muted" as const },
+    ...(memberStats.ruleSetCount > 0
+      ? [{ label: `${memberStats.ruleSetCount} 规则集`, tone: "muted" as const }]
+      : []),
   ];
   const rulesContent = rulesContentOverride !== undefined ? rulesContentOverride : hasRuleManagement ? (
     <ProxyGroupsModuleRulesPanel

@@ -408,7 +408,7 @@ describe("ProxyGroupsCategories", () => {
     renderCategories({ 0: new Set(["core"]) });
     const card = mocks.captures.moduleCards[0];
 
-    expect(card.nodeCount).toBe(2);
+    expect(card.memberStats).toEqual({ nodeCount: 1, ruleSetCount: 1 });
     expect(card.extraRules).toEqual([
       { id: "set-1", name: "Set 1", behavior: "domain", path: "geosite/set-1.mrs", noResolve: true },
     ]);
@@ -470,7 +470,7 @@ describe("ProxyGroupsCategories", () => {
 
     renderCategories({ 0: new Set(["core"]) });
 
-    expect(mocks.captures.moduleCards[0].nodeCount).toBe(0);
+    expect(mocks.captures.moduleCards[0].memberStats).toEqual({ nodeCount: 0, ruleSetCount: 0 });
     expect(mocks.captures.moduleCards[0].extraRules).toEqual([]);
   });
 

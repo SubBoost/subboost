@@ -146,7 +146,7 @@ describe("ProxyGroupsCustomGroupsPanel card props", () => {
     renderToStaticMarkup(
       React.createElement(ProxyGroupsCustomGroupsPanel, {
         advancedMode: true,
-        nodeCounts: new Map([["C Custom", 3]]),
+        memberStats: new Map([["C Custom", { nodeCount: 2, ruleSetCount: 1 }]]),
       }),
     );
 
@@ -154,7 +154,7 @@ describe("ProxyGroupsCustomGroupsPanel card props", () => {
     expect(card).toMatchObject({
       advancedMode: true,
       isEnabled: false,
-      nodeCount: 3,
+      memberStats: { nodeCount: 2, ruleSetCount: 1 },
       rulesCountOverride: 2,
     });
 

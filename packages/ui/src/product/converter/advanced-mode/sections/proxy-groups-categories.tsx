@@ -33,11 +33,25 @@ import {
 import { ProxyGroupsCustomGroupsPanel } from "./proxy-groups-custom-groups-panel";
 import { ProxyGroupsCustomRoutingRules } from "./proxy-groups-custom-routing-rules";
 import { ProxyGroupAdvancedPanel } from "./proxy-group-advanced-panel";
-import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
+import { ProxyGroupsModuleCard, type ProxyGroupMemberStats } from "./proxy-groups-module-card";
 
 const PROXY_GROUP_SECTION_LABEL_ROW_CLASS = "flex min-h-7 items-center gap-2";
 const PROXY_GROUP_SECTION_LABEL_CLASS = "text-xs text-white/50";
 const CUSTOM_CATEGORY_ID = "custom";
+
+function countProxyGroupMembers(proxies: unknown, nodeNames: Set<string>): ProxyGroupMemberStats {
+  if (!Array.isArray(proxies)) return { nodeCount: 0, ruleSetCount: 0 };
+
+  let nodeCount = 0;
+  let ruleSetCount = 0;
+  for (const proxyName of proxies) {
+    if (typeof proxyName !== "string" || !proxyName.trim()) continue;
+    // 生成后的 proxies 中既可能是真实节点，也可能是内置/自定义规则组；卡片摘要需要拆开显示。
+    if (nodeNames.has(proxyName)) nodeCount += 1;
+    else ruleSetCount += 1;
+  }
+  return { nodeCount, ruleSetCount };
+}
 
 export function ProxyGroupsCategories() {
   const {
@@ -157,8 +171,9 @@ export function ProxyGroupsCategories() {
     }
     return grouped;
   }, [hiddenProxyGroups]);
-  const generatedProxyGroupNodeCounts = React.useMemo(() => {
-    if (nodes.length === 0) return new Map<string, number>();
+  const generatedProxyGroupMemberStats = React.useMemo(() => {
+    if (nodes.length === 0) return new Map<string, ProxyGroupMemberStats>();
+    const nodeNames = new Set(nodes.map((node) => node.name));
     const generated = generateProxyGroups({
       nodes,
       enabledModules: enabledProxyGroups,
@@ -174,7 +189,7 @@ export function ProxyGroupsCategories() {
     return new Map(
       generated.map((group) => [
         group.name,
-        Array.isArray(group.proxies) ? group.proxies.length : 0,
+        countProxyGroupMembers(group.proxies, nodeNames),
       ]),
     );
   }, [
@@ -603,7 +618,7 @@ export function ProxyGroupsCategories() {
                                 })
                               }
                               advancedMode={proxyGroupAdvancedModeEnabled}
-                              nodeCount={generatedProxyGroupNodeCounts.get(display.full) ?? 0}
+                              memberStats={generatedProxyGroupMemberStats.get(display.full)}
                               renderAdvancedContent={(rulesContent, rulesCount) => (
                                 <ProxyGroupAdvancedPanel
                                   target={{ kind: "module", id: module.id, name: display.full }}
@@ -619,7 +634,7 @@ export function ProxyGroupsCategories() {
                       ) : (
                         <ProxyGroupsCustomGroupsPanel
                           advancedMode={proxyGroupAdvancedModeEnabled}
-                          nodeCounts={generatedProxyGroupNodeCounts}
+                          memberStats={generatedProxyGroupMemberStats}
                         />
                       )}
                     </div>
