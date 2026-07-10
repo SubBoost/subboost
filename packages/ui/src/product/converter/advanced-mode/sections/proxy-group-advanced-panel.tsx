@@ -4,6 +4,7 @@ import * as React from "react";
 import { Plus, X } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
+import { confirmDialog } from "@subboost/ui/components/ui/confirm-dialog";
 import { Input } from "@subboost/ui/components/ui/input";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { cn } from "@subboost/ui/lib/utils";
@@ -33,6 +34,7 @@ import {
   withoutMember,
   type ResolvedMember,
 } from "./proxy-group-member-bulk";
+import { ProxyGroupMemberSectionHeader } from "./proxy-group-member-section-header";
 
 export {
   insertMemberAfterProtected,
@@ -103,67 +105,6 @@ export function toggleValue<T extends string>(list: readonly T[] | undefined, va
   if (next.has(value)) next.delete(value);
   else next.add(value);
   return Array.from(next);
-}
-function CountBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <Badge variant="outline" className="ml-auto border-white/10 bg-white/5 text-[10px] text-white/45">
-      {children}
-    </Badge>
-  );
-}
-function BulkMemberActions({
-  label,
-  includedCount,
-  totalCount,
-  onAddAll,
-  onRemoveAll,
-  addDisabled,
-  removeDisabled,
-}: {
-  label: "节点" | "代理组";
-  includedCount: number;
-  totalCount: number;
-  onAddAll: () => void;
-  onRemoveAll: () => void;
-  addDisabled: boolean;
-  removeDisabled: boolean;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded border border-white/10 bg-white/[0.03] px-2 py-1.5">
-      <span className="text-[11px] font-medium text-white/55">{label}</span>
-      <Badge variant="outline" className="border-white/10 bg-white/5 text-[10px] text-white/40">
-        {includedCount}/{totalCount}
-      </Badge>
-      <div className="ml-auto flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1 px-1.5 text-[10px] text-white/45 hover:bg-emerald-500/10 hover:text-emerald-200 disabled:pointer-events-none disabled:opacity-30"
-          title={`添加全部${label}`}
-          aria-label={`添加全部${label}`}
-          disabled={addDisabled}
-          onClick={onAddAll}
-        >
-          <Plus className="h-3 w-3" />
-          全部添加
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1 px-1.5 text-[10px] text-white/45 hover:bg-red-500/10 hover:text-red-200 disabled:pointer-events-none disabled:opacity-30"
-          title={`删除全部${label}`}
-          aria-label={`删除全部${label}`}
-          disabled={removeDisabled}
-          onClick={onRemoveAll}
-        >
-          <X className="h-3 w-3" />
-          全部删除
-        </Button>
-      </div>
-    </div>
-  );
 }
 function DragHandle() {
   return (
@@ -375,6 +316,9 @@ export function ProxyGroupAdvancedPanel({
   const regions = normalizeList(advanced.regions);
   const extraRefs = normalizeList(advanced.extraMembers);
   const excludedRefs = normalizeList(advanced.excludedMembers);
+  const memberOrderRefs = normalizeList(advanced.memberOrder);
+  const hasMemberOverrides =
+    extraRefs.length > 0 || excludedRefs.length > 0 || memberOrderRefs.length > 0;
 
   const disableMember = React.useCallback(
     (member: ResolvedMember) => {
@@ -452,6 +396,17 @@ export function ProxyGroupAdvancedPanel({
     );
   }, [advanced, onChange, proxyGroupMembers]);
 
+  const restoreDefaultMembers = React.useCallback(async () => {
+    const confirmed = await confirmDialog({
+      title: "恢复默认成员？",
+      description: "将清除当前代理组的手动添加、排除和排序。导入源、地区、正则筛选及分流规则不会改变。",
+      confirmText: "恢复",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+    onChange({ extraMembers: [], excludedMembers: [], memberOrder: [] });
+  }, [onChange]);
+
   return (
     <div className="border-t border-white/10">
       <div className="grid gap-0 md:grid-cols-[1fr_1fr_1fr]">
@@ -527,31 +482,17 @@ export function ProxyGroupAdvancedPanel({
       <div className="mx-3 h-px bg-white/10" />
 
       <div className="p-3">
-        <div className="mb-3 grid gap-2 sm:grid-cols-2">
-          <BulkMemberActions
-            label="节点"
-            includedCount={includedNodeMembers.length}
-            totalCount={nodeMembers.length}
-            onAddAll={addAllNodes}
-            onRemoveAll={removeAllNodes}
-            addDisabled={excludedNodeMembers.length === 0}
-            removeDisabled={includedNodeMembers.length === 0}
-          />
-          <BulkMemberActions
-            label="代理组"
-            includedCount={includedProxyGroupMembers.length}
-            totalCount={proxyGroupMembers.length}
-            onAddAll={addAllProxyGroups}
-            onRemoveAll={removeAllProxyGroups}
-            addDisabled={excludedProxyGroupMembers.length === 0}
-            removeDisabled={includedProxyGroupMembers.length === 0}
-          />
-        </div>
-
-        <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
-          <div className="text-[11px] font-medium text-white/50">已启用成员</div>
-          <CountBadge>{includedMembers.length} 个</CountBadge>
-        </div>
+        <ProxyGroupMemberSectionHeader
+          mode="included"
+          nodeCount={includedNodeMembers.length}
+          proxyGroupCount={includedProxyGroupMembers.length}
+          onNodeAction={removeAllNodes}
+          onProxyGroupAction={removeAllProxyGroups}
+          nodeActionDisabled={includedNodeMembers.length === 0}
+          proxyGroupActionDisabled={includedProxyGroupMembers.length === 0}
+          onRestore={restoreDefaultMembers}
+          restoreDisabled={!hasMemberOverrides}
+        />
         {includedMembers.length === 0 ? (
           <div className="rounded border border-white/10 bg-white/[0.03] px-3 py-3 text-[11px] text-white/35">
             暂无已启用成员
@@ -599,10 +540,15 @@ export function ProxyGroupAdvancedPanel({
         )}
 
         <div className="mt-3">
-          <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
-            <div className="text-[11px] font-medium text-white/50">未启用成员</div>
-            <CountBadge>{excludedMembers.length} 个</CountBadge>
-          </div>
+          <ProxyGroupMemberSectionHeader
+            mode="excluded"
+            nodeCount={excludedNodeMembers.length}
+            proxyGroupCount={excludedProxyGroupMembers.length}
+            onNodeAction={addAllNodes}
+            onProxyGroupAction={addAllProxyGroups}
+            nodeActionDisabled={excludedNodeMembers.length === 0}
+            proxyGroupActionDisabled={excludedProxyGroupMembers.length === 0}
+          />
           {excludedMembers.length === 0 ? (
             <div className="text-[11px] text-white/35">暂无未启用成员</div>
           ) : (

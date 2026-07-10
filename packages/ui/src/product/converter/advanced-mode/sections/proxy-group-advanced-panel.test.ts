@@ -13,7 +13,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("lucide-react", () => ({
   Plus: () => React.createElement("span", null, "plus-icon"),
+  RotateCcw: () => React.createElement("span", null, "restore-icon"),
   X: () => React.createElement("span", null, "x-icon"),
+}));
+
+vi.mock("@subboost/ui/components/ui/confirm-dialog", () => ({
+  confirmDialog: vi.fn(),
 }));
 
 vi.mock("@subboost/ui/components/ui/badge", () => ({
@@ -128,16 +133,26 @@ describe("ProxyGroupAdvancedPanel", () => {
     expect(html).toContain("已启用成员");
     expect(html).toContain("未启用成员");
     expect(html).not.toContain("规则组");
+    expect(html).toContain("proxy-group-member-toolbar");
+    expect(html).toContain("whitespace-nowrap");
+    expect(html).toContain("proxy-group-member-heading-compact");
+    expect(html).toContain("proxy-group-member-action-button");
+    expect(html).toContain("proxy-group-member-action-full");
+    expect(html).toContain("proxy-group-member-action-medium");
+    expect(html).toContain("proxy-group-member-action-compact");
+    expect(html).toContain("proxy-group-member-count");
+    expect(html).not.toContain("sm:grid-cols-2");
     expect(html).toContain("rules-content");
     expect(html).toContain("还没有分流规则");
     expect(html).toContain("max-h-52 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar");
     expect(mocks.inputs.map((input) => input.value)).toEqual(["Source", "Japan"]);
     expect(mocks.buttons.map((button) => button.title)).toEqual(
       expect.arrayContaining([
+        "恢复默认成员",
         "添加全部节点",
-        "删除全部节点",
+        "移除全部节点",
         "添加全部代理组",
-        "删除全部代理组",
+        "移除全部代理组",
       ]),
     );
 
@@ -176,6 +191,8 @@ describe("ProxyGroupAdvancedPanel", () => {
 
     expect(html).toContain("暂无可匹配的导入源");
     expect(html).toContain("暂无已启用成员");
+    expect(html.match(/0 节点/g)).toHaveLength(2);
+    expect(html.match(/0 代理组/g)).toHaveLength(2);
     expect(html).toContain("DIRECT");
     expect(html).toContain("REJECT");
     expect(html).toContain("existing-rules");

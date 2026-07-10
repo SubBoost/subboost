@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   stateSetters: [] as Array<ReturnType<typeof vi.fn>>,
   store: {} as Record<string, any>,
   toast: vi.fn(),
+  confirmDialog: vi.fn(),
 }));
 
 vi.mock("react", async (importOriginal) => {
@@ -28,7 +29,12 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("lucide-react", () => ({
   Plus: () => React.createElement("span", null, "plus-icon"),
+  RotateCcw: () => React.createElement("span", null, "restore-icon"),
   X: () => React.createElement("span", null, "x-icon"),
+}));
+
+vi.mock("@subboost/ui/components/ui/confirm-dialog", () => ({
+  confirmDialog: mocks.confirmDialog,
 }));
 
 vi.mock("@subboost/ui/components/ui/badge", () => ({
@@ -104,6 +110,7 @@ function flattenElements(value: React.ReactNode): TestElement[] {
 describe("ProxyGroupAdvancedPanel interactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.confirmDialog.mockResolvedValue(true);
     mocks.draggingKey = "node:US Source";
     mocks.generatedProxyGroups = [
       { name: "Media", proxies: ["DIRECT", "US Source", "Japan Source"] },
@@ -239,7 +246,7 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
       (element) => element.type === "button" && element.props.title === "添加全部节点",
     );
     const removeAll = elements.find(
-      (element) => element.type === "button" && element.props.title === "删除全部节点",
+      (element) => element.type === "button" && element.props.title === "移除全部节点",
     );
 
     addAll?.props.onClick();
@@ -329,7 +336,7 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
       rulesContent: null,
     });
     const removeAll = flattenElements(tree).find(
-      (element) => element.type === "button" && element.props.title === "删除全部代理组",
+      (element) => element.type === "button" && element.props.title === "移除全部代理组",
     );
 
     removeAll?.props.onClick();
@@ -345,6 +352,45 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
         { kind: "direct" },
         { kind: "node", name: "US Source" },
       ],
+    });
+  });
+
+  it("restores only member overrides after confirmation", async () => {
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: {
+        sourceIds: ["source-a"],
+        includeRegex: "Source",
+        extraMembers: [{ kind: "node", name: "Extra Node" }],
+        excludedMembers: [{ kind: "reject" }],
+        memberOrder: [{ kind: "direct" }, { kind: "node", name: "Extra Node" }],
+      },
+      onChange,
+      rulesCount: 1,
+      rulesContent: null,
+    });
+    const restore = flattenElements(tree).find(
+      (element) => element.type === "button" && element.props.title === "恢复默认成员",
+    );
+
+    mocks.confirmDialog.mockResolvedValueOnce(false);
+    await restore?.props.onClick();
+    expect(onChange).not.toHaveBeenCalled();
+
+    mocks.confirmDialog.mockResolvedValueOnce(true);
+    await restore?.props.onClick();
+
+    expect(mocks.confirmDialog).toHaveBeenLastCalledWith({
+      title: "恢复默认成员？",
+      description: "将清除当前代理组的手动添加、排除和排序。导入源、地区、正则筛选及分流规则不会改变。",
+      confirmText: "恢复",
+      variant: "warning",
+    });
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [],
+      excludedMembers: [],
+      memberOrder: [],
     });
   });
 });
