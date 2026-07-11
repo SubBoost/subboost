@@ -8,6 +8,7 @@ import {
   splitNodeLinkSegments,
 } from "./content-parsers";
 import { encodeBase64 } from "./base64";
+import { parseSubscription } from "./index";
 
 function ssLink(name = "SS Node"): string {
   return `ss://${encodeBase64("aes-128-gcm:secret")}@ss.example.com:8388#${encodeURIComponent(name)}`;
@@ -29,6 +30,31 @@ describe("content parser registry helpers", () => {
     expect(isClashYamlContent("proxy-providers: {}")).toBe(true);
     expect(isClashYamlContent("- type: hysteria2\n  server: hy2.example.com\n  ports: 10000-10100")).toBe(true);
     expect(isClashYamlContent("ss://not-yaml")).toBe(false);
+  });
+
+  it("detects and parses top-level inline flow proxy arrays", () => {
+    const input = [
+      '- {name: "IPv6 A", type: vless, server: 2001:db8::1, port: 443, uuid: 11111111-1111-4111-8111-111111111111}',
+      '- {name: "IPv6 B", type: vless, server: 2001:db8::2, port: 8443, uuid: 22222222-2222-4222-8222-222222222222}',
+    ].join("\n");
+
+    expect(isClashYamlContent(input)).toBe(true);
+    expect(parseSubscription(input)).toMatchObject({
+      totalParsed: 2,
+      totalFailed: 0,
+      nodes: [
+        { name: "IPv6 A", server: "2001:db8::1", port: 443, type: "vless" },
+        { name: "IPv6 B", server: "2001:db8::2", port: 8443, type: "vless" },
+      ],
+    });
+  });
+
+  it("routes long malformed inline flow arrays to YAML errors without expensive matching", () => {
+    const input = `- {name: "${"x".repeat(100_000)}", type: vless, server: example.com, port: 443`;
+    const result = parseSubscription(input);
+
+    expect(result.nodes).toEqual([]);
+    expect(result.errors[0]).toContain("YAML 解析错误");
   });
 
   it("parses link lines and keeps per-segment errors", () => {

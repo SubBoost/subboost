@@ -5,6 +5,7 @@
  */
 
 import type { TrojanNode } from "@subboost/core/types/node";
+import { buildMihomoEchOptsFromShareValue } from "@subboost/core/mihomo/ech";
 import { splitWsPathEarlyData } from "../ws-early-data";
 import { parseUrlWithNeutralScheme, safeDecodeFormUrlEncoded, safeDecodeURIComponent } from "./url-decode";
 
@@ -76,10 +77,7 @@ export function parseTrojan(uri: string): TrojanNode {
 
   if (echRaw !== null) {
     const echValue = echRaw.trim();
-    (node as unknown as Record<string, unknown>)["ech-opts"] = {
-      enable: true,
-      ...(echValue ? { config: echValue } : {}),
-    };
+    (node as unknown as Record<string, unknown>)["ech-opts"] = buildMihomoEchOptsFromShareValue(echValue);
   }
 
   if (allowInsecure) {
@@ -131,4 +129,3 @@ export function parseTrojan(uri: string): TrojanNode {
 
   return node;
 }
-

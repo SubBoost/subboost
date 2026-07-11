@@ -302,7 +302,7 @@ describe("parseVMess", () => {
   });
 
   it("parses sparse URI, H2, HTTP, and Kitsunebi defaults", () => {
-    expect(parseVMess(`vmess://uri-default.example.com?id=${UUID}&security=tls&ech=config&alpn=,,`))
+    expect(parseVMess(`vmess://uri-default.example.com?id=${UUID}&security=tls&ech=Y29uZmln&alpn=,,`))
       .toMatchObject({
         name: "VMess 节点",
         server: "uri-default.example.com",
@@ -310,7 +310,7 @@ describe("parseVMess", () => {
         uuid: UUID,
         tls: true,
         network: "tcp",
-        "ech-opts": { enable: true, config: "config" },
+        "ech-opts": { enable: true, config: "Y29uZmln" },
       });
     expect(parseVMess(`vmess://${UUID}@h2-empty.example.com:443?type=h2&security=tls`)).toMatchObject({
       network: "h2",

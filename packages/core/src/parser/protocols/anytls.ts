@@ -8,6 +8,7 @@
 
 import { decodeBase64 } from "../base64";
 import type { AnyTLSNode } from "@subboost/core/types/node";
+import { buildMihomoEchOptsFromShareValue } from "@subboost/core/mihomo/ech";
 import { parseUrlWithNeutralScheme, safeDecodeFormUrlEncoded, safeDecodeURIComponent } from "./url-decode";
 
 function parseBool(value: string): boolean | undefined {
@@ -221,10 +222,7 @@ export function parseAnyTLS(uri: string): AnyTLSNode {
   };
 
   if (echPresent) {
-    (node as unknown as Record<string, unknown>)["ech-opts"] = {
-      enable: true,
-      ...(echValue ? { config: echValue } : {}),
-    };
+    (node as unknown as Record<string, unknown>)["ech-opts"] = buildMihomoEchOptsFromShareValue(echValue);
   }
 
   if (sni) node.sni = sni;

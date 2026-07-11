@@ -44,6 +44,68 @@ function normalizeClashYamlScalarText(content: string): string {
   );
 }
 
+function countLeadingSpaces(line: string): number {
+  let count = 0;
+  while (count < line.length && line.charCodeAt(count) === 32) count += 1;
+  return count;
+}
+
+function isRootProxiesKey(trimmed: string): boolean {
+  if (trimmed === "proxies:") return true;
+  if (!trimmed.startsWith("proxies:")) return false;
+  return trimmed.slice("proxies:".length).trimStart().startsWith("#");
+}
+
+function isSingleLineFlowSequenceItem(trimmed: string): boolean {
+  if (!trimmed.startsWith("- {")) return false;
+  const closingBrace = trimmed.lastIndexOf("}");
+  if (closingBrace < 3) return false;
+  const trailing = trimmed.slice(closingBrace + 1).trim();
+  return !trailing || trailing.startsWith("#");
+}
+
+function repairRootFlowProxyListIndent(input: string): string {
+  const lines = input.split(/\r?\n/);
+  let rootMappingIndent = Number.POSITIVE_INFINITY;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("-")) continue;
+    const colonIndex = trimmed.indexOf(":");
+    if (colonIndex <= 0) continue;
+    rootMappingIndent = Math.min(rootMappingIndent, countLeadingSpaces(line));
+  }
+
+  if (rootMappingIndent === Number.POSITIVE_INFINITY) return input;
+
+  const proxiesLineIndex = lines.findIndex((line) => {
+    const trimmed = line.trim();
+    return countLeadingSpaces(line) === rootMappingIndent && isRootProxiesKey(trimmed);
+  });
+  if (proxiesLineIndex < 0) return input;
+
+  const itemIndexes: number[] = [];
+  for (let index = proxiesLineIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const indent = countLeadingSpaces(line);
+    if (!trimmed.startsWith("-") && indent <= rootMappingIndent) break;
+    if (indent < rootMappingIndent || !isSingleLineFlowSequenceItem(trimmed)) return input;
+    itemIndexes.push(index);
+  }
+
+  if (itemIndexes.length < 2) return input;
+  const canonicalIndent = countLeadingSpaces(lines[itemIndexes[0]]);
+  if (itemIndexes.every((index) => countLeadingSpaces(lines[index]) === canonicalIndent)) return input;
+
+  for (const index of itemIndexes) {
+    lines[index] = `${" ".repeat(canonicalIndent)}${lines[index].trimStart()}`;
+  }
+  return lines.join("\n");
+}
+
 /**
  * 解析 Clash YAML 配置
  */
@@ -111,7 +173,7 @@ export function parseClashYaml(content: string): ParseResult {
       parsed = tryLoad(normalizedContent);
     } catch (e) {
       // 尝试修复缩进后再解析一次
-      const repaired = repairInlineListIndent(normalizedContent);
+      const repaired = repairRootFlowProxyListIndent(repairInlineListIndent(normalizedContent));
       parsed = tryLoad(repaired);
     }
 
@@ -452,4 +514,3 @@ function normalizeNode(proxy: Record<string, unknown>): ParsedNode | null {
       return { ...(baseNode as Record<string, unknown>), type: type as UnknownNodeType } as unknown as ParsedNode;
   }
 }
-

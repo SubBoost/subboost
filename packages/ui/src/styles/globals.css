@@ -211,6 +211,56 @@
     container-type: inline-size;
   }
 
+  .proxy-group-member-toolbar {
+    container-type: inline-size;
+  }
+
+  .proxy-group-member-action-full,
+  .proxy-group-member-action-medium {
+    display: none;
+  }
+
+  .proxy-group-member-action-compact {
+    display: inline;
+  }
+
+  .proxy-group-member-heading-compact {
+    display: none;
+  }
+
+  @container (max-width: 18rem) {
+    .proxy-group-member-actions {
+      gap: 0.0625rem !important;
+    }
+
+    .proxy-group-member-action-button {
+      gap: 0;
+      min-width: 1.5rem;
+      padding-left: 0;
+      padding-right: 0;
+      width: 1.5rem;
+    }
+
+    .proxy-group-member-action-compact {
+      display: none;
+    }
+
+    .proxy-group-member-count {
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+    }
+  }
+
+  @container (max-width: 13rem) {
+    .proxy-group-member-heading-full {
+      display: none;
+    }
+
+    .proxy-group-member-heading-compact {
+      display: inline;
+    }
+  }
+
   .proxy-group-custom-rule-editor-trailing {
     flex: 0 0 auto;
     grid-template-columns: 120px auto 92px;
@@ -256,12 +306,30 @@
     text-align: left;
   }
 
-  @container (min-width: 30rem) {
+  @container (min-width: 23rem) {
+    .proxy-group-member-action-medium {
+      display: inline;
+    }
+
+    .proxy-group-member-action-compact {
+      display: none;
+    }
+
     .proxy-group-module-summary {
       --proxy-group-summary-font-size: 0.75rem;
       flex-basis: auto;
       justify-content: flex-end;
       text-align: right;
+    }
+  }
+
+  @container (min-width: 28rem) {
+    .proxy-group-member-action-full {
+      display: inline;
+    }
+
+    .proxy-group-member-action-medium {
+      display: none;
     }
   }
 }

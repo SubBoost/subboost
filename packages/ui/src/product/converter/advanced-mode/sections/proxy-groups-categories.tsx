@@ -171,10 +171,18 @@ export function ProxyGroupsCategories() {
       builtinRuleEdits,
       proxyGroupNameOverrides,
     });
+    const nodeNameSet = new Set(nodes.map((node) => node.name));
     return new Map(
       generated.map((group) => [
         group.name,
-        Array.isArray(group.proxies) ? group.proxies.length : 0,
+        // 生成后的成员里除了真实节点，还会掺入策略组引用与 DIRECT/REJECT 兜底，
+        // 节点数只统计真实节点，避免把兜底策略和引用组算进来导致数字虚高。
+        Array.isArray(group.proxies)
+          ? group.proxies.filter(
+              (proxyName): proxyName is string =>
+                typeof proxyName === "string" && nodeNameSet.has(proxyName),
+            ).length
+          : 0,
       ]),
     );
   }, [

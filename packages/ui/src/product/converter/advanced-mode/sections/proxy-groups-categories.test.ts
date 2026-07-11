@@ -408,7 +408,8 @@ describe("ProxyGroupsCategories", () => {
     renderCategories({ 0: new Set(["core"]) });
     const card = mocks.captures.moduleCards[0];
 
-    expect(card.nodeCount).toBe(2);
+    // proxies 为 ["US", "DIRECT"]，只有 US 是真实节点，DIRECT 是兜底策略不计入节点数。
+    expect(card.nodeCount).toBe(1);
     expect(card.extraRules).toEqual([
       { id: "set-1", name: "Set 1", behavior: "domain", path: "geosite/set-1.mrs", noResolve: true },
     ]);

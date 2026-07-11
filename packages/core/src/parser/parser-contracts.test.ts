@@ -261,7 +261,7 @@ Direct Policy = direct
 
   it("parses AnyTLS TCP-safe options and rejects Reality params", () => {
     const node = mustParseNode(
-      "anytls://secret@anytls.example.com:443?alpn=h2,http%2F1.1&allowInsecure=true&fp=chrome&idle-session-check-interval=60&idle-session-timeout=120&min-idle-session=2&padding-scheme=100-200&ech=config#AnyTLS"
+      "anytls://secret@anytls.example.com:443?alpn=h2,http%2F1.1&allowInsecure=true&fp=chrome&idle-session-check-interval=60&idle-session-timeout=120&min-idle-session=2&padding-scheme=100-200&ech=Y29uZmln#AnyTLS"
     );
 
     expect(node).toMatchObject({
@@ -281,7 +281,7 @@ Direct Policy = direct
       "padding-scheme": "100-200",
       "ech-opts": {
         enable: true,
-        config: "config",
+        config: "Y29uZmln",
       },
     });
     expect(() => mustParseNode("anytls://secret@anytls.example.com:443?security=reality#Bad")).toThrow(

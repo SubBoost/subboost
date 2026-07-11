@@ -5,8 +5,11 @@ import type { ParsedNode } from "@subboost/core/types/node";
 
 const mocks = vi.hoisted(() => ({
   draggingKey: null as string | null,
+  generatedProxyGroups: [] as Array<{ name: string; proxies: string[] }>,
   stateSetters: [] as Array<ReturnType<typeof vi.fn>>,
   store: {} as Record<string, any>,
+  toast: vi.fn(),
+  confirmDialog: vi.fn(),
 }));
 
 vi.mock("react", async (importOriginal) => {
@@ -26,7 +29,12 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("lucide-react", () => ({
   Plus: () => React.createElement("span", null, "plus-icon"),
+  RotateCcw: () => React.createElement("span", null, "restore-icon"),
   X: () => React.createElement("span", null, "x-icon"),
+}));
+
+vi.mock("@subboost/ui/components/ui/confirm-dialog", () => ({
+  confirmDialog: mocks.confirmDialog,
 }));
 
 vi.mock("@subboost/ui/components/ui/badge", () => ({
@@ -41,6 +49,10 @@ vi.mock("@subboost/ui/components/ui/input", () => ({
   Input: (props: any) => React.createElement("input", props),
 }));
 
+vi.mock("@subboost/ui/components/ui/toaster", () => ({
+  toast: mocks.toast,
+}));
+
 vi.mock("@subboost/ui/lib/utils", () => ({
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
 }));
@@ -50,12 +62,7 @@ vi.mock("@subboost/core/generator/proxy-groups", () => ({
     { id: "select", name: "Select" },
     { id: "auto", name: "Auto" },
   ],
-  generateProxyGroups: () => [
-    {
-      name: "Media",
-      proxies: ["DIRECT", "US Source", "Japan Source"],
-    },
-  ],
+  generateProxyGroups: () => mocks.generatedProxyGroups,
 }));
 
 vi.mock("@subboost/core/proxy-group-name", () => ({
@@ -103,7 +110,14 @@ function flattenElements(value: React.ReactNode): TestElement[] {
 describe("ProxyGroupAdvancedPanel interactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.confirmDialog.mockResolvedValue(true);
     mocks.draggingKey = "node:US Source";
+    mocks.generatedProxyGroups = [
+      { name: "Media", proxies: ["DIRECT", "US Source", "Japan Source"] },
+      { name: "Select", proxies: ["US Source"] },
+      { name: "Auto", proxies: ["US Source"] },
+      { name: "Other", proxies: ["US Source"] },
+    ];
     mocks.stateSetters = [];
     mocks.store = {
       nodes: [
@@ -216,5 +230,167 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
     includedRows[0].props.onDrop();
     expect(onChange).not.toHaveBeenCalled();
     expect(mocks.stateSetters[0]).toHaveBeenCalledWith(null);
+  });
+
+  it("adds and removes all nodes without changing proxy group members", () => {
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: { excludedMembers: [{ kind: "reject" }] },
+      onChange,
+      rulesCount: 0,
+      rulesContent: null,
+    });
+    const elements = flattenElements(tree);
+    const addAll = elements.find(
+      (element) => element.type === "button" && element.props.title === "添加全部节点",
+    );
+    const removeAll = elements.find(
+      (element) => element.type === "button" && element.props.title === "移除全部节点",
+    );
+
+    addAll?.props.onClick();
+    removeAll?.props.onClick();
+
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [{ kind: "node", name: "Extra Node" }],
+      excludedMembers: [{ kind: "reject" }],
+      memberOrder: [
+        { kind: "direct" },
+        { kind: "node", name: "Extra Node" },
+        { kind: "node", name: "US Source" },
+        { kind: "node", name: "Japan Source" },
+      ],
+    });
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [],
+      excludedMembers: [
+        { kind: "reject" },
+        { kind: "node", name: "US Source" },
+        { kind: "node", name: "Japan Source" },
+        { kind: "node", name: "Extra Node" },
+      ],
+      memberOrder: [],
+    });
+  });
+
+  it("adds all safe proxy groups and skips groups that would create a cycle", () => {
+    mocks.generatedProxyGroups = [
+      { name: "Media", proxies: ["DIRECT", "US Source"] },
+      { name: "Select", proxies: ["US Source"] },
+      { name: "Auto", proxies: ["US Source"] },
+      { name: "Other", proxies: ["Media"] },
+    ];
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: {},
+      onChange,
+      rulesCount: 0,
+      rulesContent: null,
+    });
+    const addAll = flattenElements(tree).find(
+      (element) => element.type === "button" && element.props.title === "添加全部代理组",
+    );
+
+    addAll?.props.onClick();
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraMembers: [
+          { kind: "module", id: "select" },
+          { kind: "module", id: "auto" },
+        ],
+      }),
+    );
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "已跳过 1 个会形成循环的代理组",
+      variant: "warning",
+    });
+  });
+
+  it("removes all proxy groups while leaving nodes and fixed policies alone", () => {
+    mocks.generatedProxyGroups = [
+      { name: "Media", proxies: ["DIRECT", "Auto", "Other", "US Source"] },
+      { name: "Select", proxies: ["US Source"] },
+      { name: "Auto", proxies: ["US Source"] },
+      { name: "Other", proxies: ["US Source"] },
+    ];
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: {
+        extraMembers: [
+          { kind: "custom", id: "other" },
+          { kind: "node", name: "US Source" },
+        ],
+        memberOrder: [
+          { kind: "direct" },
+          { kind: "module", id: "auto" },
+          { kind: "custom", id: "other" },
+          { kind: "node", name: "US Source" },
+        ],
+      },
+      onChange,
+      rulesCount: 0,
+      rulesContent: null,
+    });
+    const removeAll = flattenElements(tree).find(
+      (element) => element.type === "button" && element.props.title === "移除全部代理组",
+    );
+
+    removeAll?.props.onClick();
+
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [{ kind: "node", name: "US Source" }],
+      excludedMembers: [
+        { kind: "module", id: "select" },
+        { kind: "module", id: "auto" },
+        { kind: "custom", id: "other" },
+      ],
+      memberOrder: [
+        { kind: "direct" },
+        { kind: "node", name: "US Source" },
+      ],
+    });
+  });
+
+  it("restores only member overrides after confirmation", async () => {
+    const onChange = vi.fn();
+    const tree = ProxyGroupAdvancedPanel({
+      target: { kind: "custom", id: "media", name: "Media" },
+      advanced: {
+        sourceIds: ["source-a"],
+        includeRegex: "Source",
+        extraMembers: [{ kind: "node", name: "Extra Node" }],
+        excludedMembers: [{ kind: "reject" }],
+        memberOrder: [{ kind: "direct" }, { kind: "node", name: "Extra Node" }],
+      },
+      onChange,
+      rulesCount: 1,
+      rulesContent: null,
+    });
+    const restore = flattenElements(tree).find(
+      (element) => element.type === "button" && element.props.title === "恢复默认成员",
+    );
+
+    mocks.confirmDialog.mockResolvedValueOnce(false);
+    await restore?.props.onClick();
+    expect(onChange).not.toHaveBeenCalled();
+
+    mocks.confirmDialog.mockResolvedValueOnce(true);
+    await restore?.props.onClick();
+
+    expect(mocks.confirmDialog).toHaveBeenLastCalledWith({
+      title: "恢复默认成员？",
+      description: "将清除当前代理组的手动添加、排除和排序。导入源、地区、正则筛选及分流规则不会改变。",
+      confirmText: "恢复",
+      variant: "warning",
+    });
+    expect(onChange).toHaveBeenCalledWith({
+      extraMembers: [],
+      excludedMembers: [],
+      memberOrder: [],
+    });
   });
 });

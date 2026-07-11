@@ -1,8 +1,8 @@
 import type { ParsedNode } from "@subboost/core/types/node";
 import { splitWsPathEarlyData } from "@subboost/core/parser/ws-early-data";
+import { isMihomoEchQueryServerName, isStandardBase64String } from "./ech";
 import { normalizeRealityShortId } from "./reality";
 
-const STANDARD_BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const REALITY_PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const WIREGUARD_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
 const CERTIFICATE_FINGERPRINT_HEX_PATTERN = /^[A-Fa-f0-9]{64}$/;
@@ -158,10 +158,7 @@ function normalizeSshServerFingerprint(value: unknown): string | null {
   return normalized;
 }
 
-export function isStandardBase64String(value: string): boolean {
-  const trimmed = value.trim();
-  return trimmed.length > 0 && trimmed.length % 4 === 0 && STANDARD_BASE64_PATTERN.test(trimmed);
-}
+export { isStandardBase64String } from "./ech";
 
 export function normalizeMihomoRealityPublicKey(input: unknown): string | null {
   const value = normalizeString(input);
@@ -240,6 +237,7 @@ function sanitizeEchOpts(value: unknown): unknown {
   if (!isPlainObject(value)) return undefined;
 
   const out: Record<string, unknown> = {};
+  const explicitQueryServerName = normalizeString(value["query-server-name"]);
   for (const [key, raw] of Object.entries(value)) {
     if (key.startsWith("_")) continue;
 
@@ -251,13 +249,16 @@ function sanitizeEchOpts(value: unknown): unknown {
 
     if (key === "config") {
       const config = normalizeString(raw);
-      if (config && isStandardBase64String(config)) out[key] = config;
+      if (config && isStandardBase64String(config)) {
+        out[key] = config;
+      } else if (config && !explicitQueryServerName && isMihomoEchQueryServerName(config)) {
+        out["query-server-name"] = config;
+      }
       continue;
     }
 
     if (key === "query-server-name") {
-      const queryServerName = normalizeString(raw);
-      if (queryServerName) out[key] = queryServerName;
+      if (explicitQueryServerName) out[key] = explicitQueryServerName;
       continue;
     }
 

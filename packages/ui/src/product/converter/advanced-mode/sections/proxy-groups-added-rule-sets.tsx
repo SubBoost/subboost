@@ -72,7 +72,6 @@ export function ProxyGroupsAddedRuleSets({
     customProxyGroups = [],
     proxyGroupNameOverrides = {},
     toggleProxyGroup,
-    addModuleRules,
     updateModuleRule,
     removeModuleRule,
     moveModuleRule,

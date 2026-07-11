@@ -168,20 +168,21 @@ export function ProxyGroupsCustomRules() {
   const handleAddCustomRule = () => {
     const value = newRuleValue.trim();
     if (!value || !newRuleTarget) return;
+    const addedRuleType = newRuleType;
 
     addCustomRule({
       id: createCustomRuleId(),
-      type: newRuleType,
+      type: addedRuleType,
       value,
       target: newRuleTarget,
       noResolve: newRuleNoResolve,
     });
     interactions.ruleAdded?.({
       source: "manual",
-      kind: getProductRuleKind(newRuleType),
+      kind: getProductRuleKind(addedRuleType),
     });
     setNewRuleValue("");
-    setNewRuleNoResolve(isIpCidrRuleType(newRuleType));
+    setNewRuleNoResolve(isIpCidrRuleType(addedRuleType));
   };
 
   const handleNewRuleTypeChange = (value: string) => {

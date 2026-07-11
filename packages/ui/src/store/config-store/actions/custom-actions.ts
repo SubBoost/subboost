@@ -20,7 +20,7 @@ type CustomActions = Pick<
   | "updateCustomProxyGroup"
 >;
 
-function normalizeRuleOrderForState(state: {
+type NormalizeRuleOrderState = {
   enabledProxyGroups: string[];
   customProxyGroups: Parameters<typeof normalizePersistedRuleOrder>[0]["customProxyGroups"];
   customRules: Parameters<typeof normalizePersistedRuleOrder>[0]["customRules"];
@@ -30,7 +30,9 @@ function normalizeRuleOrderForState(state: {
   experimentalCnUseCnRuleSet: boolean;
   cnIpNoResolve: boolean;
   ruleOrder: string[];
-}): string[] {
+};
+
+function normalizeRuleOrderForState(state: NormalizeRuleOrderState): string[] {
   return normalizePersistedRuleOrder({
     enabledModules: state.enabledProxyGroups,
     customProxyGroups: state.customProxyGroups,
@@ -161,9 +163,9 @@ export function createCustomActions(
         const nextCustomProxyGroups = state.customProxyGroups.filter(
           (g) => g.id !== id,
         );
-        const removedTarget = removedGroup?.name?.trim() || "";
-        const nextCustomRuleSets = removedTarget
-          ? state.customRuleSets.filter((ruleSet) => ruleSet.target !== removedTarget)
+        const removedGroupName = removedGroup?.name?.trim() || "";
+        const nextCustomRuleSets = removedGroupName
+          ? state.customRuleSets.filter((ruleSet) => ruleSet.target !== removedGroupName)
           : state.customRuleSets;
         return {
           customProxyGroups: nextCustomProxyGroups,

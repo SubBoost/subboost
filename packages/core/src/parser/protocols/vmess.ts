@@ -13,6 +13,7 @@
 import { decodeBase64 } from "../base64";
 import { tryParseJson } from "../../json";
 import type { VMessNode } from "@subboost/core/types/node";
+import { buildMihomoEchOptsFromShareValue } from "@subboost/core/mihomo/ech";
 import { splitWsPathEarlyData } from "../ws-early-data";
 import { parseUrlWithNeutralScheme, safeDecodeFormUrlEncoded, safeDecodeURIComponent } from "./url-decode";
 
@@ -493,10 +494,7 @@ function buildNodeFromConfig(config: VMessConfig): VMessNode {
       throw new Error("VMess 启用 ECH 需要 TLS（security=tls）");
     }
     const echValue = pickString(configRecord.ech);
-    node["ech-opts"] = {
-      enable: true,
-      ...(echValue ? { config: echValue } : {}),
-    } as Record<string, unknown>;
+    node["ech-opts"] = buildMihomoEchOptsFromShareValue(echValue);
   }
 
   // VMess TCP + http 伪装：vmess json 常见为 net=tcp + type=http。

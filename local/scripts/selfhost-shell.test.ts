@@ -282,8 +282,8 @@ ENV
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("健康检查: 正常");
     expect(result.stdout).not.toContain("健康检查: 异常");
-    // wait_for_health stops once ready succeeds, then status_cmd performs one final live+ready check.
-    expect(result.stdout).toContain("curl_count=7");
+    // wait_for_health checks live once per attempt, then status_cmd performs one final live+ready check.
+    expect(result.stdout).toContain("curl_count=8");
   }, 10_000);
 
   it("uses refreshed release metadata before pulling during update", () => {

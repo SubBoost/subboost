@@ -23,10 +23,7 @@ import {
   isRuleSetMoveTarget,
   type RuleSetMoveTarget,
 } from "./proxy-group-rule-row";
-import {
-  ProxyGroupTypeMenu,
-  type ProxyGroupTypeMenuValue,
-} from "./proxy-group-type-menu";
+import type { ProxyGroupTypeMenuValue } from "./proxy-group-type-menu";
 import { ProxyGroupAdvancedPanel } from "./proxy-group-advanced-panel";
 import {
   buildProxyGroupName,

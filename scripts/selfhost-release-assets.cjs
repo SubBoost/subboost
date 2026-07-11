@@ -67,36 +67,36 @@ function parseArgs(argv) {
   for (const item of INSTALLER_DEFAULTS) {
     args[item.key] = process.env[item.env] || "";
   }
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+  for (let argIndex = 0; argIndex < argv.length; argIndex += 1) {
+    const arg = argv[argIndex];
     if (arg === "--base-url") {
-      args.baseUrl = argv[index + 1] || "";
-      index += 1;
+      args.baseUrl = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else if (arg === "--build-sha") {
-      args.buildSha = argv[index + 1] || "";
-      index += 1;
+      args.buildSha = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
     } else if (arg === "--image") {
-      args.image = argv[index + 1] || "";
-      index += 1;
+      args.image = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else if (arg === "--image-repository") {
-      args.imageRepository = argv[index + 1] || "";
-      index += 1;
+      args.imageRepository = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else if (arg === "--image-tag") {
-      args.imageTag = argv[index + 1] || "";
-      index += 1;
+      args.imageTag = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else if (arg === "--output") {
-      args.output = argv[index + 1] || "";
-      index += 1;
+      args.output = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else if (arg === "--tag" || arg === "--release-tag") {
-      args.releaseTag = argv[index + 1] || "";
-      index += 1;
+      args.releaseTag = argv[argIndex + 1] || "";
+      argIndex += 1;
     } else {
       const installerDefault = INSTALLER_DEFAULTS.find((item) => item.arg === arg);
       if (installerDefault) {
-        args[installerDefault.key] = argv[index + 1] || "";
-        index += 1;
+        args[installerDefault.key] = argv[argIndex + 1] || "";
+        argIndex += 1;
       } else if (arg === "--help" || arg === "-h") {
         args.help = true;
       } else {
@@ -145,7 +145,8 @@ function buildManifest(publicRoot, args) {
   const shortSha = buildSha.slice(0, 12);
   const releaseTag = args.releaseTag || `v${version}`;
   const imageRepository = args.imageRepository || DEFAULT_IMAGE_REPOSITORY;
-  const imageTag = args.imageTag || `${imageRepository}:${releaseTag}`;
+  const defaultImageTag = `${imageRepository}:${releaseTag}`;
+  const imageTag = args.imageTag || defaultImageTag;
   const image = args.image || imageTag;
   const buildVersion = `${version}+sha.${shortSha}`;
 
@@ -172,14 +173,22 @@ function copyFile(publicRoot, from, to, options = {}) {
   fs.copyFileSync(source, to);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function replaceInstallerDefault(content, item, replacement) {
-  const expected = `${item.name}="${item.value}"`;
   const replacementLine = `${item.name}="${replacement}"`;
-  const count = content.split(expected).length - 1;
+  const assignmentPattern = new RegExp(
+    `^\\s*${escapeRegExp(item.name)}\\s*=\\s*(["'])${escapeRegExp(item.value)}\\1\\s*$`,
+    "gm",
+  );
+  const matches = content.match(assignmentPattern);
+  const count = matches ? matches.length : 0;
   if (count !== 1) {
     throw new Error(`Expected exactly one ${item.name} assignment in install.sh, found ${count}.`);
   }
-  return content.replace(expected, replacementLine);
+  return content.replace(assignmentPattern, () => replacementLine);
 }
 
 function withInferredInstallerDefaults(args) {

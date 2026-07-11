@@ -208,6 +208,75 @@ proxies:
     expect(mixed.errors[0]).toContain('节点 "Bad" 解析失败');
   });
 
+  it("parses consistently indented root flow proxy lists", () => {
+    for (const spaces of [0, 1, 2, 4]) {
+      const indent = " ".repeat(spaces);
+      const result = parseClashYaml([
+        "proxies:",
+        `${indent}- {name: A, type: vless, server: 2001:db8::1, port: 443, uuid: 11111111-1111-4111-8111-111111111111}`,
+        `${indent}- {name: B, type: vless, server: 2001:db8::2, port: 8443, uuid: 22222222-2222-4222-8222-222222222222}`,
+      ].join("\n"));
+
+      expect(result.errors).toEqual([]);
+      expect(result.nodes.map((node) => node.name)).toEqual(["A", "B"]);
+    }
+  });
+
+  it("repairs inconsistent root flow proxy list indentation", () => {
+    for (const secondIndent of [1, 4]) {
+      const result = parseClashYaml([
+        "proxies:",
+        "  - {name: A, type: vless, server: 2001:db8::1, port: 443, uuid: 11111111-1111-4111-8111-111111111111}",
+        `${" ".repeat(secondIndent)}- {name: B, type: vless, server: 2001:db8::2, port: 8443, uuid: 22222222-2222-4222-8222-222222222222, reality-opts: {public-key: test-key}}`,
+      ].join("\n"));
+
+      expect(result.errors).toEqual([]);
+      expect(result.nodes).toMatchObject([
+        { name: "A", server: "2001:db8::1", port: 443, type: "vless" },
+        {
+          name: "B",
+          server: "2001:db8::2",
+          port: 8443,
+          type: "vless",
+          "reality-opts": { "public-key": "test-key" },
+        },
+      ]);
+    }
+  });
+
+  it("does not repair nested, mixed, or unclosed flow proxy structures", () => {
+    const nested = parseClashYaml([
+      "proxy-groups:",
+      "  - name: Group",
+      "    type: select",
+      "    proxies:",
+      "      - {name: A, type: vless, server: example.com, port: 443}",
+      "       - {name: B, type: vless, server: example.net, port: 443}",
+    ].join("\n"));
+    const mixed = parseClashYaml([
+      "proxies:",
+      "  - {name: A, type: vless, server: example.com, port: 443}",
+      "    - name: B",
+      "      type: vless",
+      "      server: example.net",
+      "      port: 443",
+    ].join("\n"));
+    const unclosed = parseClashYaml("proxies:\n  - {name: A, type: vless, server: example.com, port: 443");
+
+    for (const result of [nested, mixed, unclosed]) {
+      expect(result.nodes).toEqual([]);
+      expect(result.errors[0]).toContain("YAML 解析错误");
+    }
+  });
+
+  it("keeps YAML backslash-underscore escape semantics in quoted names", () => {
+    const result = parseClashYaml(String.raw`proxies:
+  - {name: "x1.0\_50M", type: vless, server: example.com, port: 443}`);
+
+    expect(result.errors).toEqual([]);
+    expect(result.nodes[0]?.name).toBe("x1.0\u00a050M");
+  });
+
   it("handles provider variants, array noise, and malformed proxy rows", () => {
     expect(parseClashYaml("[]")).toEqual({
       nodes: [],

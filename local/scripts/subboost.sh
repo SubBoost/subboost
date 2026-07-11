@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 DEFAULT_HOME="/opt/subboost"
 DEFAULT_STABLE_RELEASE_URL="https://github.com/SubBoost/subboost/releases/latest/download/release.json"
+DEFAULT_BACKUP_RETENTION_COUNT="10"
 SUBBOOST_HOME="${SUBBOOST_HOME:-$DEFAULT_HOME}"
 ENV_FILE="$SUBBOOST_HOME/.env"
 COMPOSE_FILE="$SUBBOOST_HOME/docker-compose.yml"
@@ -225,17 +226,25 @@ health_status_text() {
 }
 
 health_status_code() {
-  local port base
+  local port base live_ok
   port="$(port_number "${SUBBOOST_PORT:-3000}")"
   base="http://127.0.0.1:$port"
   if ! command -v curl >/dev/null 2>&1; then
     printf 'curl-missing\n'
-  elif curl -fsS "$base/api/health/live" >/dev/null 2>&1 && curl -fsS "$base/api/health/ready" >/dev/null 2>&1; then
-    printf 'ok\n'
-  elif curl -fsS "$base/api/health/live" >/dev/null 2>&1; then
-    printf 'not-ready\n'
   else
-    printf 'unhealthy\n'
+    if curl -fsS "$base/api/health/live" >/dev/null 2>&1; then
+      live_ok=1
+    else
+      live_ok=0
+    fi
+
+    if [ "$live_ok" = "1" ] && curl -fsS "$base/api/health/ready" >/dev/null 2>&1; then
+      printf 'ok\n'
+    elif [ "$live_ok" = "1" ]; then
+      printf 'not-ready\n'
+    else
+      printf 'unhealthy\n'
+    fi
   fi
 }
 
@@ -249,6 +258,7 @@ health_status_label() {
 }
 
 wait_for_health() {
+  # Default max wait is about 30 seconds: 15 attempts with a 2-second interval.
   local attempts="${SUBBOOST_DOCTOR_HEALTH_ATTEMPTS:-15}"
   local interval="${SUBBOOST_DOCTOR_HEALTH_INTERVAL_SECONDS:-2}"
   local index status
@@ -336,12 +346,25 @@ backup_cmd() {
   sudo_do mkdir -p "$BACKUP_DIR"
   local stamp db_tmp db_out env_out
   local -a sql_backups env_backups
-  local i
+  local -a backup_status
+  local i backup_retention_count
+  backup_retention_count="${SUBBOOST_BACKUP_RETENTION_COUNT:-$DEFAULT_BACKUP_RETENTION_COUNT}"
+  if ! [[ "$backup_retention_count" =~ ^[0-9]+$ ]] || (( backup_retention_count < 1 )); then
+    die "SUBBOOST_BACKUP_RETENTION_COUNT must be a positive integer"
+  fi
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   db_tmp="$BACKUP_DIR/subboost-$stamp.sql.gz.partial"
   db_out="$BACKUP_DIR/subboost-$stamp.sql.gz"
   env_out="$BACKUP_DIR/subboost-$stamp.env"
+  set +e
   compose exec -T db pg_dump -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}" | gzip -c | sudo_do tee "$db_tmp" >/dev/null
+  backup_status=("${PIPESTATUS[@]}")
+  set -e
+  if (( backup_status[0] != 0 || backup_status[1] != 0 || backup_status[2] != 0 )); then
+    sudo_do rm -f -- "$db_tmp"
+    say "Backup failed: pg_dump=${backup_status[0]} gzip=${backup_status[1]} write=${backup_status[2]}"
+    return 1
+  fi
   sudo_do mv "$db_tmp" "$db_out"
   sudo_do install -m 600 "$ENV_FILE" "$env_out"
 
@@ -350,10 +373,10 @@ backup_cmd() {
   env_backups=("$BACKUP_DIR"/subboost-*.env)
   shopt -u nullglob
 
-  for ((i = 0; i < ${#sql_backups[@]} - 10; i++)); do
+  for ((i = 0; i < ${#sql_backups[@]} - backup_retention_count; i++)); do
     sudo_do rm -f -- "${sql_backups[$i]}"
   done
-  for ((i = 0; i < ${#env_backups[@]} - 10; i++)); do
+  for ((i = 0; i < ${#env_backups[@]} - backup_retention_count; i++)); do
     sudo_do rm -f -- "${env_backups[$i]}"
   done
   say "Backup written:"

@@ -110,11 +110,11 @@ vi.mock("@subboost/ui/components/ui/select", () => ({
 }));
 vi.mock("@subboost/ui/components/ui/toaster", () => ({ toast: mocks.toast }));
 vi.mock("@subboost/core/generator/proxy-groups", () => ({
-	  PROXY_GROUP_MODULES: [
-	    { id: "auto", name: "Auto", rules: [{ id: "netflix" }] },
-	    { id: "fallback", name: "Fallback", rules: [] },
-	    { id: "bare", name: "Bare" },
-	  ],
+  PROXY_GROUP_MODULES: [
+    { id: "auto", name: "Auto", rules: [{ id: "netflix" }] },
+    { id: "fallback", name: "Fallback", rules: [] },
+    { id: "bare", name: "Bare" },
+  ],
 }));
 vi.mock("@subboost/core/generator/module-rules", () => ({
   getModuleRuleOrderKey: (moduleId: string, ruleId: string) => `module:${moduleId}:${ruleId}`,

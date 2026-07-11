@@ -8,6 +8,7 @@
 
 import { decodeBase64 } from "../base64";
 import type { VLESSNode, XHttpDownloadSettings, XHttpOpts, XHttpReuseSettings } from "@subboost/core/types/node";
+import { buildMihomoEchOptsFromShareValue } from "@subboost/core/mihomo/ech";
 import { normalizeRealityShortId } from "@subboost/core/mihomo/reality";
 import { splitWsPathEarlyData } from "../ws-early-data";
 import { parseUrlWithNeutralScheme, safeDecodeFormUrlEncoded, safeDecodeURIComponent } from "./url-decode";
@@ -280,10 +281,7 @@ export function parseVLESS(uri: string): VLESSNode {
       throw new Error("VLESS 启用 ECH 需要 security=tls（不支持 Reality）");
     }
     const echValue = echRaw.trim();
-    (node as unknown as Record<string, unknown>)["ech-opts"] = {
-      enable: true,
-      ...(echValue ? { config: echValue } : {}),
-    };
+    (node as unknown as Record<string, unknown>)["ech-opts"] = buildMihomoEchOptsFromShareValue(echValue);
   }
 
   if (allowInsecure) node["skip-cert-verify"] = true;
@@ -377,6 +375,5 @@ export function parseVLESS(uri: string): VLESSNode {
 
   return node;
 }
-
 
 

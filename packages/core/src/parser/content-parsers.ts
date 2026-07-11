@@ -59,6 +59,26 @@ export function splitNodeLinkSegments(content: string): string[] {
   return segments;
 }
 
+function looksLikeInlineFlowProxyList(content: string): boolean {
+  let hasItem = false;
+  let hasType = false;
+  let hasServer = false;
+  let hasPort = false;
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (!trimmed.startsWith("- {")) return false;
+
+    hasItem = true;
+    hasType ||= trimmed.includes("type:");
+    hasServer ||= trimmed.includes("server:");
+    hasPort ||= trimmed.includes("port:") || trimmed.includes("ports:");
+  }
+
+  return hasItem && hasType && hasServer && hasPort;
+}
+
 export function isClashYamlContent(content: string): boolean {
   if (
     content.includes("proxies:") ||
@@ -67,6 +87,8 @@ export function isClashYamlContent(content: string): boolean {
   ) {
     return true;
   }
+
+  if (looksLikeInlineFlowProxyList(content)) return true;
 
   const hasType = /(^|\n)\s*(?:-\s*)?type\s*:\s*\S+/i.test(content);
   const hasServer = /(^|\n)\s*(?:-\s*)?server\s*:\s*\S+/i.test(content);
@@ -178,6 +200,5 @@ export function parseSubscriptionContentByRegistry(content: string): ParseResult
 
   return buildParseResult([], accumulatedErrors);
 }
-
 
 

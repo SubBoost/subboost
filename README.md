@@ -4,7 +4,7 @@
   <h1>SubBoost</h1>
   <p>
     <img src="https://img.shields.io/badge/platform-Linux%20%2B%20Docker-lightgrey.svg" alt="Platform: Linux + Docker">
-    <img src="https://img.shields.io/badge/version-2.5.1-green.svg" alt="Version 2.5.1">
+    <img src="https://img.shields.io/badge/version-2.6.0-green.svg" alt="Version 2.6.0">
     <a href="https://subboost.org"><img src="https://img.shields.io/badge/app-subboost.org-brightgreen.svg" alt="Online app"></a>
     <a href="https://docs.subboost.org"><img src="https://img.shields.io/badge/docs-subboost.org-blue.svg" alt="Documentation"></a>
     <img src="https://img.shields.io/badge/image-GHCR-blue.svg" alt="GHCR image">
