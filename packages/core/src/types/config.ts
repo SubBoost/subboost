@@ -164,6 +164,8 @@ export interface UserConfig {
   autoSelectStrategy: "url-test" | "fallback" | "load-balance";
   testUrl: string;
   testInterval: number;
+  urlTestLazy?: boolean;
+  urlTestTolerance?: number;
   
   // 规则设置
   ruleProviderBaseUrl: string;

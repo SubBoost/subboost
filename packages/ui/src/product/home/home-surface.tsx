@@ -76,6 +76,8 @@ function HomeSurfaceInner({ adapter }: Props) {
     ruleProviderBaseUrl,
     testUrl,
     testInterval,
+    urlTestLazy,
+    urlTestTolerance,
     cnIpNoResolve,
     experimentalCnUseCnRuleSet,
     proxyGroupNameOverrides,
@@ -121,6 +123,8 @@ function HomeSurfaceInner({ adapter }: Props) {
     ruleProviderBaseUrl,
     testUrl,
     testInterval,
+    urlTestLazy,
+    urlTestTolerance,
     cnIpNoResolve,
     experimentalCnUseCnRuleSet,
   });

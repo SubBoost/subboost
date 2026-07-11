@@ -55,6 +55,8 @@ export interface GenerateOptions {
   ruleProviderBaseUrl: string;
   testUrl: string;
   testInterval: number;
+  urlTestLazy?: boolean;
+  urlTestTolerance?: number;
   customProxyGroups?: CustomProxyGroup[];
   customRuleSets?: CustomRuleSet[];
   proxyGroupAdvanced?: Record<string, ProxyGroupAdvancedConfig>;
@@ -137,6 +139,8 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     enabledModules,
     testUrl,
     testInterval,
+    urlTestLazy,
+    urlTestTolerance,
     customProxyGroups = [],
     proxyGroupAdvanced = {},
     proxyGroupNameOverrides,
@@ -237,7 +241,8 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
       testInterval,
       strategy,
       extraFields,
-      urlTestLazy: false,
+      urlTestLazy: urlTestLazy ?? false,
+      urlTestTolerance,
     });
 
   // 辅助函数：生成单个代理组

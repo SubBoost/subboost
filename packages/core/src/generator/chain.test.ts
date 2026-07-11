@@ -33,6 +33,40 @@ function dialerGroup(patch: Partial<DialerProxyGroup> = {}): DialerProxyGroup {
 }
 
 describe("dialer proxy chain helpers", () => {
+  it("applies global url-test overrides without changing legacy defaults", () => {
+    const groups = [
+      dialerGroup({
+        id: "auto-relay",
+        name: "Auto Relay",
+        type: "url-test",
+        relayNodes: ["Relay A"],
+      }),
+    ];
+
+    expect(
+      generateDialerProxyGroups(
+        groups,
+        "https://probe.example.com/204",
+        120,
+        [],
+        { urlTestLazy: false, urlTestTolerance: 50 },
+      ),
+    ).toEqual([
+      {
+        name: "Auto Relay",
+        type: "url-test",
+        proxies: ["Relay A"],
+        url: "https://probe.example.com/204",
+        interval: 120,
+        lazy: false,
+        tolerance: 50,
+      },
+    ]);
+
+    expect(generateDialerProxyGroups(groups)[0]).not.toHaveProperty("tolerance");
+    expect(generateDialerProxyGroups(groups)[0]).toMatchObject({ lazy: true });
+  });
+
   it("generates typed dialer groups with shared proxy group fields", () => {
     expect(
       generateDialerProxyGroups(

@@ -32,6 +32,24 @@ function customGroup(id: string, groupType: CustomProxyGroup["groupType"]): Cust
 }
 
 describe("proxy group generator", () => {
+  it("applies global url-test overrides when configured", () => {
+    const groups = generateProxyGroups({
+      nodes: [node("Node A")],
+      enabledModules: ["auto"],
+      ruleProviderBaseUrl: "https://rules.example.com",
+      testUrl: "https://probe.example.com/204",
+      testInterval: 120,
+      urlTestLazy: true,
+      urlTestTolerance: 50,
+    });
+
+    expect(groups.find((group) => group.name.includes("自动选择"))).toMatchObject({
+      type: "url-test",
+      lazy: true,
+      tolerance: 50,
+    });
+  });
+
   it("generates module, custom, advanced-filtered, and provider-backed groups", () => {
     const groups = generateProxyGroups({
       nodes: [node("Node A"), node("Node B")],

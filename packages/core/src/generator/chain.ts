@@ -33,7 +33,8 @@ export function generateDialerProxyGroups(
   groups: DialerProxyGroup[],
   testUrl: string = DEFAULT_SUBBOOST_CONFIG.testUrl,
   testInterval: number = DEFAULT_SUBBOOST_CONFIG.testInterval,
-  proxyProviderNames: string[] = []
+  proxyProviderNames: string[] = [],
+  urlTestOptions: { urlTestLazy?: boolean; urlTestTolerance?: number } = {},
 ): Array<Record<string, unknown>> {
   const providerUse = proxyProviderNames.length > 0 ? { use: proxyProviderNames } : {};
   return groups
@@ -48,7 +49,8 @@ export function generateDialerProxyGroups(
         testInterval,
         strategy: group.group.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY,
         extraFields: providerUse,
-        urlTestLazy: true,
+        urlTestLazy: urlTestOptions.urlTestLazy ?? true,
+        urlTestTolerance: urlTestOptions.urlTestTolerance,
       });
     });
 }

@@ -24,6 +24,8 @@ describe("config store settings actions", () => {
     actions.setAllowLan(true);
     actions.setTestUrl("https://cp.cloudflare.com/generate_204");
     actions.setTestInterval(600);
+    actions.setUrlTestLazy(true);
+    actions.setUrlTestTolerance(50);
     actions.setRuleProviderBaseUrl("https://rules.example.com");
     actions.setCnIpNoResolve(true);
     actions.setExperimentalCnUseCnRuleSet(1 as unknown as boolean);
@@ -34,11 +36,26 @@ describe("config store settings actions", () => {
       allowLan: true,
       testUrl: "https://cp.cloudflare.com/generate_204",
       testInterval: 600,
+      urlTestLazy: true,
+      urlTestTolerance: 50,
       ruleProviderBaseUrl: "https://rules.example.com",
       cnIpNoResolve: true,
       experimentalCnUseCnRuleSet: true,
     });
-    expect(store.setAndGenerateConfig).toHaveBeenCalledTimes(8);
+    expect(store.setAndGenerateConfig).toHaveBeenCalledTimes(10);
     expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("can clear the optional global url-test overrides", () => {
+    const store = createStore({ urlTestLazy: true, urlTestTolerance: 50 });
+    const actions = createSettingsActions(store.set as any, store.get as any, store.setAndGenerateConfig as any);
+
+    actions.setUrlTestLazy(undefined);
+    actions.setUrlTestTolerance(undefined);
+
+    expect(store.state()).toMatchObject({
+      urlTestLazy: undefined,
+      urlTestTolerance: undefined,
+    });
   });
 });

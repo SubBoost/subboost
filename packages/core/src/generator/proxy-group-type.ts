@@ -14,6 +14,7 @@ type BuildTypedProxyGroupOptions = {
   strategy?: LoadBalanceStrategy;
   extraFields?: Record<string, unknown>;
   urlTestLazy?: boolean;
+  urlTestTolerance?: number;
 };
 
 export function uniqueProxyNames(values: string[]): string[] {
@@ -36,6 +37,7 @@ export function buildTypedProxyGroup({
   strategy,
   extraFields = {},
   urlTestLazy = false,
+  urlTestTolerance,
 }: BuildTypedProxyGroupOptions): ProxyGroup {
   const base: ProxyGroup = {
     name,
@@ -52,6 +54,7 @@ export function buildTypedProxyGroup({
         url: testUrl,
         interval: testInterval,
         lazy: urlTestLazy,
+        ...(urlTestTolerance !== undefined ? { tolerance: urlTestTolerance } : {}),
       };
     case "fallback":
       return {

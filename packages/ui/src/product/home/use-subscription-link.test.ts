@@ -260,6 +260,8 @@ describe("useSubscriptionLink", () => {
             proxyGroupAdvancedModeEnabled: true,
             listenerPorts: { "Node A": 41000 },
             proxyGroupOrder: ["select", "auto"],
+            urlTestLazy: true,
+            urlTestTolerance: 50,
           }),
         }),
       })

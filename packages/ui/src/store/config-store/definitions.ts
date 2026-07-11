@@ -205,6 +205,8 @@ export interface ConfigState {
   allowLan: boolean;
   testUrl: string;
   testInterval: number;
+  urlTestLazy?: boolean;
+  urlTestTolerance?: number;
   ruleProviderBaseUrl: string;
   cnIpNoResolve: boolean;
   experimentalCnUseCnRuleSet: boolean;
@@ -294,6 +296,8 @@ export interface ConfigActions {
   setAllowLan: (allow: boolean) => void;
   setTestUrl: (url: string) => void;
   setTestInterval: (interval: number) => void;
+  setUrlTestLazy: (lazy: boolean | undefined) => void;
+  setUrlTestTolerance: (tolerance: number | undefined) => void;
   setRuleProviderBaseUrl: (url: string) => void;
   setProxyGroupAdvancedModeEnabled: (value: boolean) => void;
   setCnIpNoResolve: (value: boolean) => void;

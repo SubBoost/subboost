@@ -92,6 +92,10 @@ export function validateSubBoostTemplateConfig(value: unknown): ValidationResult
   if (!testUrl.ok) return testUrl;
   const testInterval = parsePositiveInteger(value.testInterval, "testInterval");
   if (!testInterval.ok) return testInterval;
+  const urlTestLazy = parseOptionalBoolean(value.urlTestLazy, "urlTestLazy");
+  if (!urlTestLazy.ok) return urlTestLazy;
+  const urlTestTolerance = parseOptionalNonNegativeInteger(value.urlTestTolerance, "urlTestTolerance");
+  if (!urlTestTolerance.ok) return urlTestTolerance;
   const ruleProviderBaseUrl = parseHttpUrlString(value.ruleProviderBaseUrl, "ruleProviderBaseUrl");
   if (!ruleProviderBaseUrl.ok) return ruleProviderBaseUrl;
   const cnIpNoResolve = parseOptionalBoolean(value.cnIpNoResolve, "cnIpNoResolve");
@@ -142,6 +146,8 @@ export function validateSubBoostTemplateConfig(value: unknown): ValidationResult
       allowLan: allowLan.value,
       testUrl: testUrl.value,
       testInterval: testInterval.value,
+      ...(urlTestLazy.value !== undefined ? { urlTestLazy: urlTestLazy.value } : {}),
+      ...(urlTestTolerance.value !== undefined ? { urlTestTolerance: urlTestTolerance.value } : {}),
       ruleProviderBaseUrl: ruleProviderBaseUrl.value,
     },
   };
@@ -205,6 +211,17 @@ function parsePositiveInteger(
 ): { ok: true; value: number } | { ok: false; error: string } {
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
     return invalid(`${field} 必须是正整数`);
+  }
+  return { ok: true, value };
+}
+
+function parseOptionalNonNegativeInteger(
+  value: unknown,
+  field: string
+): { ok: true; value?: number } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    return invalid(`${field} 必须是非负整数`);
   }
   return { ok: true, value };
 }

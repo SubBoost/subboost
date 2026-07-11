@@ -118,6 +118,8 @@ describe("createTemplateActions", () => {
       allowLan: false,
       testUrl: "https://example.com/generate_204",
       testInterval: 60,
+      urlTestLazy: true,
+      urlTestTolerance: 50,
       ruleProviderBaseUrl: "https://example.com/rules",
     } as unknown as SubBoostTemplateConfig;
 
@@ -157,6 +159,8 @@ describe("createTemplateActions", () => {
       allowLan: false,
       testUrl: "https://example.com/generate_204",
       testInterval: 60,
+      urlTestLazy: true,
+      urlTestTolerance: 50,
       ruleProviderBaseUrl: "https://example.com/rules",
     });
     expect(getState().customRules).toEqual([

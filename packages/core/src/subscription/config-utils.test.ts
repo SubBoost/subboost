@@ -98,6 +98,8 @@ describe("subscription config utils", () => {
         ruleProviderBaseUrl: " https://rules.example.com ",
         testUrl: "https://cp.cloudflare.com",
         testInterval: 180,
+        urlTestLazy: true,
+        urlTestTolerance: 50,
       },
       { nodes: [node()] }
     );
@@ -117,6 +119,8 @@ describe("subscription config utils", () => {
       experimentalCnUseCnRuleSet: true,
       testUrl: "https://cp.cloudflare.com",
       testInterval: 180,
+      urlTestLazy: true,
+      urlTestTolerance: 50,
       listenerPorts: { Node: 12000 },
     });
     expect(userConfig.customRules?.[0]).toMatchObject({

@@ -3,6 +3,20 @@ import { validateSubBoostTemplateConfig } from "./config-template";
 import { expectInvalid, validConfig } from "./config-template.test-helpers";
 
 describe("validateSubBoostTemplateConfig field validation", () => {
+  it("accepts optional global url-test overrides and validates tolerance", () => {
+    const result = validateSubBoostTemplateConfig(
+      validConfig({ urlTestLazy: true, urlTestTolerance: 50 }),
+    );
+
+    expect(result.ok && result.config).toMatchObject({
+      urlTestLazy: true,
+      urlTestTolerance: 50,
+    });
+    expectInvalid({ urlTestLazy: "yes" as never }, "urlTestLazy 必须是布尔值");
+    expectInvalid({ urlTestTolerance: -1 }, "urlTestTolerance 必须是非负整数");
+    expectInvalid({ urlTestTolerance: 1.5 }, "urlTestTolerance 必须是非负整数");
+  });
+
   it("rejects invalid dialer, module rule, scalar, and URL fields", () => {
     expectInvalid({ dialerProxyGroups: "bad" as never }, "dialerProxyGroups 必须是数组");
     expectInvalid({ dialerProxyGroups: [1 as never] }, "dialerProxyGroups 只能包含对象");

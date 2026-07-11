@@ -265,6 +265,13 @@ export function buildGenerateOptionsFromConfig(
   const cnIpNoResolve = typeof config.cnIpNoResolve === "boolean" ? config.cnIpNoResolve : undefined;
   const experimentalCnUseCnRuleSet =
     typeof config.experimentalCnUseCnRuleSet === "boolean" ? config.experimentalCnUseCnRuleSet : undefined;
+  const urlTestLazy = typeof config.urlTestLazy === "boolean" ? config.urlTestLazy : undefined;
+  const urlTestTolerance =
+    typeof config.urlTestTolerance === "number" &&
+    Number.isInteger(config.urlTestTolerance) &&
+    config.urlTestTolerance >= 0
+      ? config.urlTestTolerance
+      : undefined;
   const proxyGroupNameOverrides = normalizeProxyGroupNameOverrides(config.proxyGroupNameOverrides);
   const listenerPorts = normalizeListenerPorts(config.listenerPorts);
   const ruleOrder = normalizePersistedRuleOrder({
@@ -290,6 +297,8 @@ export function buildGenerateOptionsFromConfig(
     ...(autoSelectStrategy ? { autoSelectStrategy } : {}),
     testUrl,
     testInterval,
+    ...(urlTestLazy !== undefined ? { urlTestLazy } : {}),
+    ...(urlTestTolerance !== undefined ? { urlTestTolerance } : {}),
     ...(cnIpNoResolve !== undefined ? { cnIpNoResolve } : {}),
     ...(experimentalCnUseCnRuleSet !== undefined ? { experimentalCnUseCnRuleSet } : {}),
     ...(normalizePort(config.mixedPort) !== undefined ? { mixedPort: normalizePort(config.mixedPort) as number } : {}),

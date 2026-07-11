@@ -41,5 +41,7 @@ export type SubBoostTemplateConfig = {
   allowLan: boolean;
   testUrl: string;
   testInterval: number;
+  urlTestLazy?: boolean;
+  urlTestTolerance?: number;
   ruleProviderBaseUrl: string;
 };

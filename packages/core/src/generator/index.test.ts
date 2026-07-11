@@ -17,6 +17,39 @@ function ssNode(patch: Partial<ParsedNode> = {}): ParsedNode {
 const REALITY_PUBLIC_KEY = "A".repeat(43);
 
 describe("generateClashConfig", () => {
+  it("applies global url-test overrides to regular and dialer groups", () => {
+    const config = generateClashConfig({
+      nodes: [
+        ssNode({ name: "Relay" }),
+        ssNode({ name: "Target", server: "target.example.com" }),
+      ],
+      userConfig: {
+        dnsYaml: "",
+        enabledGroups: ["auto"],
+        urlTestLazy: true,
+        urlTestTolerance: 50,
+      },
+      dialerProxyGroups: [
+        {
+          id: "relay",
+          name: "Relay Auto",
+          type: "url-test",
+          relayNodes: ["Relay"],
+          targetNodes: ["Target"],
+        },
+      ],
+    });
+
+    const urlTestGroups = (config["proxy-groups"] ?? []).filter((group) => group.type === "url-test");
+    expect(urlTestGroups.length).toBeGreaterThanOrEqual(2);
+    expect(urlTestGroups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "⚡ 自动选择", lazy: true, tolerance: 50 }),
+        expect.objectContaining({ name: "Relay Auto", lazy: true, tolerance: 50 }),
+      ]),
+    );
+  });
+
   it("treats explicit empty base YAML as a strict patch instead of re-adding defaults", () => {
     const config = generateClashConfig({
       nodes: [ssNode()],

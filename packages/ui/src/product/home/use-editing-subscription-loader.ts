@@ -540,6 +540,12 @@ export function useEditingSubscriptionLoader({
             typeof cfg.ruleProviderBaseUrl === "string" ? (cfg.ruleProviderBaseUrl as string) : state.ruleProviderBaseUrl,
           testUrl: typeof cfg.testUrl === "string" ? (cfg.testUrl as string) : state.testUrl,
           testInterval: typeof cfg.testInterval === "number" ? (cfg.testInterval as number) : state.testInterval,
+          urlTestLazy:
+            typeof cfg.urlTestLazy === "boolean" ? (cfg.urlTestLazy as boolean) : state.urlTestLazy,
+          urlTestTolerance:
+            typeof cfg.urlTestTolerance === "number" && Number.isInteger(cfg.urlTestTolerance) && cfg.urlTestTolerance >= 0
+              ? (cfg.urlTestTolerance as number)
+              : state.urlTestTolerance,
           cnIpNoResolve: typeof (cfg as any).cnIpNoResolve === "boolean" ? Boolean((cfg as any).cnIpNoResolve) : state.cnIpNoResolve,
           experimentalCnUseCnRuleSet:
             typeof (cfg as any).experimentalCnUseCnRuleSet === "boolean"

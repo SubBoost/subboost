@@ -232,6 +232,8 @@ describe("useEditingSubscriptionLoader", () => {
               ruleProviderBaseUrl: "https://rules.example.com",
               testUrl: "https://test.example.com",
               testInterval: 600,
+              urlTestLazy: true,
+              urlTestTolerance: 50,
               cnIpNoResolve: false,
               experimentalCnUseCnRuleSet: true,
               smartNodeMatchingEnabled: false,
@@ -289,6 +291,8 @@ describe("useEditingSubscriptionLoader", () => {
       ruleProviderBaseUrl: "https://rules.example.com",
       testUrl: "https://test.example.com",
       testInterval: 600,
+      urlTestLazy: true,
+      urlTestTolerance: 50,
       cnIpNoResolve: false,
       experimentalCnUseCnRuleSet: true,
     });

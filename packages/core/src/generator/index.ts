@@ -343,7 +343,11 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     sanitizedDialerProxyGroups,
     config.testUrl,
     config.testInterval,
-    proxyProviderNames
+    proxyProviderNames,
+    {
+      urlTestLazy: config.urlTestLazy,
+      urlTestTolerance: config.urlTestTolerance,
+    },
   ) as unknown as ProxyGroup[];
 
   // 生成选项
@@ -354,6 +358,8 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     ruleProviderBaseUrl: config.ruleProviderBaseUrl,
     testUrl: config.testUrl,
     testInterval: config.testInterval,
+    urlTestLazy: config.urlTestLazy,
+    urlTestTolerance: config.urlTestTolerance,
     customProxyGroups,
     customRuleSets,
     proxyGroupAdvanced,

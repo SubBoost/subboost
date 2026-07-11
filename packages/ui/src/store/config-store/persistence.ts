@@ -54,6 +54,10 @@ export function normalizePersistedConfigState(
     ...(typeof state.allowLan === "boolean" ? { allowLan: state.allowLan } : {}),
     ...(typeof state.testUrl === "string" ? { testUrl: state.testUrl } : {}),
     ...(typeof state.testInterval === "number" ? { testInterval: state.testInterval } : {}),
+    ...(typeof state.urlTestLazy === "boolean" ? { urlTestLazy: state.urlTestLazy } : {}),
+    ...(typeof state.urlTestTolerance === "number" && Number.isInteger(state.urlTestTolerance) && state.urlTestTolerance >= 0
+      ? { urlTestTolerance: state.urlTestTolerance }
+      : {}),
     ...(typeof state.ruleProviderBaseUrl === "string" ? { ruleProviderBaseUrl: state.ruleProviderBaseUrl } : {}),
     ...(typeof state.proxyGroupAdvancedModeEnabled === "boolean"
       ? { proxyGroupAdvancedModeEnabled: state.proxyGroupAdvancedModeEnabled }
@@ -74,6 +78,8 @@ export function partializeConfigState(state: ConfigState): Partial<ConfigState> 
     allowLan: state.allowLan,
     testUrl: state.testUrl,
     testInterval: state.testInterval,
+    ...(state.urlTestLazy !== undefined ? { urlTestLazy: state.urlTestLazy } : {}),
+    ...(state.urlTestTolerance !== undefined ? { urlTestTolerance: state.urlTestTolerance } : {}),
     ruleProviderBaseUrl: state.ruleProviderBaseUrl,
     proxyGroupAdvancedModeEnabled: state.proxyGroupAdvancedModeEnabled,
     cnIpNoResolve: state.cnIpNoResolve,

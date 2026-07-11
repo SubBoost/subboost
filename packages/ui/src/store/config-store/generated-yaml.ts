@@ -69,6 +69,8 @@ function buildGenerateClashYamlOptions(
       listenerPorts: state.listenerPorts,
       testUrl: state.testUrl,
       testInterval: state.testInterval,
+      urlTestLazy: state.urlTestLazy,
+      urlTestTolerance: state.urlTestTolerance,
       ruleProviderBaseUrl: state.ruleProviderBaseUrl,
       autoSelectStrategy: "url-test",
     },

@@ -172,6 +172,12 @@ export function createTemplateActions(
           testUrl: typeof config.testUrl === "string" ? config.testUrl : state.testUrl,
           testInterval:
             typeof config.testInterval === "number" ? config.testInterval : state.testInterval,
+          urlTestLazy:
+            typeof config.urlTestLazy === "boolean" ? config.urlTestLazy : state.urlTestLazy,
+          urlTestTolerance:
+            typeof config.urlTestTolerance === "number"
+              ? config.urlTestTolerance
+              : state.urlTestTolerance,
           ruleProviderBaseUrl:
             typeof config.ruleProviderBaseUrl === "string"
               ? config.ruleProviderBaseUrl

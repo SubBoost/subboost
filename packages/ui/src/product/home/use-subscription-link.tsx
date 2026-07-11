@@ -87,6 +87,8 @@ type Options = {
   ruleProviderBaseUrl: string;
   testUrl: string;
   testInterval: number;
+  urlTestLazy?: boolean;
+  urlTestTolerance?: number;
   cnIpNoResolve: boolean;
   experimentalCnUseCnRuleSet: boolean;
 };
@@ -121,6 +123,8 @@ export function useSubscriptionLink({
   ruleProviderBaseUrl,
   testUrl,
   testInterval,
+  urlTestLazy,
+  urlTestTolerance,
   cnIpNoResolve,
   experimentalCnUseCnRuleSet,
 }: Options) {
@@ -392,6 +396,8 @@ export function useSubscriptionLink({
             ruleProviderBaseUrl,
             testUrl,
             testInterval,
+            ...(urlTestLazy !== undefined ? { urlTestLazy } : {}),
+            ...(urlTestTolerance !== undefined ? { urlTestTolerance } : {}),
             cnIpNoResolve,
             experimentalCnUseCnRuleSet,
             autoSelectStrategy: "url-test",
@@ -488,6 +494,8 @@ export function useSubscriptionLink({
     template,
     testInterval,
     testUrl,
+    urlTestLazy,
+    urlTestTolerance,
     trackSubscriptionMutation,
   ]);
 

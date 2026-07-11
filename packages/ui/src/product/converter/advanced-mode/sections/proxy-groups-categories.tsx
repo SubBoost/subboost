@@ -34,6 +34,7 @@ import { ProxyGroupsCustomGroupsPanel } from "./proxy-groups-custom-groups-panel
 import { ProxyGroupsCustomRoutingRules } from "./proxy-groups-custom-routing-rules";
 import { ProxyGroupAdvancedPanel } from "./proxy-group-advanced-panel";
 import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
+import { ProxyGroupsUrlTestSettings } from "./proxy-groups-url-test-settings";
 
 const PROXY_GROUP_SECTION_LABEL_ROW_CLASS = "flex min-h-7 items-center gap-2";
 const PROXY_GROUP_SECTION_LABEL_CLASS = "text-xs text-white/50";
@@ -314,6 +315,8 @@ export function ProxyGroupsCategories() {
           </div>
         </div>
       </div>
+
+      <ProxyGroupsUrlTestSettings />
 
       <div className="space-y-1">
         <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>

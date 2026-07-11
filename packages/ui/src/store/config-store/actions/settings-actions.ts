@@ -8,6 +8,8 @@ type SettingsActions = Pick<
   | "setAllowLan"
   | "setTestUrl"
   | "setTestInterval"
+  | "setUrlTestLazy"
+  | "setUrlTestTolerance"
   | "setRuleProviderBaseUrl"
   | "setProxyGroupAdvancedModeEnabled"
   | "setCnIpNoResolve"
@@ -38,6 +40,14 @@ export function createSettingsActions(
 
     setTestInterval: (interval: number) => {
       setAndGenerateConfig(() => ({ testInterval: interval }));
+    },
+
+    setUrlTestLazy: (lazy: boolean | undefined) => {
+      setAndGenerateConfig(() => ({ urlTestLazy: lazy }));
+    },
+
+    setUrlTestTolerance: (tolerance: number | undefined) => {
+      setAndGenerateConfig(() => ({ urlTestTolerance: tolerance }));
     },
 
     setRuleProviderBaseUrl: (url: string) => {
