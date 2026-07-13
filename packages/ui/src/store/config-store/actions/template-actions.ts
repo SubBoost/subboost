@@ -5,7 +5,6 @@ import { normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
 import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 import { normalizeRuleModelFromConfig } from "@subboost/core/rules/rule-model";
 import { resolveProxyGroupAdvancedModeEnabled } from "@subboost/core/proxy-group-advanced-mode";
-import { migrateLegacyConfig } from "@subboost/core/migrations/legacy-config";
 import type { ConfigActions, SubBoostTemplateConfig } from "../definitions";
 import type { GetState, SetAndGenerateConfig, SetState } from "../store-types";
 
@@ -80,10 +79,7 @@ export function createTemplateActions(
     // 应用模板配置（从模板库应用）
     applyTemplateConfig: (config: SubBoostTemplateConfig) => {
       if (!config || typeof config !== "object") return;
-      const migratedConfig = migrateLegacyConfig(config) as SubBoostTemplateConfig;
-
       setAndGenerateConfig((state) => {
-        const config = migratedConfig;
         const ruleModel = normalizeRuleModelFromConfig(config);
         const hasCustomProxyGroups = Array.isArray(config.customProxyGroups);
         const hasCustomRuleSets = Array.isArray(config.customRuleSets);

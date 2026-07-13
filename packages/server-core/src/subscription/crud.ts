@@ -5,7 +5,6 @@ import type { ParsedNode } from "@subboost/core/types/node";
 import { resolveSubscriptionAutoUpdateState, type SubscriptionAutoUpdateStateFields } from "./auto-update-state";
 import { normalizeSavedSourcesForPersistence, type NormalizeSavedSourcesForPersistenceOptions } from "./saved-sources";
 import { resolveSmartNodeMatchingEnabled } from "./refresh-node-snapshot";
-import { migrateLegacyConfig } from "@subboost/core/migrations/legacy-config";
 
 export type SubscriptionConfigInput = {
   config?: unknown;
@@ -115,7 +114,7 @@ export function normalizeSubscriptionConfigForPersistence(
     baseConfig.smartNodeMatchingEnabled = options.defaultSmartNodeMatchingEnabled;
   }
 
-  return migrateLegacyConfig(baseConfig);
+  return baseConfig;
 }
 
 export function serializeSubscriptionAutoUpdateState(

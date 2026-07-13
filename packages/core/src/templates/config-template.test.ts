@@ -196,40 +196,19 @@ describe("validateSubBoostTemplateConfig", () => {
     expect(result.config).not.toHaveProperty("experimentalCnUseCnRuleSet");
   });
 
-  it("migrates removed rule-model compatibility fields at the template boundary", () => {
-    const result = validateSubBoostTemplateConfig(
-      validConfig({
-        moduleRuleExclusions: { ai: ["openai"] },
-        allRulesOrderEditingEnabled: true,
-        customProxyGroups: [
-          {
-            id: "custom",
-            name: "Custom",
-            emoji: "",
-            groupType: "select",
-            rules: [
-              {
-                id: "legacy-provider",
-                name: "Legacy Provider",
-                path: "geosite/legacy.mrs",
-                behavior: "domain",
-              },
-            ],
-          },
-        ],
-      } as never)
+  it("rejects removed rule-model compatibility fields", () => {
+    expectInvalid({ moduleRuleOverrides: {} } as never, "模板配置包含已移除字段: moduleRuleOverrides");
+    expectInvalid({ moduleRuleExclusions: {} } as never, "模板配置包含已移除字段: moduleRuleExclusions");
+    expectInvalid({ allRulesOrderEditingEnabled: true } as never, "模板配置包含已移除字段: allRulesOrderEditingEnabled");
+    const removedFilteredGroupsField = `filtered${"ProxyGroups"}`;
+    expectInvalid(
+      { [removedFilteredGroupsField]: [] } as never,
+      `模板配置包含已移除字段: ${removedFilteredGroupsField}`
     );
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.config.builtinRuleEdits?.["module:ai:openai"]).toEqual({ enabled: false });
-    expect(result.config.customRuleSets).toEqual([
-      expect.objectContaining({
-        id: "legacy-provider",
-        target: { kind: "custom", id: "custom" },
-      }),
-    ]);
-    expect(result.config.customProxyGroups[0]).not.toHaveProperty("rules");
+    expectInvalid(
+      { customProxyGroups: [{ id: "custom", name: "Custom", emoji: "", groupType: "select", rules: [] }] } as never,
+      "模板配置包含已移除字段: customProxyGroups[0].rules"
+    );
   });
 
   it("rejects template configs that hide every enabled module", () => {

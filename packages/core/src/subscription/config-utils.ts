@@ -19,7 +19,6 @@ import { DEFAULT_SUBBOOST_CONFIG } from "@subboost/core/config/defaults";
 import { normalizeRuleModelFromConfig } from "@subboost/core/rules/rule-model";
 import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
 import { normalizeProxyGroupTargetRef } from "@subboost/core/proxy-group-targets";
-import { migrateLegacyConfig } from "@subboost/core/migrations/legacy-config";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -236,7 +235,7 @@ export function buildGenerateOptionsFromConfig(
     proxyProviders?: Record<string, unknown>;
   }
 ): GenerateOptions {
-  const config = migrateLegacyConfig(rawConfig);
+  const config = rawConfig;
   const { testUrl, testInterval } = getEffectiveTestOptions(config);
   const proxyProviders =
     opts.proxyProviders ?? buildProxyProvidersFromConfig(config, { testUrl, testInterval });

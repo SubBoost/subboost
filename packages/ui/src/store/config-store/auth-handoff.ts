@@ -3,7 +3,6 @@ import { initialState } from "./definitions";
 import { safeParseJsonObject } from "@subboost/core/json";
 import { resolveProxyGroupAdvancedModeEnabled } from "@subboost/core/proxy-group-advanced-mode";
 import { normalizeRuleModelFromConfig } from "@subboost/core/rules/rule-model";
-import { migrateLegacyConfig } from "@subboost/core/migrations/legacy-config";
 
 export const AUTH_CONFIG_HANDOFF_STORAGE_NAME = "subboost-auth-config-handoff";
 
@@ -172,10 +171,8 @@ function buildHandoffState(state: ConfigState): Partial<ConfigState> {
   };
 }
 
-function normalizeHandoffState(rawValue: unknown): Partial<ConfigState> | null {
-  const migratedRaw = migrateLegacyConfig(rawValue);
-  if (!isRecord(migratedRaw)) return null;
-  const raw = migratedRaw;
+function normalizeHandoffState(raw: unknown): Partial<ConfigState> | null {
+  if (!isRecord(raw)) return null;
   const out: Partial<ConfigState> = {};
 
   const sources = sourceArray(raw.sources);

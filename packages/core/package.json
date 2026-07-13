@@ -13,7 +13,6 @@
     "./generator/yaml-semantics": "./src/generator/yaml-semantics.ts",
     "./json": "./src/json.ts",
     "./mihomo/*": "./src/mihomo/*.ts",
-    "./migrations/*": "./src/migrations/*.ts",
     "./node-name-template": "./src/node-name-template.ts",
     "./node-identity": "./src/node-identity.ts",
     "./parser": "./src/parser/index.ts",
