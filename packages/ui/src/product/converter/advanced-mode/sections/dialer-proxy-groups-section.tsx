@@ -21,6 +21,7 @@ import {
   type ProxyGroupNameDraft,
 } from "./proxy-group-name-editor";
 import { ProxyGroupSummary } from "./proxy-group-summary";
+import { GroupListenerPortBadge } from "./proxy-groups-group-listeners";
 import {
   getLoadBalanceStrategyLabel,
   getProxyGroupTypeLabel,
@@ -263,6 +264,7 @@ export function DialerProxyGroupsSection({
                     <span className="text-sm font-medium text-white truncate" title={group.name}>
                       {group.name}
                     </span>
+                    <GroupListenerPortBadge name={group.name} />
                     <Button
                       variant="ghost"
                       size="sm"

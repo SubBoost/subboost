@@ -98,6 +98,21 @@ vi.mock("@subboost/core/generator/proxy-groups", () => ({
 	    { id: "fallback", name: "Fallback", category: "core", rules: [] },
 	  ],
   generateProxyGroups: vi.fn(() => []),
+  buildProviderProxyGroups: (attachments: any[]) => {
+    const grouped = attachments.filter((a) => a && a.mode === "grouped");
+    return {
+      groups: grouped.map((a) => ({ name: a.groupName || a.key, type: "select", use: [a.key] })),
+      names: grouped.map((a) => a.groupName || a.key),
+    };
+  },
+}));
+vi.mock("@subboost/core/subscription/proxy-providers", () => ({
+  buildProxyProviderPlanFromSources: (sources: any[]) => {
+    const attachments = (sources || [])
+      .filter((s) => s && s.type === "url" && s.useProxyProviders && s.providerMode === "grouped")
+      .map((s) => ({ key: `url_${s.id}`, mode: "grouped", groupName: s.providerGroupName || `✈️ url_${s.id}` }));
+    return attachments.length > 0 ? { providers: {}, attachments } : undefined;
+  },
 }));
 vi.mock("@subboost/core/proxy-group-name", () => ({
   resolveProxyGroupModuleName: (module: { name: string }, override?: string) => override || module.name,
@@ -127,9 +142,19 @@ vi.mock("./proxy-groups-custom-routing-rules", () => ({
     return null;
   },
 }));
+vi.mock("./proxy-groups-group-listeners", () => ({
+  GroupListenerPortBadge: () => null,
+  ProxyGroupsGroupListeners: () => null,
+}));
 vi.mock("./proxy-groups-module-card", () => ({
   ProxyGroupsModuleCard: (props: any) => {
     mocks.captures.moduleCards.push(props);
+    return null;
+  },
+}));
+vi.mock("./provider-group-readonly-card", () => ({
+  ProviderGroupReadonlyCard: (props: any) => {
+    mocks.captures.providerCards.push(props);
     return null;
   },
 }));
@@ -146,6 +171,7 @@ function renderCategories(overrides: Record<number, unknown> = {}) {
   mocks.captures.inputs = [];
   mocks.captures.dropdownItems = [];
   mocks.captures.moduleCards = [];
+  mocks.captures.providerCards = [];
   mocks.captures.customPanelRendered = false;
   mocks.captures.customRulesRendered = false;
   try {
@@ -165,6 +191,7 @@ function renderCategoryTree(overrides: Record<number, unknown> = {}) {
   mocks.captures.inputs = [];
   mocks.captures.dropdownItems = [];
   mocks.captures.moduleCards = [];
+  mocks.captures.providerCards = [];
   mocks.captures.customPanelRendered = false;
   mocks.captures.customRulesRendered = false;
   try {
@@ -193,7 +220,7 @@ describe("ProxyGroupsCategories", () => {
     vi.clearAllMocks();
     stateMock.refOverride = undefined;
     mocks.confirmDialog.mockResolvedValue(true);
-    mocks.captures = { inputs: [], dropdownItems: [], moduleCards: [] };
+    mocks.captures = { inputs: [], dropdownItems: [], moduleCards: [], providerCards: [] };
     mocks.store = {
       ruleProviderBaseUrl: "https://rules.example/base/",
       nodes: [],
@@ -286,6 +313,29 @@ describe("ProxyGroupsCategories", () => {
     expect(mocks.store.restoreHiddenProxyGroup).toHaveBeenCalledWith("fallback");
     expect(stateMock.setters[0]).toHaveBeenCalledWith(expect.any(Function));
     expect(mocks.captures.customRulesRendered).toBe(true);
+  });
+
+  it("renders airport groups as read-only cards after the auto module in the core category", () => {
+    mocks.store.sources = [
+      {
+        id: "s1",
+        type: "url",
+        useProxyProviders: true,
+        providerMode: "grouped",
+        providerGroupName: "✈️ 测试机场",
+      },
+      // 非分组模式的 provider 不产生只读卡片
+      { id: "s2", type: "url", useProxyProviders: true, providerMode: "inline" },
+    ];
+    renderCategories({ 0: new Set(["core"]) });
+
+    expect(mocks.captures.providerCards).toEqual([expect.objectContaining({ name: "✈️ 测试机场" })]);
+  });
+
+  it("does not render airport cards when no grouped provider source exists", () => {
+    mocks.store.sources = [{ id: "s1", type: "url", useProxyProviders: true, providerMode: "bare" }];
+    renderCategories({ 0: new Set(["core"]) });
+    expect(mocks.captures.providerCards).toHaveLength(0);
   });
 
   it("handles module card actions, confirmations, and rule movement", async () => {

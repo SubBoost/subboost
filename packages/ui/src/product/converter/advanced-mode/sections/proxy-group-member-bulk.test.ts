@@ -15,7 +15,9 @@ function resolved(ref: ProxyGroupMemberRef, name: string): ResolvedMember {
       ? `node:${ref.name}`
       : ref.kind === "module" || ref.kind === "custom"
         ? `${ref.kind}:${ref.id}`
-        : `${ref.kind}:${ref.kind === "direct" ? "DIRECT" : "REJECT"}`;
+        : ref.kind === "provider-inline" || ref.kind === "provider-group"
+          ? `${ref.kind}:${ref.key}`
+          : `${ref.kind}:${ref.kind === "direct" ? "DIRECT" : "REJECT"}`;
   return { key, ref, name, kind: ref.kind };
 }
 
@@ -95,6 +97,8 @@ describe("proxy group member bulk helpers", () => {
     const moduleMember = resolved({ kind: "module", id: "auto" }, "Auto");
     const custom = resolved({ kind: "custom", id: "media" }, "Media");
     const direct = resolved({ kind: "direct" }, "DIRECT");
+    const providerInline = resolved({ kind: "provider-inline", key: "lxy" }, "内联 lxy");
+    const providerGroup = resolved({ kind: "provider-group", key: "lxy" }, "✈️ 香港机场");
 
     expect(isNodeMember(node)).toBe(true);
     expect(isNodeMember(moduleMember)).toBe(false);
@@ -102,6 +106,35 @@ describe("proxy group member bulk helpers", () => {
     expect(isProxyGroupMember(custom)).toBe(true);
     expect(isProxyGroupMember(node)).toBe(false);
     expect(isProxyGroupMember(direct)).toBe(false);
+    // provider-inline 按节点、provider-group 按代理组，各归各类、互不交叉
+    expect(isNodeMember(providerInline)).toBe(true);
+    expect(isProxyGroupMember(providerInline)).toBe(false);
+    expect(isProxyGroupMember(providerGroup)).toBe(true);
+    expect(isNodeMember(providerGroup)).toBe(false);
+  });
+
+  it("removes provider members from extraMembers without writing them to excludedMembers", () => {
+    const providerInline = resolved({ kind: "provider-inline", key: "lxy" }, "内联 lxy");
+    const nodeA = resolved({ kind: "node", name: "A" }, "A");
+
+    expect(
+      buildRemoveAllMembersPatch({
+        advanced: {
+          extraMembers: [
+            { kind: "provider-inline", key: "lxy" },
+            { kind: "node", name: "A" },
+          ],
+          excludedMembers: [],
+          memberOrder: [{ kind: "node", name: "A" }],
+        },
+        membersToRemove: [providerInline, nodeA],
+      }),
+    ).toEqual({
+      // provider 从 extraMembers 删除，node 走常规排除
+      extraMembers: [],
+      excludedMembers: [{ kind: "node", name: "A" }],
+      memberOrder: [],
+    });
   });
 
   it("blocks direct and transitive proxy group cycles", () => {

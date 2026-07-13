@@ -108,6 +108,10 @@ vi.mock("@subboost/ui/components/ui/switch", () => ({
   },
 }));
 vi.mock("@subboost/ui/components/ui/toaster", () => ({ toast: mocks.toast }));
+vi.mock("./proxy-groups-group-listeners", () => ({
+  GroupListenerPortBadge: () => null,
+  ProxyGroupsGroupListeners: () => null,
+}));
 vi.mock("@subboost/core/generator/proxy-groups", () => ({
   PROXY_GROUP_MODULES: [
     { id: "auto", name: "Auto" },

@@ -95,6 +95,17 @@ export interface ListenerConfig {
   [key: string]: unknown;
 }
 
+/**
+ * 分组监听绑定：给一个"已存在的策略组"开本地 inbound 监听端口。
+ * 生成时映射为 listeners 条目：{ name: 自动, type: mixed, listen: 0.0.0.0, port, proxy: target, udp: true }。
+ */
+export interface GroupListenerBinding {
+  id: string;
+  // 绑定的策略组名（写入 listener 的 proxy 字段）
+  target: string;
+  port: number;
+}
+
 export interface SnifferConfig {
   enable?: boolean;
   "parse-pure-ip"?: boolean;
@@ -220,6 +231,11 @@ export type ProxyGroupMemberRef =
   | { kind: "node"; name: string }
   | { kind: "module"; id: string }
   | { kind: "custom"; id: string }
+  // provider 成员（存 provider key，稳定标识）：
+  // provider-inline → 本组 use: [key]（把该订阅节点内联进本组）
+  // provider-group  → 本组 proxies 追加该 provider 的机场组名（引用已生成的机场组）
+  | { kind: "provider-inline"; key: string }
+  | { kind: "provider-group"; key: string }
   | { kind: "direct" }
   | { kind: "reject" };
 

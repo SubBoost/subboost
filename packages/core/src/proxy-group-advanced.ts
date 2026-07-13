@@ -48,6 +48,9 @@ export interface ResolveProxyGroupMembersOptions {
   nodes: ParsedNode[];
   moduleNames?: Record<string, string>;
   customProxyGroups?: CustomProxyGroup[];
+  // 机场组（proxy-providers 分组模式）：{key, name} 列表，让机场组名可解析成 provider-group 成员，
+  // 与普通成员一样参与排除/排序/插入。不传则 provider-group 名字不被识别（与旧行为一致）。
+  providerGroups?: Array<{ key: string; name: string }>;
   advanced?: ProxyGroupAdvancedConfig;
   self?: { kind: "module" | "custom"; id: string; name: string };
 }
@@ -148,6 +151,12 @@ export function normalizeProxyGroupMemberRef(value: unknown): ProxyGroupMemberRe
   if (item.kind === "custom" && typeof item.id === "string" && item.id.trim()) {
     return { kind: "custom", id: item.id.trim() };
   }
+  if (item.kind === "provider-inline" && typeof item.key === "string" && item.key.trim()) {
+    return { kind: "provider-inline", key: item.key.trim() };
+  }
+  if (item.kind === "provider-group" && typeof item.key === "string" && item.key.trim()) {
+    return { kind: "provider-group", key: item.key.trim() };
+  }
   return null;
 }
 
@@ -201,6 +210,7 @@ function buildMemberFromName(
     nodeNameSet: Set<string>;
     moduleNameToId: Map<string, string>;
     customNameToId: Map<string, string>;
+    providerNameToKey?: Map<string, string>;
   }
 ): ProxyGroupResolvedMember | null {
   const trimmed = name.trim();
@@ -215,6 +225,9 @@ function buildMemberFromName(
     if (moduleId) ref = { kind: "module", id: moduleId };
     const customId = options.customNameToId.get(trimmed);
     if (!ref && customId) ref = { kind: "custom", id: customId };
+    // 机场组名（proxy-providers 分组模式）→ provider-group 成员；组名经 reserved 去重不会与上述冲突
+    const providerKey = options.providerNameToKey?.get(trimmed);
+    if (!ref && providerKey) ref = { kind: "provider-group", key: providerKey };
   }
 
   if (!ref) return null;
@@ -232,6 +245,7 @@ function buildMemberFromRef(
     nodeNameSet: Set<string>;
     moduleNames: Record<string, string>;
     customGroupsById: Map<string, CustomProxyGroup>;
+    providerKeyToName?: Map<string, string>;
   }
 ): ProxyGroupResolvedMember | null {
   const key = getProxyGroupMemberKey(ref);
@@ -243,6 +257,13 @@ function buildMemberFromRef(
   }
   if (ref.kind === "module") {
     const name = options.moduleNames[ref.id]?.trim();
+    return name ? { ref, key, name, kind: ref.kind } : null;
+  }
+  // provider-inline 注入 use，不进 proxies、无顺序语义，不参与常规 member 解析
+  if (ref.kind === "provider-inline") return null;
+  // provider-group（机场组）：查 key→组名，命中即作为普通成员；孤儿（源已改/删）返回 null
+  if (ref.kind === "provider-group") {
+    const name = options.providerKeyToName?.get(ref.key);
     return name ? { ref, key, name, kind: ref.kind } : null;
   }
   const group = options.customGroupsById.get(ref.id);
@@ -295,13 +316,23 @@ export function resolveProxyGroupMembers(options: ResolveProxyGroupMembersOption
       customGroupsById.set(group.id, group);
     }
   }
+  const providerNameToKey = new Map<string, string>();
+  const providerKeyToName = new Map<string, string>();
+  for (const item of options.providerGroups || []) {
+    const key = typeof item.key === "string" ? item.key.trim() : "";
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    if (key && name) {
+      providerNameToKey.set(name, key);
+      providerKeyToName.set(key, name);
+    }
+  }
 
   const buildMembersFromNames = (names: string[]) => {
     const out: ProxyGroupResolvedMember[] = [];
     const seen = new Set<string>();
     for (const rawName of names || []) {
       if (typeof rawName !== "string") continue;
-      const member = buildMemberFromName(rawName, { nodeNameSet, moduleNameToId, customNameToId });
+      const member = buildMemberFromName(rawName, { nodeNameSet, moduleNameToId, customNameToId, providerNameToKey });
       if (!member || seen.has(member.key)) continue;
       if (options.self && member.key === `${options.self.kind}:${options.self.id}`) continue;
       seen.add(member.key);
@@ -320,6 +351,7 @@ export function resolveProxyGroupMembers(options: ResolveProxyGroupMembersOption
       nodeNameSet,
       moduleNames: options.moduleNames || {},
       customGroupsById,
+      providerKeyToName,
     });
     if (!member || candidateMap.has(member.key)) continue;
     if (options.self && member.key === `${options.self.kind}:${options.self.id}`) continue;

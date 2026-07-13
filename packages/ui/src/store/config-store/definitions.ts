@@ -4,6 +4,7 @@ import type {
   CustomProxyGroup,
   CustomRule,
   CustomRuleSet,
+  GroupListenerBinding,
   ProxyGroupAdvancedConfig,
   TemplateType,
 } from "@subboost/core/types/config";
@@ -62,6 +63,15 @@ export interface SubscriptionSource {
   nameTemplate?: string;
   // URL 源使用 proxy-providers 模式：不在 SubBoost 内拉取/解析节点，仅在最终配置中写入 proxy-providers 供客户端拉取
   useProxyProviders?: boolean;
+  // proxy-providers 的自定义 key（留空用默认 url_<源id>）
+  providerKey?: string;
+  // provider 接入方式：grouped=生成机场组挂入节点选择（UI 默认）；inline=直接 use 注入所有策略组（旧行为，
+  // 旧数据无此字段时按 inline 兼容）；bare=仅生成 proxy-providers 不挂接
+  providerMode?: "grouped" | "inline" | "bare";
+  // 机场组名（仅 grouped 模式生效；emoji 拼在组名前缀，留空回落为 "✈️ <key>"）
+  providerGroupName?: string;
+  // provider 节点过滤正则（mihomo proxy-providers filter）；未设置时生成默认正则，显式清空则不写 filter
+  providerFilter?: string;
   // 独立的流量/到期元信息 URL（可选）
   userinfoUrl?: string;
   // 获取流量/到期元信息时使用的自定义 User-Agent（可选）
@@ -212,6 +222,9 @@ export interface ConfigState {
   // 节点监听端口（用于生成 listeners）
   listenerPorts: Record<string, number>;
 
+  // 分组监听：给已存在的策略组绑定 inbound 端口（用于生成 listeners）
+  groupListeners: GroupListenerBinding[];
+
   // 生成结果
   generatedYaml: string;
   generatedYamlError: string | null;
@@ -301,6 +314,11 @@ export interface ConfigActions {
   setListenerPort: (nodeName: string, port: number | null) => void;
   bulkSetListenerPorts: (patch: Record<string, number | null>) => void;
 
+  // 分组监听
+  addGroupListener: (binding?: Partial<Omit<GroupListenerBinding, "id">>) => void;
+  updateGroupListener: (id: string, patch: Partial<Omit<GroupListenerBinding, "id">>) => void;
+  removeGroupListener: (id: string) => void;
+
   // 生成配置
   generateConfig: () => string;
   setGeneratedYaml: (yaml: string) => void;
@@ -360,6 +378,7 @@ export const initialState: ConfigState = {
   cnIpNoResolve: DEFAULT_SUBBOOST_CONFIG.cnIpNoResolve,
   experimentalCnUseCnRuleSet: DEFAULT_SUBBOOST_CONFIG.experimentalCnUseCnRuleSet,
   listenerPorts: {},
+  groupListeners: [],
   generatedYaml: "",
   generatedYamlError: null,
   history: [],

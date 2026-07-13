@@ -96,6 +96,10 @@ vi.mock("./proxy-group-rule-targets", () => ({
   listCustomRulesForTarget: (_rules: any[], target: string) =>
     target === "🧩 Custom" ? [{ rule: { id: "manual-1" }, index: 0 }] : [],
 }));
+vi.mock("./proxy-groups-group-listeners", () => ({
+  GroupListenerPortBadge: () => null,
+  ProxyGroupsGroupListeners: () => null,
+}));
 vi.mock("./proxy-group-rule-row", () => ({
   ProxyGroupManualRuleRow: (props: any) => {
     mocks.captures.manualRows.push(props);

@@ -143,6 +143,10 @@ export function useEditingSubscriptionLoader({
               const tag = (item as any).tag;
               const nameTemplate = (item as any).nameTemplate;
               const useProxyProviders = (item as any).useProxyProviders;
+              const providerKey = (item as any).providerKey;
+              const providerMode = (item as any).providerMode;
+              const providerGroupName = (item as any).providerGroupName;
+              const providerFilter = (item as any).providerFilter;
               const userinfoUrl = (item as any).userinfoUrl;
               const userinfoUserAgent = (item as any).userinfoUserAgent;
               const subscriptionUserInfo = normalizeSubscriptionUserInfo((item as any).subscriptionUserInfo);
@@ -170,6 +174,18 @@ export function useEditingSubscriptionLoader({
                 nameTemplate: typeof nameTemplate === "string" && nameTemplate.trim() ? nameTemplate.trim() : undefined,
                 subscriptionUserInfo: hasSubscriptionUserInfo(subscriptionUserInfo) ? subscriptionUserInfo : undefined,
                 useProxyProviders: t === "url" && useProxyProviders === true ? true : undefined,
+                providerKey:
+                  t === "url" && typeof providerKey === "string" && providerKey.trim() ? providerKey.trim() : undefined,
+                providerMode:
+                  t === "url" && (providerMode === "grouped" || providerMode === "inline" || providerMode === "bare")
+                    ? providerMode
+                    : undefined,
+                providerGroupName:
+                  t === "url" && typeof providerGroupName === "string" && providerGroupName.trim()
+                    ? providerGroupName.trim()
+                    : undefined,
+                // providerFilter 保留空串（空串=显式不过滤，与"未设置走默认正则"区分）
+                providerFilter: t === "url" && typeof providerFilter === "string" ? providerFilter : undefined,
                 userinfoUrl: normalizedUserinfoUrl,
                 userinfoUserAgent:
                   t === "url" && typeof userinfoUserAgent === "string" && userinfoUserAgent.trim()
@@ -191,6 +207,10 @@ export function useEditingSubscriptionLoader({
               nameTemplate?: string;
               subscriptionUserInfo?: SubscriptionUserInfo;
               useProxyProviders?: boolean;
+              providerKey?: string;
+              providerMode?: "grouped" | "inline" | "bare";
+              providerGroupName?: string;
+              providerFilter?: string;
               userinfoUrl?: string;
               userinfoUserAgent?: string;
               lastParsedTag?: string;
@@ -257,6 +277,19 @@ export function useEditingSubscriptionLoader({
               ...(typeof s.nameTemplate === "string" && s.nameTemplate.trim() ? { nameTemplate: s.nameTemplate.trim() } : {}),
               ...(hasSubscriptionUserInfo(s.subscriptionUserInfo) ? { subscriptionUserInfo: s.subscriptionUserInfo } : {}),
               ...(s.type === "url" && s.useProxyProviders ? { useProxyProviders: true } : {}),
+              ...(s.type === "url" && typeof s.providerKey === "string" && s.providerKey.trim()
+                ? { providerKey: s.providerKey.trim() }
+                : {}),
+              ...(s.type === "url" &&
+              (s.providerMode === "grouped" || s.providerMode === "inline" || s.providerMode === "bare")
+                ? { providerMode: s.providerMode }
+                : {}),
+              ...(s.type === "url" && typeof s.providerGroupName === "string" && s.providerGroupName.trim()
+                ? { providerGroupName: s.providerGroupName.trim() }
+                : {}),
+              ...(s.type === "url" && typeof s.providerFilter === "string"
+                ? { providerFilter: s.providerFilter }
+                : {}),
               ...(s.type === "url" && typeof s.userinfoUrl === "string" && s.userinfoUrl.trim()
                 ? { userinfoUrl: tryNormalizeSubscriptionUrlInput(s.userinfoUrl) ?? s.userinfoUrl.trim() }
                 : {}),
@@ -317,6 +350,19 @@ export function useEditingSubscriptionLoader({
               ...(typeof s.nameTemplate === "string" && s.nameTemplate.trim() ? { nameTemplate: s.nameTemplate.trim() } : {}),
               ...(hasSubscriptionUserInfo(subscriptionUserInfo) ? { subscriptionUserInfo } : {}),
               ...(s.type === "url" && s.useProxyProviders ? { useProxyProviders: true } : {}),
+              ...(s.type === "url" && typeof s.providerKey === "string" && s.providerKey.trim()
+                ? { providerKey: s.providerKey.trim() }
+                : {}),
+              ...(s.type === "url" &&
+              (s.providerMode === "grouped" || s.providerMode === "inline" || s.providerMode === "bare")
+                ? { providerMode: s.providerMode }
+                : {}),
+              ...(s.type === "url" && typeof s.providerGroupName === "string" && s.providerGroupName.trim()
+                ? { providerGroupName: s.providerGroupName.trim() }
+                : {}),
+              ...(s.type === "url" && typeof s.providerFilter === "string"
+                ? { providerFilter: s.providerFilter }
+                : {}),
               ...(s.type === "url" && typeof s.userinfoUrl === "string" && s.userinfoUrl.trim()
                 ? { userinfoUrl: tryNormalizeSubscriptionUrlInput(s.userinfoUrl) ?? s.userinfoUrl.trim() }
                 : {}),
@@ -482,6 +528,27 @@ export function useEditingSubscriptionLoader({
           }
           return out;
         })();
+        const groupListenersFromCfg = (() => {
+          const raw = (cfg as any).groupListeners;
+          if (!Array.isArray(raw)) return [];
+          const out: Array<{ id: string; target: string; port: number }> = [];
+          const usedTargets = new Set<string>();
+          for (let index = 0; index < raw.length; index += 1) {
+            const item = raw[index];
+            if (!item || typeof item !== "object") continue;
+            const target = typeof (item as any).target === "string" ? (item as any).target.trim() : "";
+            const port = (item as any).port;
+            if (!target || typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+            if (usedTargets.has(target)) continue;
+            usedTargets.add(target);
+            const id =
+              typeof (item as any).id === "string" && (item as any).id.trim()
+                ? ((item as any).id as string)
+                : `group_listener_${index + 1}`;
+            out.push({ id, target, port });
+          }
+          return out;
+        })();
         const appliedTemplateIdFromCfg =
           typeof cfg.appliedTemplateId === "string" && cfg.appliedTemplateId.trim()
             ? (cfg.appliedTemplateId as string)
@@ -534,6 +601,7 @@ export function useEditingSubscriptionLoader({
           proxyGroupOrder: proxyGroupOrderFromCfg ? proxyGroupOrderFromCfg : state.proxyGroupOrder,
           ruleOrder: ruleOrderFromCfg.length > 0 ? ruleOrderFromCfg : state.ruleOrder,
           listenerPorts: listenerPortsFromCfg,
+          groupListeners: groupListenersFromCfg,
           appliedTemplateId: appliedTemplateIdFromCfg ?? state.appliedTemplateId,
           dnsYaml: typeof cfg.dnsYaml === "string" ? (cfg.dnsYaml as string) : state.dnsYaml,
           ruleProviderBaseUrl:

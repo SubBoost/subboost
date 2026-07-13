@@ -58,6 +58,7 @@ describe("computeGeneratedYamlResult", () => {
         testInterval: 600,
         enabledProxyGroups: ["select", "ai"],
         ruleOrder: ["module:ai"],
+        groupListeners: [{ id: "g1", target: "美国中转", port: 7891 }],
       })
     );
 
@@ -70,15 +71,20 @@ describe("computeGeneratedYamlResult", () => {
           "url_source-1": {
             type: "http",
             url: "https://example.com/sub.yaml",
-            interval: 3600,
+            interval: 43200,
             path: "./proxy_providers/url_source-1.yaml",
+            filter: "(?i)^(?!.*(到期时间|套餐到期|官网|更新|到期)).*",
             "health-check": {
               enable: true,
               url: "https://cp.cloudflare.com/generate_204",
-              interval: 600,
+              interval: 300,
+              timeout: 5000,
+              lazy: true,
             },
           },
         },
+        proxyProviderAttachments: [{ key: "url_source-1", mode: "inline" }],
+        groupListeners: [{ id: "g1", target: "美国中转", port: 7891 }],
         userConfig: expect.objectContaining({
           enabledGroups: ["select", "ai"],
           enabledRules: ["select", "ai"],

@@ -213,12 +213,14 @@ describe("subscription URL and config helpers", () => {
         url_main_source: {
           type: "http",
           url: "https://sub.example.com/list?token=abc",
-          interval: 3600,
+          interval: 43200,
           path: "./proxy_providers/url_main_source.yaml",
           "health-check": {
             enable: true,
             url: "https://probe.example.com/204",
-            interval: 120,
+            interval: 300,
+            timeout: 5000,
+            lazy: true,
           },
         },
       },

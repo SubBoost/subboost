@@ -35,6 +35,11 @@ import {
   type ResolvedMember,
 } from "./proxy-group-member-bulk";
 import { ProxyGroupMemberSectionHeader } from "./proxy-group-member-section-header";
+import { buildProviderGroupInfo } from "./provider-group-plan";
+import {
+  PROVIDER_GROUP_DEFAULT_EMOJI,
+  resolveProviderMode,
+} from "@subboost/ui/product/converter/provider-settings-fields";
 
 export {
   insertMemberAfterProtected,
@@ -62,6 +67,10 @@ export function memberKindLabel(member: ResolvedMember): string {
       return "内置组";
     case "custom":
       return "自定义组";
+    case "provider-inline":
+      return "Provider";
+    case "provider-group":
+      return "机场组";
     case "direct":
       return "直连";
     case "reject":
@@ -75,6 +84,7 @@ export function buildMemberFromName(
     nodes: ParsedNode[];
     moduleNames: Record<string, string>;
     customProxyGroups: CustomProxyGroup[];
+    providerNameToKey?: Map<string, string>;
   },
 ): ResolvedMember | null {
   const trimmed = name.trim();
@@ -89,6 +99,11 @@ export function buildMemberFromName(
     const customEntry = options.customProxyGroups.find((group) => group.name === trimmed);
     if (moduleEntry) ref = { kind: "module", id: moduleEntry[0] };
     else if (customEntry) ref = { kind: "custom", id: customEntry.id };
+    else {
+      // 机场组名（proxy-providers 分组模式）→ provider-group 成员，与生成器 resolve 保持一致
+      const providerKey = options.providerNameToKey?.get(trimmed);
+      if (providerKey) ref = { kind: "provider-group", key: providerKey };
+    }
   }
 
   if (!ref) return null;
@@ -119,6 +134,14 @@ function DragHandle() {
 const ADVANCED_PANEL_TITLE_CLASS = "mb-2 block text-[11px] font-medium text-white/50";
 const ADVANCED_PANEL_TITLE_ROW_CLASS = "mb-2 flex min-h-5 items-center gap-2";
 
+function CountBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <Badge variant="outline" className="ml-auto border-white/10 bg-white/5 text-[10px] text-white/45">
+      {children}
+    </Badge>
+  );
+}
+
 export function ProxyGroupAdvancedPanel({
   target,
   advanced,
@@ -141,6 +164,7 @@ export function ProxyGroupAdvancedPanel({
     proxyGroupAdvanced,
     builtinRuleEdits,
     proxyGroupNameOverrides,
+    dialerProxyGroups,
     testUrl,
     testInterval,
     ruleProviderBaseUrl,
@@ -176,6 +200,25 @@ export function ProxyGroupAdvancedPanel({
     [proxyGroupNameOverrides],
   );
 
+  // 机场组信息（组名/key↔名/全部key），与生成器共用同一构建逻辑，保证预览与真实生成一致
+  const providerInfo = React.useMemo(
+    () =>
+      buildProviderGroupInfo(sources, {
+        nodes,
+        proxyGroupNameOverrides,
+        customProxyGroups,
+        dialerProxyGroups,
+        testUrl,
+        testInterval,
+      }),
+    [sources, nodes, proxyGroupNameOverrides, customProxyGroups, dialerProxyGroups, testUrl, testInterval],
+  );
+  const providerNameToKey = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [key, name] of Object.entries(providerInfo.nameByKey)) map.set(name, key);
+    return map;
+  }, [providerInfo]);
+
   const generatedProxyGroups = React.useMemo(() => {
     return generateProxyGroups({
       nodes,
@@ -188,6 +231,9 @@ export function ProxyGroupAdvancedPanel({
       proxyGroupAdvanced,
       builtinRuleEdits,
       proxyGroupNameOverrides,
+      providerGroupNames: providerInfo.names,
+      allProviderKeys: providerInfo.keys,
+      providerGroupNameByKey: providerInfo.nameByKey,
     });
   }, [
     nodes,
@@ -200,44 +246,118 @@ export function ProxyGroupAdvancedPanel({
     proxyGroupAdvanced,
     builtinRuleEdits,
     proxyGroupNameOverrides,
+    providerInfo,
   ]);
   const generatedProxyNames = React.useMemo(() => {
     if (nodes.length === 0) return [];
     return generatedProxyGroups.find((group) => group.name === target.name)?.proxies ?? [];
   }, [generatedProxyGroups, nodes.length, target.name]);
 
+  const extraRefs = normalizeList(advanced.extraMembers);
+
+  // Provider 组胶囊：只保留 grouped/bare 源的「内联 key」胶囊（写 provider-inline，注入 use）。
+  // grouped 的机场组已作为默认成员出现在「已启用成员」列表，不再另设机场组名胶囊。
+  const providerChips = React.useMemo(() => {
+    const out: Array<{ ref: ProxyGroupMemberRef; label: string }> = [];
+    for (const source of sources) {
+      if (source.type !== "url" || !source.useProxyProviders) continue;
+      const mode = resolveProviderMode(source);
+      if (mode !== "grouped" && mode !== "bare") continue;
+      const key = source.providerKey?.trim() || `url_${source.id}`;
+      out.push({ ref: { kind: "provider-inline", key }, label: `内联 ${key}` });
+    }
+    return out;
+  }, [sources]);
+
+  // 合成成员（不经生成器 proxies 反解析、直接拼进已启用列表末尾的 provider 成员）：
+  // - provider-inline：注入 use，本就不在 proxies，固定末尾；
+  // - 孤儿 provider-group：源已删/改，nameByKey 查不到组名，兜底显示、可手动移除。
+  // 非孤儿机场组由 generatedProxyNames 反解析进列表（位置=YAML），走普通成员路径。
+  const selectedProviderMembers = React.useMemo<ResolvedMember[]>(() => {
+    const out: ResolvedMember[] = [];
+    const seen = new Set<string>();
+    for (const ref of normalizeList(advanced.extraMembers)) {
+      let synthetic: ResolvedMember | null = null;
+      if (ref.kind === "provider-inline") {
+        synthetic = { key: getProxyGroupMemberKey(ref), ref, name: `内联 ${ref.key}`, kind: ref.kind };
+      } else if (ref.kind === "provider-group" && !providerInfo.nameByKey[ref.key]) {
+        synthetic = {
+          key: getProxyGroupMemberKey(ref),
+          ref,
+          name: `${PROVIDER_GROUP_DEFAULT_EMOJI} ${ref.key}`,
+          kind: ref.kind,
+        };
+      }
+      if (!synthetic || seen.has(synthetic.key)) continue;
+      seen.add(synthetic.key);
+      out.push(synthetic);
+    }
+    return out;
+  }, [advanced.extraMembers, providerInfo]);
+
+  // 合成成员判定：provider-inline 或 孤儿 provider-group（源已删/改）——固定末尾、不可拖、X 只删 extraMembers。
+  // 非孤儿机场组不属于合成成员，走普通成员路径（可拖拽、X 写 excludedMembers）。
+  const isSyntheticMember = React.useCallback(
+    (member: ResolvedMember): boolean => {
+      if (member.kind === "provider-inline") return true;
+      if (member.kind === "provider-group" && member.ref.kind === "provider-group") {
+        return !providerInfo.nameByKey[member.ref.key];
+      }
+      return false;
+    },
+    [providerInfo],
+  );
+
   const candidateMembers = React.useMemo(() => {
+    // 候选池顺序对齐生成器的默认成员序（moduleBaseProxies + withProviderGroupDefaults 锚点）：
+    // 节点选择 → 自动选择 → 机场组 → DIRECT/REJECT → 其余模块组 → 自定义组 → 节点，
+    // 使"未启用成员"的展示序与成员重新启用后在 YAML 中的位置一致。
+    const enabledModules = PROXY_GROUP_MODULES.filter((module) => enabledProxyGroups.includes(module.id));
+    const anchorModuleNames = ["select", "auto"]
+      .map((id) => (enabledModules.some((module) => module.id === id) ? moduleNames[id] : undefined))
+      .filter((name): name is string => Boolean(name));
+    const otherModuleNames = enabledModules
+      .filter((module) => module.id !== "select" && module.id !== "auto")
+      .map((module) => moduleNames[module.id]);
     const rawNames = [
+      ...anchorModuleNames,
+      ...providerInfo.names,
       "DIRECT",
       "REJECT",
-      ...activeNodes.map((node) => node.name),
-      ...PROXY_GROUP_MODULES.filter((module) => enabledProxyGroups.includes(module.id)).map((module) => moduleNames[module.id]),
+      ...otherModuleNames,
       ...activeCustomProxyGroups.map((group) => group.name),
+      ...activeNodes.map((node) => node.name),
     ];
     const out: ResolvedMember[] = [];
     const seen = new Set<string>();
     for (const rawName of rawNames) {
       if (typeof rawName !== "string" || !rawName.trim()) continue;
-      const member = buildMemberFromName(rawName, { nodes: activeNodes, moduleNames, customProxyGroups: activeCustomProxyGroups });
+      const member = buildMemberFromName(rawName, { nodes: activeNodes, moduleNames, customProxyGroups: activeCustomProxyGroups, providerNameToKey });
       if (!member || seen.has(member.key)) continue;
       if (member.key === `${target.kind}:${target.id}`) continue;
       seen.add(member.key);
       out.push(member);
     }
     return out;
-  }, [activeCustomProxyGroups, activeNodes, enabledProxyGroups, moduleNames, target.id, target.kind]);
+  }, [activeCustomProxyGroups, activeNodes, enabledProxyGroups, moduleNames, providerInfo, providerNameToKey, target.id, target.kind]);
 
   const includedMembers = React.useMemo(() => {
     const out: ResolvedMember[] = [];
     const seen = new Set<string>();
     for (const name of generatedProxyNames) {
-      const member = buildMemberFromName(name, { nodes: activeNodes, moduleNames, customProxyGroups: activeCustomProxyGroups });
+      const member = buildMemberFromName(name, { nodes: activeNodes, moduleNames, customProxyGroups: activeCustomProxyGroups, providerNameToKey });
       if (!member || seen.has(member.key)) continue;
       seen.add(member.key);
       out.push(member);
     }
+    // 合成成员（provider-inline / 孤儿 provider-group）固定追加在普通成员之后
+    for (const member of selectedProviderMembers) {
+      if (seen.has(member.key)) continue;
+      seen.add(member.key);
+      out.push(member);
+    }
     return out;
-  }, [activeCustomProxyGroups, activeNodes, generatedProxyNames, moduleNames]);
+  }, [activeCustomProxyGroups, activeNodes, generatedProxyNames, moduleNames, providerNameToKey, selectedProviderMembers]);
 
   const excludedMembers = React.useMemo(() => {
     const included = new Set(includedMembers.map((member) => member.key));
@@ -300,7 +420,10 @@ export function ProxyGroupAdvancedPanel({
   const moveMember = React.useCallback(
     (fromKey: string, toKey: string) => {
       if (fromKey === toKey) return;
-      const current = includedMembers.map((member) => member.ref);
+      // 合成成员（inline / 孤儿机场组）不参与排序，memberOrder 里不能混入它们的 ref
+      const current = includedMembers
+        .filter((member) => !isSyntheticMember(member))
+        .map((member) => member.ref);
       const from = current.findIndex((member) => getProxyGroupMemberKey(member) === fromKey);
       const to = current.findIndex((member) => getProxyGroupMemberKey(member) === toKey);
       if (from < 0 || to < 0) return;
@@ -309,12 +432,11 @@ export function ProxyGroupAdvancedPanel({
       next.splice(to, 0, item);
       onChange({ memberOrder: next });
     },
-    [includedMembers, onChange],
+    [includedMembers, isSyntheticMember, onChange],
   );
 
   const sourceIds = normalizeList(advanced.sourceIds);
   const regions = normalizeList(advanced.regions);
-  const extraRefs = normalizeList(advanced.extraMembers);
   const excludedRefs = normalizeList(advanced.excludedMembers);
   const memberOrderRefs = normalizeList(advanced.memberOrder);
   const hasMemberOverrides =
@@ -322,13 +444,19 @@ export function ProxyGroupAdvancedPanel({
 
   const disableMember = React.useCallback(
     (member: ResolvedMember) => {
+      // 合成成员（inline / 孤儿机场组）的"排除"就是从 extraMembers 删掉，与胶囊取消等价；
+      // 不写 excludedMembers（不在常规候选池，排除记录是脏数据）。
+      if (isSyntheticMember(member)) {
+        onChange({ extraMembers: withoutMember(extraRefs, member.key) });
+        return;
+      }
       onChange({
         extraMembers: withoutMember(extraRefs, member.key),
         excludedMembers: withMember(excludedRefs, member.ref),
         memberOrder: withoutMember(advanced.memberOrder, member.key),
       });
     },
-    [advanced.memberOrder, excludedRefs, extraRefs, onChange],
+    [advanced.memberOrder, excludedRefs, extraRefs, isSyntheticMember, onChange],
   );
 
   const enableMember = React.useCallback(
@@ -356,10 +484,14 @@ export function ProxyGroupAdvancedPanel({
     onChange(
       buildRemoveAllMembersPatch({
         advanced,
-        membersToRemove: nodeMembers,
+        // provider-inline 语义是"该订阅节点内联进本组"，移除全部节点时一并移除
+        membersToRemove: [
+          ...nodeMembers,
+          ...includedMembers.filter((member) => member.kind === "provider-inline"),
+        ],
       }),
     );
-  }, [advanced, nodeMembers, onChange]);
+  }, [advanced, includedMembers, nodeMembers, onChange]);
 
   const addAllProxyGroups = React.useCallback(() => {
     if (addableProxyGroupMembers.length > 0) {
@@ -391,10 +523,14 @@ export function ProxyGroupAdvancedPanel({
     onChange(
       buildRemoveAllMembersPatch({
         advanced,
-        membersToRemove: proxyGroupMembers,
+        // 非孤儿机场组已在 proxyGroupMembers（候选池含机场组名）；孤儿机场组只在 includedMembers，需另补
+        membersToRemove: [
+          ...proxyGroupMembers,
+          ...includedMembers.filter((member) => member.kind === "provider-group" && isSyntheticMember(member)),
+        ],
       }),
     );
-  }, [advanced, onChange, proxyGroupMembers]);
+  }, [advanced, includedMembers, isSyntheticMember, onChange, proxyGroupMembers]);
 
   const restoreDefaultMembers = React.useCallback(async () => {
     const confirmed = await confirmDialog({
@@ -406,6 +542,15 @@ export function ProxyGroupAdvancedPanel({
     if (!confirmed) return;
     onChange({ extraMembers: [], excludedMembers: [], memberOrder: [] });
   }, [onChange]);
+
+  const toggleProviderMember = React.useCallback(
+    (ref: ProxyGroupMemberRef) => {
+      const key = getProxyGroupMemberKey(ref);
+      const selected = extraRefs.some((item) => getProxyGroupMemberKey(item) === key);
+      onChange({ extraMembers: selected ? withoutMember(extraRefs, key) : withMember(extraRefs, ref) });
+    },
+    [extraRefs, onChange],
+  );
 
   return (
     <div className="border-t border-white/10">
@@ -499,11 +644,13 @@ export function ProxyGroupAdvancedPanel({
           </div>
         ) : (
           <div className="max-h-52 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
-            {includedMembers.map((member) => (
+            {includedMembers.map((member) => {
+              const synthetic = isSyntheticMember(member);
+              return (
               <div
                 key={member.key}
-                draggable
-                onDragStart={() => setDraggingKey(member.key)}
+                draggable={!synthetic}
+                onDragStart={synthetic ? undefined : () => setDraggingKey(member.key)}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => {
                   if (draggingKey) moveMember(draggingKey, member.key);
@@ -515,7 +662,13 @@ export function ProxyGroupAdvancedPanel({
                   draggingKey === member.key && "opacity-50",
                 )}
               >
-                <span className="flex h-5 w-4 cursor-grab items-center justify-center">
+                {/* 合成成员不参与排序，占位保持网格对齐 */}
+                <span
+                  className={cn(
+                    "flex h-5 w-4 items-center justify-center",
+                    synthetic ? "opacity-0" : "cursor-grab",
+                  )}
+                >
                   <DragHandle />
                 </span>
                 <div className="min-w-0">
@@ -535,7 +688,43 @@ export function ProxyGroupAdvancedPanel({
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            ))}
+              );
+            })}
+          </div>
+        )}
+
+        {providerChips.length > 0 && (
+          <div className="mt-3">
+            <div className={ADVANCED_PANEL_TITLE_ROW_CLASS}>
+              <div className="text-[11px] font-medium text-white/50">Provider 组</div>
+              <CountBadge>{providerChips.length} 项</CountBadge>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {providerChips.map((chip) => {
+                const key = getProxyGroupMemberKey(chip.ref);
+                const selected = extraRefs.some((item) => getProxyGroupMemberKey(item) === key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={cn(
+                      "inline-flex max-w-full items-center gap-1 rounded border px-2 py-1 text-[10px] transition-colors",
+                      selected
+                        ? "border-indigo-400/40 bg-indigo-500/20 text-indigo-100"
+                        : "border-white/10 bg-white/5 text-white/55 hover:border-indigo-400/30 hover:bg-indigo-500/10 hover:text-indigo-100",
+                    )}
+                    title={chip.label}
+                    onClick={() => toggleProviderMember(chip.ref)}
+                  >
+                    {selected ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                    <span className="truncate">{chip.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-[10px] text-white/35">
+              点击把该 provider 追加进本组；已加入的再点一次取消
+            </div>
           </div>
         )}
 

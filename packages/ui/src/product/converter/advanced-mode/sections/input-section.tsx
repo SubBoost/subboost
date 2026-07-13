@@ -4,7 +4,6 @@ import * as Popover from "@radix-ui/react-popover";
 import { AlertCircle, Check, HelpCircle, Loader2, Maximize2, Plus, Server, X, Menu, ChevronUp, ChevronDown } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
-import { Input } from "@subboost/ui/components/ui/input";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 import { cn } from "@subboost/ui/lib/utils";
 import type { SourceType } from "@subboost/ui/store/config-store";
@@ -14,6 +13,7 @@ import { useSubscriptionSourcesController } from "@subboost/ui/product/converter
 import { sourceTypeInfo } from "../constants";
 import { SectionHeader } from "../section-header";
 import { SubscriptionImportErrorBadge } from "@subboost/ui/product/converter/subscription-import-error";
+import { ProviderModeStatusBar } from "@subboost/ui/product/converter/provider-mode-status-bar";
 import { InputSourceEditorDialog } from "./input-source-editor-dialog";
 
 export function InputSection({
@@ -206,12 +206,31 @@ export function InputSection({
                   </div>
                 </div>
                 {source.type === "url" ? (
-                  <Input
-                    value={source.content}
-                    onChange={(e) => updateSource(source.id, e.target.value)}
-                    placeholder={typeInfo.placeholder}
-                    className="text-xs h-8"
-                  />
+                  <div className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-all duration-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/50">
+                    <Textarea
+                      rows={1}
+                      wrap="off"
+                      value={source.content}
+                      onChange={(e) => updateSource(source.id, e.target.value.replace(/[\r\n]+/g, ""))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.preventDefault();
+                      }}
+                      placeholder={typeInfo.placeholder}
+                      className="block h-8 min-h-0 w-full resize-none overflow-x-auto rounded-none border-0 bg-transparent px-4 py-0 text-xs leading-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus:ring-0"
+                    />
+                    <ProviderModeStatusBar
+                      source={source}
+                      defaultProviderKey={`url_${source.id}`}
+                      onCheckedChange={(checked) =>
+                        updateSourceMeta(source.id, {
+                          useProxyProviders: checked,
+                          // UI 新开启时默认分组模式；旧数据（已保存无此字段）保持 inline 兼容
+                          ...(checked && !source.providerMode ? { providerMode: "grouped" as const } : {}),
+                        })
+                      }
+                      onUpdateMeta={updateSourceMeta}
+                    />
+                  </div>
                 ) : (
                   <Textarea
                     value={source.content}

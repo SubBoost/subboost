@@ -1,40 +1,13 @@
 import { generateClashYaml } from "@subboost/core/generator";
+import { buildProxyProviderPlanFromSources, type ProxyProviderPlan } from "@subboost/core/subscription/proxy-providers";
 import { stripImportedNodeControlFieldsFromList } from "@subboost/core/subscription/imported-node-controls";
 import type { ConfigState } from "./definitions";
 
-function buildProxyProvidersFromSources(
-  state: ConfigState
-): Record<string, unknown> | undefined {
-  const out: Record<string, unknown> = {};
-
-  for (const source of state.sources) {
-    if (!source || source.type !== "url" || !source.useProxyProviders) continue;
-    const url = typeof source.content === "string" ? source.content.trim() : "";
-    if (!url) continue;
-
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      continue;
-    }
-    if (!["http:", "https:"].includes(parsed.protocol)) continue;
-
-    const name = `url_${source.id}`;
-    out[name] = {
-      type: "http",
-      url,
-      interval: 3600,
-      path: `./proxy_providers/${name}.yaml`,
-      "health-check": {
-        enable: true,
-        url: state.testUrl,
-        interval: state.testInterval,
-      },
-    };
-  }
-
-  return Object.keys(out).length > 0 ? out : undefined;
+function buildProxyProviderPlan(state: ConfigState): ProxyProviderPlan | undefined {
+  return buildProxyProviderPlanFromSources(state.sources, {
+    testUrl: state.testUrl,
+    testInterval: state.testInterval,
+  });
 }
 
 export type GeneratedYamlResult = {
@@ -50,11 +23,12 @@ function formatGeneratedYamlError(error: unknown): string {
 
 function buildGenerateClashYamlOptions(
   state: ConfigState,
-  proxyProviders: Record<string, unknown> | undefined
+  providerPlan: ProxyProviderPlan | undefined
 ): GenerateClashYamlOptions {
   return {
     nodes: stripImportedNodeControlFieldsFromList(state.nodes),
-    proxyProviders,
+    proxyProviders: providerPlan?.providers,
+    proxyProviderAttachments: providerPlan?.attachments,
     template: state.template,
     userConfig: {
       enabledGroups: state.enabledProxyGroups,
@@ -79,15 +53,16 @@ function buildGenerateClashYamlOptions(
     proxyGroupAdvanced: state.proxyGroupAdvanced,
     proxyGroupNameOverrides: state.proxyGroupNameOverrides,
     proxyGroupOrder: state.proxyGroupOrder,
+    groupListeners: state.groupListeners,
   };
 }
 
 export function computeGeneratedYamlResult(state: ConfigState): GeneratedYamlResult {
-  const proxyProviders = buildProxyProvidersFromSources(state);
-  const hasPreviewContent = state.nodes.length > 0 || Boolean(proxyProviders);
+  const providerPlan = buildProxyProviderPlan(state);
+  const hasPreviewContent = state.nodes.length > 0 || Boolean(providerPlan);
 
   try {
-    const yaml = generateClashYaml(buildGenerateClashYamlOptions(state, proxyProviders));
+    const yaml = generateClashYaml(buildGenerateClashYamlOptions(state, providerPlan));
     return { yaml: hasPreviewContent ? yaml : "", error: null };
   } catch (error) {
     return { yaml: "", error: formatGeneratedYamlError(error) };

@@ -8,6 +8,7 @@ import {
   buildDefaultUserConfig,
 } from "@subboost/core/config/defaults";
 import {
+  buildProviderProxyGroups,
   generateProxyGroups,
   generateRules,
   generateRuleProviders,
@@ -26,12 +27,14 @@ import type {
   ClashConfig,
   CustomProxyGroup,
   CustomRuleSet,
+  GroupListenerBinding,
   ProxyGroup,
   ProxyGroupAdvancedConfig,
   TemplateType,
   UserConfig,
 } from "@subboost/core/types/config";
 import type { DialerProxyGroup } from "@subboost/core/types/template-config";
+import type { ProxyProviderAttachment } from "@subboost/core/subscription/proxy-providers";
 import { collectDnsPolicyEntries, configToYaml } from "./yaml";
 import { isMihomoSupportedProxyNode, normalizeMihomoVlessForGeneration } from "../mihomo/proxy-sanitizer";
 import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-targets";
@@ -39,6 +42,10 @@ import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-t
 export interface GenerateOptions {
   nodes: ParsedNode[];
   proxyProviders?: Record<string, unknown>;
+  // 各 provider 的接入方式（key 对应 proxyProviders 的键）：
+  // grouped=生成机场组挂入节点选择；inline=直接 use 注入所有策略组；bare=仅生成不挂接。
+  // 未提供条目的 key 按 inline 处理（与历史行为一致）。
+  proxyProviderAttachments?: ProxyProviderAttachment[];
   template?: TemplateType;
   userConfig?: Partial<UserConfig>;
   dialerProxyGroups?: DialerProxyGroup[];
@@ -48,6 +55,7 @@ export interface GenerateOptions {
   builtinRuleEdits?: BuiltinRuleEdits;
   proxyGroupNameOverrides?: Record<string, string>;
   proxyGroupOrder?: string[];
+  groupListeners?: GroupListenerBinding[];
 }
 
 type BaseConfig = Record<string, unknown>;
@@ -179,6 +187,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
   const {
     nodes,
     proxyProviders,
+    proxyProviderAttachments = [],
     template = "standard",
     userConfig = {},
     dialerProxyGroups = [],
@@ -203,6 +212,19 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
   const proxyProviderNames = resolvedProxyProviders
     ? Object.keys(resolvedProxyProviders).map((k) => k.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b))
     : [];
+
+  // provider 接入模式：grouped/inline/bare；未声明的 key 按 inline（历史行为）
+  const attachmentByKey = new Map<string, ProxyProviderAttachment>();
+  for (const attachment of proxyProviderAttachments) {
+    if (!attachment || typeof attachment.key !== "string" || !attachment.key.trim()) continue;
+    attachmentByKey.set(attachment.key.trim(), attachment);
+  }
+  const providerModeOf = (key: string) => {
+    const mode = attachmentByKey.get(key)?.mode;
+    return mode === "grouped" || mode === "bare" ? mode : "inline";
+  };
+  const inlineProviderNames = proxyProviderNames.filter((key) => providerModeOf(key) === "inline");
+  const groupedProviderKeys = proxyProviderNames.filter((key) => providerModeOf(key) === "grouped");
 
   // 解析用户自定义的基础配置（提前解析：用于规范化补齐）
   const baseConfigYaml = (hasExplicitBaseConfigYaml ? userConfig.dnsYaml : config.dnsYaml) ?? "";
@@ -338,18 +360,40 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     return out.length > 0 ? out : undefined;
   })();
 
+  // 生成机场组（proxy-providers 分组模式）：与可视化预览共用同一构建函数，保证组名一致
+  const groupedAttachments = groupedProviderKeys
+    .map((key) => attachmentByKey.get(key))
+    .filter((attachment): attachment is ProxyProviderAttachment => Boolean(attachment));
+  const { groups: providerGroups, names: providerGroupNames } = buildProviderProxyGroups(groupedAttachments, [
+    "DIRECT",
+    "REJECT",
+    ...nodeNameSet,
+    ...moduleGroupNameSet,
+    ...customGroupNameSet,
+    ...sanitizedDialerProxyGroups.map((g) => g.name.trim()).filter(Boolean),
+  ]);
+  // key→机场组名映射（供 Provider 组面板手动追加 provider-group 成员时解析组名）
+  const providerGroupNameByKey: Record<string, string> = {};
+  for (const providerGroup of providerGroups) {
+    const key = Array.isArray(providerGroup.use) ? providerGroup.use[0] : undefined;
+    if (typeof key === "string" && key) providerGroupNameByKey[key] = providerGroup.name;
+  }
+
   // 生成中转代理组
   const dialerGroups = generateDialerProxyGroups(
     sanitizedDialerProxyGroups,
     config.testUrl,
     config.testInterval,
-    proxyProviderNames
+    inlineProviderNames
   ) as unknown as ProxyGroup[];
 
   // 生成选项
   const generateOpts = {
     nodes: outputNodes,
-    proxyProviderNames,
+    proxyProviderNames: inlineProviderNames,
+    providerGroupNames,
+    allProviderKeys: proxyProviderNames,
+    providerGroupNameByKey,
     enabledModules: config.enabledGroups,
     ruleProviderBaseUrl: config.ruleProviderBaseUrl,
     testUrl: config.testUrl,
@@ -376,8 +420,9 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     const allGroups = generateProxyGroups(generateOpts);
 
     const mergedGroups = (() => {
-      // 如果没有中转组，直接返回
-      if (dialerGroups.length === 0) {
+      // 机场组与中转组一起插入到“节点选择/自动选择”之后
+      const extraGroups = [...providerGroups, ...dialerGroups];
+      if (extraGroups.length === 0) {
         return allGroups;
       }
 
@@ -390,11 +435,11 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
         // 在节点选择和自动选择之后插入中转组
         const before = allGroups.slice(0, insertAfter + 1);
         const after = allGroups.slice(insertAfter + 1);
-        return [...before, ...dialerGroups, ...after];
+        return [...before, ...extraGroups, ...after];
       }
 
       // 如果找不到，就放在最前面
-      return [...dialerGroups, ...allGroups];
+      return [...extraGroups, ...allGroups];
     })();
 
     const orderKeys = Array.isArray(options.proxyGroupOrder)
@@ -476,9 +521,53 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     availablePolicyTargets
   );
   const resolvedListeners = (() => {
-    if (!listeners) return baseTopLevelPatch.listeners;
-    if (baseTopLevelPatch.listeners === undefined) return listeners;
-    if (Array.isArray(baseTopLevelPatch.listeners)) return [...baseTopLevelPatch.listeners, ...listeners];
+    // 分组监听：给"已存在的策略组"绑定 inbound 端口；端口在节点监听与 mixed-port 之间去重。
+    const groupListenerEntries = (() => {
+      const list = Array.isArray(options.groupListeners) ? options.groupListeners : [];
+      if (list.length === 0) return [] as Array<Record<string, unknown>>;
+
+      const validTargets = new Set(availablePolicyTargets);
+      const usedPorts = new Set<number>(Array.isArray(listeners) ? listeners.map((l) => l.port) : []);
+      if (typeof config.mixedPort === "number" && Number.isInteger(config.mixedPort)) {
+        usedPorts.add(config.mixedPort);
+      }
+      const usedNames = new Set<string>(Array.isArray(listeners) ? listeners.map((l) => l.name) : []);
+      const usedTargets = new Set<string>();
+
+      const out: Array<Record<string, unknown>> = [];
+      let autoIndex = 0;
+      for (const binding of list) {
+        if (!binding || typeof binding !== "object") continue;
+
+        const target = typeof binding.target === "string" ? binding.target.trim() : "";
+        if (!target || !validTargets.has(target)) continue;
+        // 一组一端口：同 target 重复绑定只取首条
+        if (usedTargets.has(target)) continue;
+
+        const port = binding.port;
+        if (typeof port !== "number" || !Number.isInteger(port)) continue;
+        if (port < 1 || port > 65535) continue;
+        if (usedPorts.has(port)) continue;
+        usedPorts.add(port);
+        usedTargets.add(target);
+
+        let name = `group-in-${autoIndex++}`;
+        while (usedNames.has(name)) name = `group-in-${autoIndex++}`;
+        usedNames.add(name);
+
+        out.push({ name, type: "mixed", listen: "0.0.0.0", port, proxy: target, udp: true });
+      }
+      return out;
+    })();
+
+    const generatedListeners: Array<Record<string, unknown>> = [
+      ...(Array.isArray(listeners) ? (listeners as Array<Record<string, unknown>>) : []),
+      ...groupListenerEntries,
+    ];
+
+    if (generatedListeners.length === 0) return baseTopLevelPatch.listeners;
+    if (baseTopLevelPatch.listeners === undefined) return generatedListeners;
+    if (Array.isArray(baseTopLevelPatch.listeners)) return [...baseTopLevelPatch.listeners, ...generatedListeners];
     throw new BaseConfigYamlError("基础和 DNS 配置中的 listeners 必须是数组，才能与节点监听端口合并。");
   })();
 

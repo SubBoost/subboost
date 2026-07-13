@@ -69,6 +69,12 @@ function sourceArray(value: unknown): SubscriptionSource[] | undefined {
       ...(typeof item.tag === "string" ? { tag: item.tag } : {}),
       ...(typeof item.nameTemplate === "string" ? { nameTemplate: item.nameTemplate } : {}),
       ...(typeof item.useProxyProviders === "boolean" ? { useProxyProviders: item.useProxyProviders } : {}),
+      ...(typeof item.providerKey === "string" ? { providerKey: item.providerKey } : {}),
+      ...(item.providerMode === "grouped" || item.providerMode === "inline" || item.providerMode === "bare"
+        ? { providerMode: item.providerMode }
+        : {}),
+      ...(typeof item.providerGroupName === "string" ? { providerGroupName: item.providerGroupName } : {}),
+      ...(typeof item.providerFilter === "string" ? { providerFilter: item.providerFilter } : {}),
       ...(typeof item.userinfoUrl === "string" ? { userinfoUrl: item.userinfoUrl } : {}),
       ...(typeof item.userinfoUserAgent === "string" ? { userinfoUserAgent: item.userinfoUserAgent } : {}),
       ...(typeof item.parsed === "boolean" ? { parsed: item.parsed } : {}),
@@ -134,7 +140,8 @@ function hasMeaningfulConfig(state: ConfigState): boolean {
     state.ruleProviderBaseUrl !== initialState.ruleProviderBaseUrl ||
     state.cnIpNoResolve !== initialState.cnIpNoResolve ||
     state.experimentalCnUseCnRuleSet !== initialState.experimentalCnUseCnRuleSet ||
-    Object.keys(state.listenerPorts).length > 0
+    Object.keys(state.listenerPorts).length > 0 ||
+    state.groupListeners.length > 0
   );
 }
 
@@ -168,6 +175,7 @@ function buildHandoffState(state: ConfigState): Partial<ConfigState> {
     cnIpNoResolve: state.cnIpNoResolve,
     experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet,
     listenerPorts: state.listenerPorts,
+    groupListeners: state.groupListeners,
   };
 }
 
@@ -233,6 +241,8 @@ function normalizeHandoffState(raw: unknown): Partial<ConfigState> | null {
   }
   const listenerPorts = numberRecord(raw.listenerPorts);
   if (listenerPorts) out.listenerPorts = listenerPorts;
+  const groupListeners = objectArray<ConfigState["groupListeners"][number]>(raw.groupListeners);
+  if (groupListeners) out.groupListeners = groupListeners;
 
   return out;
 }
