@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   buttons: [] as any[],
   dialogs: [] as any[],
   inputs: [] as any[],
+  providerSettings: [] as any[],
   switches: [] as any[],
   textareas: [] as any[],
 }));
@@ -18,6 +19,8 @@ vi.mock("@radix-ui/react-popover", () => ({
   Trigger: (props: any) => React.createElement("div", null, props.children),
 }));
 vi.mock("lucide-react", () => ({
+  ChevronDown: () => React.createElement("span", null, "chevron-down"),
+  ChevronRight: () => React.createElement("span", null, "chevron-right"),
   HelpCircle: () => React.createElement("span", null, "help-icon"),
 }));
 vi.mock("@subboost/ui/components/ui/button", () => ({
@@ -56,6 +59,12 @@ vi.mock("@subboost/ui/components/ui/textarea", () => ({
 vi.mock("@subboost/core/node-name-template", () => ({
   DEFAULT_NODE_NAME_TEMPLATE: "{tag}-{name}",
 }));
+vi.mock("@subboost/ui/product/converter/provider-settings-fields", () => ({
+  ProviderSettingsFields: (props: any) => {
+    mocks.providerSettings.push(props);
+    return React.createElement("div", null, "provider-settings-fields");
+  },
+}));
 vi.mock("../constants", () => ({
   sourceTypeInfo: {
     url: { label: "订阅链接", placeholder: "https://example.com/sub" },
@@ -81,6 +90,7 @@ function renderDialog(props: Partial<React.ComponentProps<typeof InputSourceEdit
   mocks.buttons = [];
   mocks.dialogs = [];
   mocks.inputs = [];
+  mocks.providerSettings = [];
   mocks.switches = [];
   mocks.textareas = [];
   const handlers = {
@@ -120,21 +130,28 @@ describe("InputSourceEditorDialog", () => {
     expect(html).toContain("proxy-providers模式");
     expect(html).toContain("proxy-providers 模式");
     expect(html).toContain("subscription-userinfo");
+    // url 输入行在标签（tag）行之前（红蓝换位后的顺序）
+    expect(html.indexOf("https://example.com/sub")).toBeGreaterThan(-1);
+    expect(html.indexOf("https://example.com/sub")).toBeLessThan(html.indexOf("标签（tag）"));
 
-    mocks.inputs[0].onChange({ target: { value: "B" } });
-    mocks.inputs[1].onChange({ target: { value: "{name}" } });
-    expect(mocks.inputs[2]).toEqual(expect.objectContaining({ value: "A-Node", readOnly: true }));
-    mocks.inputs[3].onChange({ target: { value: "https://next.example/sub" } });
+    mocks.inputs[0].onChange({ target: { value: "https://next.example/sub" } });
+    mocks.inputs[1].onChange({ target: { value: "B" } });
+    mocks.inputs[2].onChange({ target: { value: "{name}" } });
+    expect(mocks.inputs[3]).toEqual(expect.objectContaining({ value: "A-Node", readOnly: true }));
     mocks.inputs[4].onChange({ target: { value: "https://next.example/userinfo" } });
     mocks.inputs[5].onChange({ target: { value: "Meta" } });
     mocks.switches[0].onCheckedChange(true);
 
+    expect(handlers.onUpdateContent).toHaveBeenCalledWith("source-url", "https://next.example/sub");
     expect(handlers.onUpdateMeta).toHaveBeenCalledWith("source-url", { tag: "B" });
     expect(handlers.onUpdateMeta).toHaveBeenCalledWith("source-url", { nameTemplate: "{name}" });
-    expect(handlers.onUpdateContent).toHaveBeenCalledWith("source-url", "https://next.example/sub");
     expect(handlers.onUpdateMeta).toHaveBeenCalledWith("source-url", { userinfoUrl: "https://next.example/userinfo" });
     expect(handlers.onUpdateMeta).toHaveBeenCalledWith("source-url", { userinfoUserAgent: "Meta" });
-    expect(handlers.onUpdateMeta).toHaveBeenCalledWith("source-url", { useProxyProviders: true });
+    // 开启开关时（旧数据无 providerMode）默认写入分组模式
+    expect(handlers.onUpdateMeta).toHaveBeenCalledWith("source-url", {
+      useProxyProviders: true,
+      providerMode: "grouped",
+    });
   });
 
   it("edits yaml and node text sources with a textarea", () => {

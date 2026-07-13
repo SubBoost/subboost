@@ -69,6 +69,12 @@ function sourceArray(value: unknown): SubscriptionSource[] | undefined {
       ...(typeof item.tag === "string" ? { tag: item.tag } : {}),
       ...(typeof item.nameTemplate === "string" ? { nameTemplate: item.nameTemplate } : {}),
       ...(typeof item.useProxyProviders === "boolean" ? { useProxyProviders: item.useProxyProviders } : {}),
+      ...(typeof item.providerKey === "string" ? { providerKey: item.providerKey } : {}),
+      ...(item.providerMode === "grouped" || item.providerMode === "inline" || item.providerMode === "bare"
+        ? { providerMode: item.providerMode }
+        : {}),
+      ...(typeof item.providerGroupName === "string" ? { providerGroupName: item.providerGroupName } : {}),
+      ...(typeof item.providerFilter === "string" ? { providerFilter: item.providerFilter } : {}),
       ...(typeof item.userinfoUrl === "string" ? { userinfoUrl: item.userinfoUrl } : {}),
       ...(typeof item.userinfoUserAgent === "string" ? { userinfoUserAgent: item.userinfoUserAgent } : {}),
       ...(typeof item.parsed === "boolean" ? { parsed: item.parsed } : {}),
@@ -233,7 +239,6 @@ function normalizeHandoffState(raw: unknown): Partial<ConfigState> | null {
   }
   const listenerPorts = numberRecord(raw.listenerPorts);
   if (listenerPorts) out.listenerPorts = listenerPorts;
-
   return out;
 }
 

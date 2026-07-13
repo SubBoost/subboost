@@ -8,10 +8,12 @@ import { cn } from "@subboost/ui/lib/utils";
 import { useConfigStore } from "@subboost/ui/store/config-store";
 import {
   PROXY_GROUP_MODULES,
+  buildProviderProxyGroups,
   generateProxyGroups,
 } from "@subboost/core/generator/proxy-groups";
 import { getModuleRuleOrderKey } from "@subboost/core/generator/module-rules";
-import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
+import { buildProxyProviderPlanFromSources } from "@subboost/core/subscription/proxy-providers";
+import { resolveProxyGroupModuleName, splitLeadingEmoji } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { collectCustomRoutingRuleSets } from "@subboost/core/rules/custom-routing-rule-sets";
 import { CustomRulesPreview } from "./visual-graph/custom-rules-preview";
@@ -28,6 +30,7 @@ import {
 export function VisualGraph() {
   const {
     nodes,
+    sources,
     enabledProxyGroups,
     dialerProxyGroups,
     customRules,
@@ -44,6 +47,7 @@ export function VisualGraph() {
   } = useConfigStore(
     useShallow((state) => ({
       nodes: state.nodes,
+      sources: state.sources ?? [],
       enabledProxyGroups: state.enabledProxyGroups,
       dialerProxyGroups: state.dialerProxyGroups ?? [],
       customRules: state.customRules ?? [],
@@ -265,16 +269,47 @@ export function VisualGraph() {
             },
           }));
 
-    const merged = (() => {
-      if (dialerGroups.length === 0) return base;
+    // 机场组（proxy-providers 分组模式）：与生成器共用 buildProviderProxyGroups 保证组名一致
+    const providerPlan = buildProxyProviderPlanFromSources(sources, { testUrl, testInterval });
+    const providerDisplayGroups: VisualDisplayGroup[] = (() => {
+      if (!providerPlan) return [];
+      const reserved = [
+        "DIRECT",
+        "REJECT",
+        ...nodes.map((n) => n.name),
+        ...PROXY_GROUP_MODULES.map((m) => resolveModuleName(m)),
+        ...activeCustomProxyGroups
+          .map((g) => (typeof g.name === "string" ? g.name.trim() : ""))
+          .filter(Boolean),
+        ...enabledDialerProxyGroups.map((g) => g.name.trim()).filter(Boolean),
+      ];
+      const { groups: providerGroups } = buildProviderProxyGroups(providerPlan.attachments, reserved);
+      return providerGroups.map((g) => {
+        const parsed = splitLeadingEmoji(g.name);
+        return {
+          // id 用 name: 前缀：与生成器 getKeyByName 对机场组的 key 一致，
+          // 且能通过 setProxyGroupOrder 的前缀白名单（provider: 会被过滤导致拖拽排序丢失）。
+          id: `name:${g.name}`,
+          name: g.name,
+          emoji: parsed.hasEmojiPrefix ? parsed.emoji : "✈️",
+          groupType: g.type,
+          category: "provider",
+          rules: [],
+        };
+      });
+    })();
 
-      // 按 Clash UI 默认顺序：插入到“自动选择(auto)”和“广告拦截(ad)”之间
+    const merged = (() => {
+      const extraGroups = [...providerDisplayGroups, ...dialerGroups];
+      if (extraGroups.length === 0) return base;
+
+      // 按 Clash UI 默认顺序：插入到“自动选择(auto)”之后
       const autoIndex = base.findIndex((g) => g.id === "module:auto");
       const insertAt =
         autoIndex >= 0 ? autoIndex + 1 : Math.min(2, base.length);
       return [
         ...base.slice(0, insertAt),
-        ...dialerGroups,
+        ...extraGroups,
         ...base.slice(insertAt),
       ];
     })();
@@ -320,6 +355,10 @@ export function VisualGraph() {
     proxyGroupAdvanced,
     proxyGroupOrder,
     resolveModuleName,
+    nodes,
+    sources,
+    testUrl,
+    testInterval,
   ]);
 
   const defaultProxyByGroupName = React.useMemo(() => {

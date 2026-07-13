@@ -572,4 +572,39 @@ describe("refreshNodeSnapshot", () => {
       }),
     ]);
   });
+
+  it("keeps provider settings on saved sources after refresh", async () => {
+    const result = await refreshNodeSnapshot({
+      config: {
+        sources: [
+          {
+            id: "provider",
+            type: "url",
+            content: "https://provider.example.com/sub",
+            useProxyProviders: true,
+            providerKey: "my_key",
+            providerMode: "grouped",
+            providerGroupName: "✈️ 机场A",
+            providerFilter: "",
+          },
+        ],
+      },
+      urls: [],
+      storedNodes: [],
+      fetchUrlNodes: vi.fn(),
+    });
+
+    expect(result.savedSources).toEqual([
+      {
+        id: "provider",
+        type: "url",
+        content: "https://provider.example.com/sub",
+        useProxyProviders: true,
+        providerKey: "my_key",
+        providerMode: "grouped",
+        providerGroupName: "✈️ 机场A",
+        providerFilter: "",
+      },
+    ]);
+  });
 });

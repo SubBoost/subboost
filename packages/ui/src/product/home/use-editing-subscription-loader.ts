@@ -143,6 +143,10 @@ export function useEditingSubscriptionLoader({
               const tag = (item as any).tag;
               const nameTemplate = (item as any).nameTemplate;
               const useProxyProviders = (item as any).useProxyProviders;
+              const providerKey = (item as any).providerKey;
+              const providerMode = (item as any).providerMode;
+              const providerGroupName = (item as any).providerGroupName;
+              const providerFilter = (item as any).providerFilter;
               const userinfoUrl = (item as any).userinfoUrl;
               const userinfoUserAgent = (item as any).userinfoUserAgent;
               const subscriptionUserInfo = normalizeSubscriptionUserInfo((item as any).subscriptionUserInfo);
@@ -170,6 +174,18 @@ export function useEditingSubscriptionLoader({
                 nameTemplate: typeof nameTemplate === "string" && nameTemplate.trim() ? nameTemplate.trim() : undefined,
                 subscriptionUserInfo: hasSubscriptionUserInfo(subscriptionUserInfo) ? subscriptionUserInfo : undefined,
                 useProxyProviders: t === "url" && useProxyProviders === true ? true : undefined,
+                providerKey:
+                  t === "url" && typeof providerKey === "string" && providerKey.trim() ? providerKey.trim() : undefined,
+                providerMode:
+                  t === "url" && (providerMode === "grouped" || providerMode === "inline" || providerMode === "bare")
+                    ? providerMode
+                    : undefined,
+                providerGroupName:
+                  t === "url" && typeof providerGroupName === "string" && providerGroupName.trim()
+                    ? providerGroupName.trim()
+                    : undefined,
+                // providerFilter 保留空串（空串=显式不过滤，与"未设置走默认正则"区分）
+                providerFilter: t === "url" && typeof providerFilter === "string" ? providerFilter : undefined,
                 userinfoUrl: normalizedUserinfoUrl,
                 userinfoUserAgent:
                   t === "url" && typeof userinfoUserAgent === "string" && userinfoUserAgent.trim()
@@ -191,6 +207,10 @@ export function useEditingSubscriptionLoader({
               nameTemplate?: string;
               subscriptionUserInfo?: SubscriptionUserInfo;
               useProxyProviders?: boolean;
+              providerKey?: string;
+              providerMode?: "grouped" | "inline" | "bare";
+              providerGroupName?: string;
+              providerFilter?: string;
               userinfoUrl?: string;
               userinfoUserAgent?: string;
               lastParsedTag?: string;
@@ -257,6 +277,19 @@ export function useEditingSubscriptionLoader({
               ...(typeof s.nameTemplate === "string" && s.nameTemplate.trim() ? { nameTemplate: s.nameTemplate.trim() } : {}),
               ...(hasSubscriptionUserInfo(s.subscriptionUserInfo) ? { subscriptionUserInfo: s.subscriptionUserInfo } : {}),
               ...(s.type === "url" && s.useProxyProviders ? { useProxyProviders: true } : {}),
+              ...(s.type === "url" && typeof s.providerKey === "string" && s.providerKey.trim()
+                ? { providerKey: s.providerKey.trim() }
+                : {}),
+              ...(s.type === "url" &&
+              (s.providerMode === "grouped" || s.providerMode === "inline" || s.providerMode === "bare")
+                ? { providerMode: s.providerMode }
+                : {}),
+              ...(s.type === "url" && typeof s.providerGroupName === "string" && s.providerGroupName.trim()
+                ? { providerGroupName: s.providerGroupName.trim() }
+                : {}),
+              ...(s.type === "url" && typeof s.providerFilter === "string"
+                ? { providerFilter: s.providerFilter }
+                : {}),
               ...(s.type === "url" && typeof s.userinfoUrl === "string" && s.userinfoUrl.trim()
                 ? { userinfoUrl: tryNormalizeSubscriptionUrlInput(s.userinfoUrl) ?? s.userinfoUrl.trim() }
                 : {}),
@@ -317,6 +350,19 @@ export function useEditingSubscriptionLoader({
               ...(typeof s.nameTemplate === "string" && s.nameTemplate.trim() ? { nameTemplate: s.nameTemplate.trim() } : {}),
               ...(hasSubscriptionUserInfo(subscriptionUserInfo) ? { subscriptionUserInfo } : {}),
               ...(s.type === "url" && s.useProxyProviders ? { useProxyProviders: true } : {}),
+              ...(s.type === "url" && typeof s.providerKey === "string" && s.providerKey.trim()
+                ? { providerKey: s.providerKey.trim() }
+                : {}),
+              ...(s.type === "url" &&
+              (s.providerMode === "grouped" || s.providerMode === "inline" || s.providerMode === "bare")
+                ? { providerMode: s.providerMode }
+                : {}),
+              ...(s.type === "url" && typeof s.providerGroupName === "string" && s.providerGroupName.trim()
+                ? { providerGroupName: s.providerGroupName.trim() }
+                : {}),
+              ...(s.type === "url" && typeof s.providerFilter === "string"
+                ? { providerFilter: s.providerFilter }
+                : {}),
               ...(s.type === "url" && typeof s.userinfoUrl === "string" && s.userinfoUrl.trim()
                 ? { userinfoUrl: tryNormalizeSubscriptionUrlInput(s.userinfoUrl) ?? s.userinfoUrl.trim() }
                 : {}),

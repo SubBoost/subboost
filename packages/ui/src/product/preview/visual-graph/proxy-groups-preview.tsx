@@ -119,6 +119,8 @@ function getGroupColor(category: string) {
       return "border-indigo-500/50 bg-indigo-500/10";
     case "dialer":
       return "border-amber-500/50 bg-amber-500/10";
+    case "provider":
+      return "border-sky-500/50 bg-sky-500/10";
     default:
       return "border-white/20 bg-white/5";
   }

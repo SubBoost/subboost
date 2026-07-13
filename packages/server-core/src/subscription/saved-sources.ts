@@ -12,6 +12,10 @@ export type SavedSource = {
   type: SavedSourceType;
   content: string;
   useProxyProviders?: boolean;
+  providerKey?: string;
+  providerMode?: "grouped" | "inline" | "bare";
+  providerGroupName?: string;
+  providerFilter?: string;
   userinfoUrl?: string;
   userinfoUserAgent?: string;
   subscriptionUserInfo?: SubscriptionUserInfo;
@@ -85,12 +89,24 @@ export function normalizeSavedSourcesForPersistence(
     const lastParsedContent = toTrimmedString(record.lastParsedContent);
     const lastParsedTag = toTrimmedString(record.lastParsedTag);
     const lastParsedNameTemplate = toTrimmedString(record.lastParsedNameTemplate);
+    const providerKey = toTrimmedString(record.providerKey);
+    const providerMode =
+      record.providerMode === "grouped" || record.providerMode === "inline" || record.providerMode === "bare"
+        ? record.providerMode
+        : undefined;
+    const providerGroupName = toTrimmedString(record.providerGroupName);
+    // providerFilter 保留空串（空串=显式不过滤，与"未设置走默认正则"区分），不能 trim
+    const providerFilter = typeof record.providerFilter === "string" ? record.providerFilter : undefined;
 
     return {
       id: nextId(preferredId),
       type,
       content: type === "url" ? normalizeUrlContent(content) : content,
       ...(type === "url" && record.useProxyProviders === true ? { useProxyProviders: true } : {}),
+      ...(type === "url" && providerKey ? { providerKey } : {}),
+      ...(type === "url" && providerMode ? { providerMode } : {}),
+      ...(type === "url" && providerGroupName ? { providerGroupName } : {}),
+      ...(type === "url" && providerFilter !== undefined ? { providerFilter } : {}),
       ...(type === "url" && userinfoUrl ? { userinfoUrl: normalizeUrlContent(userinfoUrl) } : {}),
       ...(type === "url" && userinfoUserAgent ? { userinfoUserAgent } : {}),
       ...(subscriptionUserInfo ? { subscriptionUserInfo } : {}),

@@ -138,4 +138,116 @@ describe("normalizeSavedSourcesForPersistence", () => {
       },
     ]);
   });
+
+  it("preserves provider settings on url sources", () => {
+    expect(
+      normalizeSavedSourcesForPersistence([
+        {
+          id: "src-1",
+          type: "url",
+          content: "https://example.com/sub",
+          useProxyProviders: true,
+          providerKey: " my_key ",
+          providerMode: "grouped",
+          providerGroupName: " ✈️ 机场A ",
+          providerFilter: "(?i)^(?!.*到期).*",
+        },
+      ])
+    ).toEqual([
+      {
+        id: "src-1",
+        type: "url",
+        content: "https://example.com/sub",
+        useProxyProviders: true,
+        providerKey: "my_key",
+        providerMode: "grouped",
+        providerGroupName: "✈️ 机场A",
+        providerFilter: "(?i)^(?!.*到期).*",
+      },
+    ]);
+  });
+
+  it("keeps empty-string providerFilter (explicit no-filter) but drops empty providerKey/providerGroupName", () => {
+    expect(
+      normalizeSavedSourcesForPersistence([
+        {
+          id: "src-1",
+          type: "url",
+          content: "https://example.com/sub",
+          useProxyProviders: true,
+          providerKey: "   ",
+          providerMode: "bare",
+          providerGroupName: "",
+          providerFilter: "",
+        },
+      ])
+    ).toEqual([
+      {
+        id: "src-1",
+        type: "url",
+        content: "https://example.com/sub",
+        useProxyProviders: true,
+        providerMode: "bare",
+        providerFilter: "",
+      },
+    ]);
+  });
+
+  it("drops invalid providerMode values and provider settings on non-url sources", () => {
+    expect(
+      normalizeSavedSourcesForPersistence([
+        {
+          id: "src-1",
+          type: "url",
+          content: "https://example.com/sub",
+          providerMode: "unknown",
+          providerFilter: 42,
+        },
+        {
+          id: "src-2",
+          type: "yaml",
+          content: "proxies: []",
+          providerKey: "my_key",
+          providerMode: "grouped",
+          providerGroupName: "✈️ 机场A",
+          providerFilter: "",
+        },
+      ])
+    ).toEqual([
+      {
+        id: "src-1",
+        type: "url",
+        content: "https://example.com/sub",
+      },
+      {
+        id: "src-2",
+        type: "yaml",
+        content: "proxies: []",
+      },
+    ]);
+  });
+
+  it("preserves provider settings even when useProxyProviders is off", () => {
+    expect(
+      normalizeSavedSourcesForPersistence([
+        {
+          id: "src-1",
+          type: "url",
+          content: "https://example.com/sub",
+          providerKey: "my_key",
+          providerMode: "grouped",
+          providerGroupName: "✈️ 机场A",
+        },
+      ])
+    ).toEqual([
+      {
+        id: "src-1",
+        type: "url",
+        content: "https://example.com/sub",
+        providerKey: "my_key",
+        providerMode: "grouped",
+        providerGroupName: "✈️ 机场A",
+      },
+    ]);
+  });
 });

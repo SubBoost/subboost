@@ -62,6 +62,15 @@ export interface SubscriptionSource {
   nameTemplate?: string;
   // URL 源使用 proxy-providers 模式：不在 SubBoost 内拉取/解析节点，仅在最终配置中写入 proxy-providers 供客户端拉取
   useProxyProviders?: boolean;
+  // proxy-providers 的自定义 key（留空用默认 url_<源id>）
+  providerKey?: string;
+  // provider 接入方式：grouped=生成机场组挂入节点选择（UI 默认）；inline=直接 use 注入所有策略组（旧行为，
+  // 旧数据无此字段时按 inline 兼容）；bare=仅生成 proxy-providers 不挂接
+  providerMode?: "grouped" | "inline" | "bare";
+  // 机场组名（仅 grouped 模式生效；emoji 拼在组名前缀，留空回落为 "✈️ <key>"）
+  providerGroupName?: string;
+  // provider 节点过滤正则（mihomo proxy-providers filter）；未设置时生成默认正则，显式清空则不写 filter
+  providerFilter?: string;
   // 独立的流量/到期元信息 URL（可选）
   userinfoUrl?: string;
   // 获取流量/到期元信息时使用的自定义 User-Agent（可选）
