@@ -19,7 +19,7 @@ import {
   selectDnsAddressesAfterFakeIpRecheck,
   shouldRecheckFakeIpDnsAnswers,
 } from "@subboost/server-core/subscription/ssrf-ip";
-import { getAllowUnsafeSubscriptionSources } from "@local/lib/source-import-settings";
+import { getAllowUnsafeSubscriptionSources } from "./source-import-settings";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;

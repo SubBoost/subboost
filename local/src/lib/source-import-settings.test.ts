@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
 }));
 
-vi.mock("@local/lib/prisma", () => ({
+vi.mock("./prisma", () => ({
   prisma: {
     localAdmin: { findFirst: mocks.findFirst },
   },
