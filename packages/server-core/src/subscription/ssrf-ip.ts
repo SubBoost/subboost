@@ -58,49 +58,63 @@ function isBenchmarkReservedIPv4(ip: string): boolean {
   return ipv4InCidr(ipInt, baseInt, 15);
 }
 
-function ipv4FromMappedHexTail(value: string): string | null {
-  const parts = value.split(":");
-  if (parts.length !== 2) return null;
-  const nums = parts.map((part) => Number.parseInt(part, 16));
-  if (nums.some((num) => !Number.isInteger(num) || num < 0 || num > 0xffff)) return null;
+function ipv4FromHextets(high: number, low: number): string {
   return [
-    nums[0] >> 8,
-    nums[0] & 0xff,
-    nums[1] >> 8,
-    nums[1] & 0xff,
+    high >> 8,
+    high & 0xff,
+    low >> 8,
+    low & 0xff,
   ].join(".");
 }
 
-function isDocumentationIPv6(ip: string): boolean {
-  const [first = "", second = ""] = ip.split(":");
-  return Number.parseInt(first, 16) === 0x2001 && Number.parseInt(second, 16) === 0x0db8;
+function expandIpv6Hextets(ip: string): number[] | null {
+  let normalized = ip.toLowerCase();
+  if (normalized.includes(".")) {
+    const lastColon = normalized.lastIndexOf(":");
+    if (lastColon < 0) return null;
+    const ipv4Int = ipv4ToInt(normalized.slice(lastColon + 1));
+    if (ipv4Int === null) return null;
+    normalized = `${normalized.slice(0, lastColon)}:${((ipv4Int >>> 16) & 0xffff).toString(16)}:${(
+      ipv4Int & 0xffff
+    ).toString(16)}`;
+  }
+
+  const compressionIndex = normalized.indexOf("::");
+  if (compressionIndex !== normalized.lastIndexOf("::")) return null;
+
+  const left = (compressionIndex === -1 ? normalized : normalized.slice(0, compressionIndex))
+    .split(":")
+    .filter(Boolean);
+  const right = (compressionIndex === -1 ? "" : normalized.slice(compressionIndex + 2))
+    .split(":")
+    .filter(Boolean);
+  const missing = 8 - left.length - right.length;
+  if ((compressionIndex === -1 && missing !== 0) || (compressionIndex !== -1 && missing < 1)) return null;
+
+  const parts = compressionIndex === -1 ? left : [...left, ...Array(missing).fill("0"), ...right];
+  const hextets = parts.map((part) => Number.parseInt(part, 16));
+  if (hextets.length !== 8 || hextets.some((part) => !Number.isInteger(part) || part < 0 || part > 0xffff)) {
+    return null;
+  }
+  return hextets;
 }
 
 function isPrivateOrReservedIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-  if (normalized === "::" || normalized === "0:0:0:0:0:0:0:0") return true;
-  if (normalized === "::1") return true;
+  const hextets = expandIpv6Hextets(ip);
+  if (!hextets) return true;
 
-  const firstHextet = normalized.split(":")[0] || "";
-  if (firstHextet.startsWith("fc") || firstHextet.startsWith("fd")) return true;
-  if (
-    firstHextet.startsWith("fe8") ||
-    firstHextet.startsWith("fe9") ||
-    firstHextet.startsWith("fea") ||
-    firstHextet.startsWith("feb")
-  ) {
-    return true;
-  }
-  if (firstHextet.startsWith("ff")) return true;
-  if (isDocumentationIPv6(normalized)) return true;
+  const [first, second] = hextets;
+  const allButLastZero = hextets.slice(0, 7).every((part) => part === 0);
+  if (hextets.every((part) => part === 0) || (allButLastZero && hextets[7] === 1)) return true;
+  if ((first & 0xfe00) === 0xfc00) return true;
+  if ((first & 0xffc0) === 0xfe80) return true;
+  if ((first & 0xff00) === 0xff00) return true;
+  if (first === 0x2001 && second === 0x0db8) return true;
 
-  const lastSegment = normalized.split(":").slice(-1)[0] || "";
-  if (lastSegment.includes(".")) {
-    return isPrivateOrReservedIPv4(lastSegment);
-  }
-  if (normalized.startsWith("::ffff:")) {
-    const mappedIpv4 = ipv4FromMappedHexTail(normalized.slice("::ffff:".length));
-    return mappedIpv4 ? isPrivateOrReservedIPv4(mappedIpv4) : false;
+  const isIpv4Compatible = hextets.slice(0, 6).every((part) => part === 0);
+  const isIpv4Mapped = hextets.slice(0, 5).every((part) => part === 0) && hextets[5] === 0xffff;
+  if (isIpv4Compatible || isIpv4Mapped) {
+    return isPrivateOrReservedIPv4(ipv4FromHextets(hextets[6], hextets[7]));
   }
 
   return false;

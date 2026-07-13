@@ -39,8 +39,9 @@ export function tokenizeConfigLine(line: string): {
 
   const type = tokens[0].toLowerCase();
   const host = stripQuotes(tokens[1]);
-  const port = Number(tokens[2]);
-  if (!host || !Number.isFinite(port) || port < 1 || port > 65535) {
+  const portText = stripQuotes(tokens[2]);
+  const port = Number(portText);
+  if (!host || !/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("配置行中的地址或端口无效");
   }
 

@@ -1,11 +1,14 @@
 import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 import { normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
+import { normalizeProxyGroupTargetRef } from "@subboost/core/proxy-group-targets";
 import { isValidRuleSetPathOrUrl, normalizeRuleSetPathInput } from "@subboost/core/rules/rule-model";
 import type {
   BuiltinRuleEdits,
   CustomProxyGroup,
   CustomRuleSet,
+  ProxyGroupRuleTarget,
+  ProxyGroupTargetRef,
   RuleSetBehavior,
 } from "@subboost/core/types/config";
 import type { RuleSetDraft } from "../definitions";
@@ -82,7 +85,8 @@ export function resolveRuleSetContainerTargetName(
 export function compactBuiltinRuleEdits(edits: BuiltinRuleEdits): BuiltinRuleEdits {
   const next: BuiltinRuleEdits = {};
   for (const [key, edit] of Object.entries(edits || {})) {
-    const target = typeof edit?.target === "string" ? edit.target.trim() : "";
+    const target = normalizeProxyGroupTargetRef(edit?.target) ??
+      (typeof edit?.target === "string" ? edit.target.trim() : "");
     const enabled = edit?.enabled === false ? false : undefined;
     if (!target && enabled !== false) continue;
     next[key] = {
@@ -96,12 +100,13 @@ export function compactBuiltinRuleEdits(edits: BuiltinRuleEdits): BuiltinRuleEdi
 export function updateBuiltinRuleEdit(
   edits: BuiltinRuleEdits,
   key: string,
-  patch: { target?: string | null; enabled?: false | true | null }
+  patch: { target?: ProxyGroupRuleTarget | null; enabled?: false | true | null }
 ): BuiltinRuleEdits {
   const prev = edits?.[key] || {};
   const next = { ...prev };
   if ("target" in patch) {
-    const target = typeof patch.target === "string" ? patch.target.trim() : "";
+    const target = normalizeProxyGroupTargetRef(patch.target) ??
+      (typeof patch.target === "string" ? patch.target.trim() : "");
     if (target) next.target = target;
     else delete next.target;
   }
@@ -129,12 +134,13 @@ export function retargetBuiltinRuleEdits(edits: BuiltinRuleEdits, from: string, 
 
 export function findBuiltinRuleEditKeyByTarget(
   edits: BuiltinRuleEdits,
-  target: string,
+  target: ProxyGroupTargetRef,
+  legacyTargetName: string,
   ruleId: string
 ): string | null {
-  if (!target || !ruleId) return null;
+  if (!target.id || !legacyTargetName || !ruleId) return null;
   for (const [key, edit] of Object.entries(edits || {})) {
-    if (edit?.target !== target) continue;
+    if (!ruleTargetMatchesContainer(edit?.target, target, legacyTargetName)) continue;
     const parts = key.split(":");
     if (parts.length !== 3 || parts[0] !== "module") continue;
     if (parts[2] === ruleId) return key;
@@ -145,7 +151,7 @@ export function findBuiltinRuleEditKeyByTarget(
 export function appendUniqueCustomRuleSets(
   existing: CustomRuleSet[],
   drafts: RuleSetDraft[],
-  target: string
+  target: ProxyGroupRuleTarget
 ): CustomRuleSet[] {
   const seen = new Set(existing.map((item) => item.id));
   const next = [...existing];
@@ -156,4 +162,14 @@ export function appendUniqueCustomRuleSets(
     next.push({ ...ruleSet, target });
   }
   return next;
+}
+
+export function ruleTargetMatchesContainer(
+  target: ProxyGroupRuleTarget | undefined,
+  container: ProxyGroupTargetRef,
+  legacyTargetName: string
+): boolean {
+  const ref = normalizeProxyGroupTargetRef(target);
+  if (ref) return ref.kind === container.kind && ref.id === container.id;
+  return typeof target === "string" && target.trim() === legacyTargetName.trim();
 }

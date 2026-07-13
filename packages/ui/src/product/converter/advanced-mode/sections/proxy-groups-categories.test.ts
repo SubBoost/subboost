@@ -318,8 +318,10 @@ describe("ProxyGroupsCategories", () => {
     expect(mocks.store.removeModuleRule).toHaveBeenCalledWith("auto", "rule-a");
     card.onMoveRule("rule-a", "top");
     expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("auto", "rule-a", "top");
-    card.onMoveManualRule("manual-1", "Fallback");
-    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", { target: "Fallback" });
+    card.onMoveManualRule("manual-1", { kind: "module", id: "fallback", name: "Fallback" });
+    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", {
+      target: { kind: "module", id: "fallback" },
+    });
     card.onRestoreRule("rule-a");
     expect(mocks.store.restoreModuleRule).toHaveBeenCalledWith("auto", "rule-a");
     card.onResetRuleTarget("rule-a");

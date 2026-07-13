@@ -36,6 +36,7 @@ describe("SSRF IP classification", () => {
       "::",
       "0:0:0:0:0:0:0:0",
       "::1",
+      "0:0:0:0:0:0:0:1",
       "fc00::1",
       "fd00::1",
       "fe80::1",
@@ -45,6 +46,9 @@ describe("SSRF IP classification", () => {
       "2001:0db8::1",
       "::ffff:127.0.0.1",
       "::ffff:c0a8:1",
+      "0:0:0:0:0:ffff:7f00:1",
+      "0:0:0:0:0:ffff:c0a8:1",
+      "::127.0.0.1",
     ]) {
       expect(isPrivateOrReservedIp(ip), ip).toBe(true);
     }

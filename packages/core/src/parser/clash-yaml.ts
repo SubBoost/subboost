@@ -106,6 +106,53 @@ function repairRootFlowProxyListIndent(input: string): string {
   return lines.join("\n");
 }
 
+function repairInlineListIndent(input: string): string {
+  // 修复常见的“列表项首行内联 key（- name: xxx）但后续 key 又多缩进”的不合法 YAML。
+  // 逐个列表项消费其后续块，确保每一行最多检查一次，避免大型订阅退化为 O(n²)。
+  const lines = input.split(/\r?\n/);
+  const out: string[] = [];
+
+  for (let index = 0; index < lines.length; ) {
+    const line = lines[index];
+    const match = line.match(/^(\s*)-\s*(name\s*:\s*.+)$/);
+    if (!match) {
+      out.push(line);
+      index += 1;
+      continue;
+    }
+
+    const dashIndent = match[1].length;
+    const keyIndent = dashIndent + 2;
+    let minIndent = Number.POSITIVE_INFINITY;
+    let blockEnd = index + 1;
+
+    while (blockEnd < lines.length) {
+      const nextLine = lines[blockEnd];
+      const trimmed = nextLine.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        blockEnd += 1;
+        continue;
+      }
+
+      const indent = countLeadingSpaces(nextLine);
+      if (indent <= dashIndent) break;
+      minIndent = Math.min(minIndent, indent);
+      blockEnd += 1;
+    }
+
+    if (minIndent !== Number.POSITIVE_INFINITY && minIndent > keyIndent) {
+      out.push(`${" ".repeat(dashIndent)}-`);
+      out.push(`${" ".repeat(minIndent)}${match[2]}`);
+    } else {
+      out.push(line);
+    }
+    out.push(...lines.slice(index + 1, blockEnd));
+    index = blockEnd;
+  }
+
+  return out.join("\n");
+}
+
 /**
  * 解析 Clash YAML 配置
  */
@@ -115,55 +162,6 @@ export function parseClashYaml(content: string): ParseResult {
 
   try {
     const normalizeTabs = (s: string) => s.replace(/\t/g, "  ");
-
-    const repairInlineListIndent = (input: string): string => {
-      // 修复常见的“列表项首行内联 key（- name: xxx）但后续 key 又多缩进”的不合法 YAML
-      // 例如（不合法）：
-      //  - name: ss-A
-      //     type: ss
-      // 修复为（合法）：
-      //  -
-      //     name: ss-A
-      //     type: ss
-      const lines = input.split(/\r?\n/);
-      const out: string[] = [];
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const m = line.match(/^(\s*)-\s*(name\s*:\s*.+)$/);
-        if (!m) {
-          out.push(line);
-          continue;
-        }
-
-        const dashIndent = m[1].length;
-        const namePair = m[2];
-        const keyIndent = dashIndent + 2;
-
-        // 计算该列表项后续块内最小缩进（用于对齐 name/type/server 等）
-        let minIndent = Number.POSITIVE_INFINITY;
-        for (let j = i + 1; j < lines.length; j++) {
-          const l = lines[j];
-          if (!l.trim() || l.trim().startsWith("#")) continue;
-
-          const indent = (l.match(/^(\s*)/)?.[1].length ?? 0);
-          // 缩进回退到当前列表项的 '-' 缩进（或更浅）时，说明已经离开该列表项
-          if (indent <= dashIndent) break;
-          minIndent = Math.min(minIndent, indent);
-        }
-
-        // 仅当后续 key 明显比内联 key 更深时才修复，避免误改合法 YAML
-        if (minIndent !== Number.POSITIVE_INFINITY && minIndent > keyIndent) {
-          out.push(`${" ".repeat(dashIndent)}-`);
-          out.push(`${" ".repeat(minIndent)}${namePair}`);
-          continue;
-        }
-
-        out.push(line);
-      }
-
-      return out.join("\n");
-    };
 
     const tryLoad = (raw: string): unknown => yaml.load(raw) as unknown;
     const normalizedContent = normalizeClashYamlScalarText(normalizeTabs(content));

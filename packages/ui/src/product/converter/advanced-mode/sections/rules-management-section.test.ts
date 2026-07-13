@@ -320,7 +320,7 @@ describe("RulesManagementSection", () => {
 
   it("moves editable rules by buttons, absolute order input, blur, and escape cleanup", () => {
     stateMock.value = { "custom:one": "1" };
-    const tree = renderSection();
+    const tree = renderSection({ ruleOrder: ["module:geo", "custom:one"] });
     const orderInputs = collectElements(tree, (element) => (element.props as any).title === "最终规则行号（1=最前）");
     const upButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "上移");
     const downButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "下移");
@@ -344,6 +344,29 @@ describe("RulesManagementSection", () => {
     upButtons[1].props.onClick();
     downButtons[0].props.onClick();
     expect(mocks.store.setRuleOrder).toHaveBeenCalledWith(["custom:one", "module:geo"]);
+  });
+
+  it("does not turn legacy custom-only ordering into full ordering after a custom move", () => {
+    const tree = renderSection({ ruleOrder: ["custom:one"] });
+    const orderInputs = collectElements(tree, (element) => (element.props as any).title === "最终规则行号（1=最前）");
+    const upButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "上移");
+    const downButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "下移");
+
+    stateMock.value = { "custom:one": "1" };
+    orderInputs[1].props.onKeyDown({ key: "Enter" });
+    upButtons[1].props.onClick();
+    downButtons[1].props.onClick();
+
+    expect(upButtons[1].props.disabled).toBe(true);
+    expect(downButtons[1].props.disabled).toBe(true);
+    expect(mocks.store.setRuleOrder).not.toHaveBeenCalled();
+  });
+
+  it("uses full non-MATCH ordering for a new empty rule-order state", () => {
+    const tree = renderSection({ ruleOrder: [] });
+    const header = collectElements(tree, (element) => element.props.title === "规则管理")[0];
+    expect(collectText(tree)).toContain("已开启全规则排序");
+    expect(collectText(header.props.badge)).toContain("可调 2 / 全部 3");
   });
 
   it("keeps collapsed sections lightweight", () => {

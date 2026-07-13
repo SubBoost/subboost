@@ -40,8 +40,16 @@ export function decryptEncryptedFieldV2(ciphertext: string, masterKey: string): 
 
   const parts = ciphertext.split(":");
   const [prefix, ivHex, authTagHex, encrypted] = parts;
-  if (prefix !== V2_PREFIX || !ivHex || !authTagHex || !encrypted || parts.length !== 4) {
+  if (prefix !== V2_PREFIX || !ivHex || !authTagHex || encrypted === undefined || parts.length !== 4) {
     throw new Error("Invalid ciphertext v2 format");
+  }
+
+  if (
+    !/^[0-9a-f]{24}$/i.test(ivHex)
+    || !/^[0-9a-f]{32}$/i.test(authTagHex)
+    || !/^(?:[0-9a-f]{2})*$/i.test(encrypted)
+  ) {
+    throw new Error("Invalid ciphertext v2 encoding");
   }
 
   const iv = Buffer.from(ivHex, "hex");

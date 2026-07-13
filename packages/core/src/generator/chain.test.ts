@@ -6,7 +6,6 @@ import {
   generateDialerProxyGroups,
   getDialerRelayNodes,
   getDialerTargetNodes,
-  suggestDialerGroups,
   validateDialerConfig,
 } from "./chain";
 
@@ -184,25 +183,4 @@ describe("dialer proxy chain helpers", () => {
     });
   });
 
-  it("suggests regional relay groups from node names", () => {
-    const suggestions = suggestDialerGroups([
-      node("US Los Angeles 01"),
-      node("美国 New York 02"),
-      node("香港 HK 01"),
-      node("Unknown 01"),
-    ]);
-
-    expect(suggestions).toEqual([
-      {
-        name: "🇺🇸 美国中转",
-        relayNodes: ["US Los Angeles 01", "美国 New York 02"],
-        description: "使用美国节点作为中转",
-      },
-      {
-        name: "🇭🇰 香港中转",
-        relayNodes: ["香港 HK 01"],
-        description: "使用香港节点作为中转",
-      },
-    ]);
-  });
 });

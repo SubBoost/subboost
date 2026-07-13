@@ -74,6 +74,19 @@ describe("SSR and Snell parsers", () => {
     });
   });
 
+  it("preserves literal plus and percent sequences after SSR base64 decoding", () => {
+    const literal = "A+B%20C";
+    const node = parseSSR(
+      `ssr://${b64(`literal.example.com:8388:origin:aes-256-cfb:plain:${b64("secret")}/?remarks=${b64(literal)}&protoparam=${b64(literal)}&obfsparam=${b64(literal)}`)}`
+    );
+
+    expect(node).toMatchObject({
+      name: literal,
+      "protocol-param": literal,
+      "obfs-param": literal,
+    });
+  });
+
   it("keeps SSR validation errors explicit", () => {
     expect(() => parseSSR("http://bad")).toThrow("无效的 SSR 链接");
     expect(() => parseSSR("ssr://")).toThrow("无效的 SSR 链接");

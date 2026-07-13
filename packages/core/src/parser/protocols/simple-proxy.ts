@@ -42,7 +42,10 @@ function stripMetaSuffix(input: string): { value: string; name?: string } {
   }
 
   const bracket = takeTerminalEnclosedValue(remaining, "[", "]");
-  if (bracket.enclosed !== undefined) {
+  const bracketIsIpv6Host =
+    bracket.enclosed?.includes(":") &&
+    (remaining.startsWith("[") || /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/(?:[^/?#@]+@)?\[[^\]]+\]$/.test(remaining));
+  if (bracket.enclosed !== undefined && !bracketIsIpv6Host) {
     remaining = bracket.value;
   }
 
@@ -531,4 +534,3 @@ export function parseTelegramProxyLink(uri: string): SocksNode | HttpNode {
 
   return buildNode(kind, { name, server, port, username, password }) as HttpNode;
 }
-

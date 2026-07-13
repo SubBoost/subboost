@@ -15,6 +15,7 @@ describe("simple proxy parsers", () => {
     const colonAuth = parseHttp("http://colon.example.com:8080:user:p%40ss#Colon");
     const headerAlias = parseHttp("http://alias.example.com:8080?header=bad|:skip|X-Empty:&skip_cert_verify=no&peer=peer.example.com");
     const ipv6 = parseHttp("http://[2001:db8::1]:8080#IPv6");
+    const ipv6DefaultPort = parseHttp("http://[2001:db8::2]");
     const tlsVerified = parseHttp("http://verified.example.com:8080?tls-verification=true#Verified");
 
     expect(http).toMatchObject({
@@ -66,6 +67,10 @@ describe("simple proxy parsers", () => {
       name: "IPv6",
       server: "2001:db8::1",
       port: 8080,
+    });
+    expect(ipv6DefaultPort).toMatchObject({
+      server: "2001:db8::2",
+      port: 80,
     });
     expect(tlsVerified).toMatchObject({
       name: "Verified",

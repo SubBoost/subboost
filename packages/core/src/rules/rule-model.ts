@@ -33,7 +33,8 @@ function trimTrailingSlashes(value: string): string {
 
 export function extractRuleSetPathFromUrl(url: string): string {
   const trimmed = url.trim();
-  const match = trimmed.match(/(?:^|\/)(geosite|geoip)\/[^/?#\s]+\.mrs/i);
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const match = trimmed.match(/^(?:\/+)?(geosite|geoip)\/[^/?#\s]+\.mrs$/i);
   if (!match) return trimmed;
   return trimLeadingSlashes(match[0]);
 }

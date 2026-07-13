@@ -15,7 +15,6 @@ import {
   getCustomRuleOrderKey,
   isCustomRuleType,
   listEditableRuleOrderKeys,
-  reconcileRuleOrder,
 } from "./custom-rule-utils";
 import type { CustomProxyGroup, CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 
@@ -29,7 +28,7 @@ describe("custom routing rule set helpers", () => {
     expect(parseRuleSetTargetValue("other:select")).toBeNull();
 
     expect(extractRuleSetPathFromUrl("https://cdn.example/rules/geosite/openai.mrs?token=1")).toBe(
-      "geosite/openai.mrs"
+      "https://cdn.example/rules/geosite/openai.mrs?token=1"
     );
     expect(extractRuleSetPathFromUrl("plain/rule.txt")).toBe("plain/rule.txt");
     expect(normalizeRuleSetPathInput(" /geoip/cn.mrs ")).toBe("geoip/cn.mrs");
@@ -98,7 +97,7 @@ describe("custom routing rule set helpers", () => {
           source: { kind: "custom-rule-set", id: "custom-rule" },
           id: "custom-rule",
           name: "custom-rule",
-          path: "geosite/custom.mrs",
+          path: "https://cdn.example/geosite/custom.mrs",
           target: expect.objectContaining({ id: "custom-a", value: "custom:custom-a" }),
           noResolve: true,
         }),
@@ -153,15 +152,6 @@ describe("custom rule id and order helpers", () => {
       `custom-rule:${ruleWithoutId.id}`,
       "custom-rule-set:rule-a",
     ]);
-    expect(reconcileRuleOrder(undefined, [], [])).toEqual([]);
-    expect(
-      reconcileRuleOrder(
-        [" missing ", "custom-rule-set:rule-a", "custom-rule-set:rule-a"],
-        customRules,
-        customRuleSets
-      )
-    ).toEqual(["custom-rule-set:rule-a", `custom-rule:${ruleWithoutId.id}`]);
-    expect(reconcileRuleOrder("bad" as never, customRules, [])).toEqual([`custom-rule:${ruleWithoutId.id}`]);
   });
 });
 

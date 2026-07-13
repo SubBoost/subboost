@@ -119,7 +119,7 @@ export function ProxyGroupsModuleRulesPanel({
   onAddRuleToCustomGroup: (groupId: string, rule: RuleSetDraft) => void;
   onRemoveRule: (ruleId: string) => void;
   onMoveRule: (ruleId: string, target: MoveTarget) => void;
-  onMoveManualRule: (ruleId: string, targetName: string) => void;
+  onMoveManualRule: (ruleId: string, target: ProxyGroupRuleTarget) => void;
   onRemoveManualRule: (index: number) => void;
   onRestoreRule: (ruleId: string) => void;
   onResetRuleTarget: (ruleId: string) => void;
@@ -386,7 +386,7 @@ export function ProxyGroupsModuleRulesPanel({
               item={item}
               targets={manualRuleTargets}
               currentTargetName={moduleDisplayName}
-              onMove={(nextItem, target) => onMoveManualRule(nextItem.rule.id, target.name)}
+              onMove={(nextItem, target) => onMoveManualRule(nextItem.rule.id, target)}
               onRemove={({ index }) => onRemoveManualRule(index)}
             />
           ))}

@@ -14,7 +14,6 @@ import {
   getCustomRuleOrderKey,
   isCustomRuleType,
   listEditableRuleOrderKeys,
-  reconcileRuleOrder,
 } from "./custom-rule-utils";
 
 describe("custom rule helpers", () => {
@@ -52,24 +51,6 @@ describe("custom rule helpers", () => {
     ).toEqual([
       "custom-rule:custom-rule-domain-suffix-example-com-direct-3",
       "custom-rule-set:nested",
-    ]);
-    expect(
-      reconcileRuleOrder(
-        ["missing", "custom-rule-set:nested", "custom-rule-set:nested"],
-        [rule],
-        [
-          {
-            id: "nested",
-            name: "Nested",
-            behavior: "domain",
-            path: "https://rules.example.com/a.mrs",
-            target: "Group",
-          },
-        ]
-      )
-    ).toEqual([
-      "custom-rule-set:nested",
-      "custom-rule:custom-rule-domain-suffix-example-com-direct-3",
     ]);
   });
 

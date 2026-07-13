@@ -34,6 +34,20 @@ describe("parsePlatformProxyLine", () => {
     });
   });
 
+  it("keeps ws=false disabled and accepts IP or single-label SNI values", () => {
+    const disabledWs = parsePlatformProxyLine(
+      "No WS = vmess, vmess.example.com, 443, username=11111111-1111-4111-8111-111111111111, ws=false, ws-path=/ignored, tls=true, sni=127.0.0.1"
+    );
+    const localSni = parsePlatformProxyLine(
+      "Local SNI = anytls, anytls.example.com, 443, password=secret, sni=localhost"
+    );
+
+    expect(disabledWs).toMatchObject({ servername: "127.0.0.1" });
+    expect(disabledWs).not.toHaveProperty("network");
+    expect(disabledWs).not.toHaveProperty("ws-opts");
+    expect(localSni).toMatchObject({ sni: "localhost" });
+  });
+
   it("parses Surge WireGuard through its referenced section", () => {
     const sections = new Map<string, string[]>([
       [

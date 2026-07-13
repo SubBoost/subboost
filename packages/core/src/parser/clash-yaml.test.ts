@@ -208,6 +208,25 @@ proxies:
     expect(mixed.errors[0]).toContain('节点 "Bad" 解析失败');
   });
 
+  it("repairs large malformed proxy lists without quadratic scanning", () => {
+    const count = 2_000;
+    const rows = ["proxies:"];
+    for (let index = 0; index < count; index += 1) {
+      rows.push(`  - name: Node ${index}`);
+      rows.push("      type: ss");
+      rows.push(`      server: node-${index}.example.com`);
+      rows.push("      port: 8388");
+    }
+
+    const startedAt = performance.now();
+    const result = parseClashYaml(rows.join("\n"));
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(result.errors).toEqual([]);
+    expect(result.nodes).toHaveLength(count);
+    expect(elapsedMs).toBeLessThan(1_500);
+  }, 10_000);
+
   it("parses consistently indented root flow proxy lists", () => {
     for (const spaces of [0, 1, 2, 4]) {
       const indent = " ".repeat(spaces);

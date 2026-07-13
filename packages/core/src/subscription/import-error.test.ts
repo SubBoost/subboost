@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SubscriptionImportError,
   createSubscriptionImportErrorInfo,
+  extractHttpStatus,
   getSubscriptionImportErrorBadgeText,
   getSubscriptionImportErrorCategoryLabel,
   inferSubscriptionImportErrorCategory,
@@ -10,6 +11,16 @@ import {
   normalizeSubscriptionImportErrorInfo,
   sanitizePublicErrorText,
 } from "./import-error";
+
+describe("extractHttpStatus", () => {
+  it("only extracts explicit HTTP error status context", () => {
+    expect(extractHttpStatus("upstream HTTP 503 then 404")).toBe(503);
+    expect(extractHttpStatus("request failed with status code 429")).toBe(429);
+    expect(extractHttpStatus("upstream returned 502")).toBe(502);
+    expect(extractHttpStatus("成功解析 502 个节点")).toBeNull();
+    expect(extractHttpStatus("HTTP 200")).toBeNull();
+  });
+});
 
 describe("sanitizePublicErrorText", () => {
   it("does not mistake protocol URIs for Windows file paths", () => {

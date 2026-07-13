@@ -71,13 +71,13 @@ const NETWORK_CODE_BADGE: Record<string, string> = {
   EAI_AGAIN: "DNS",
 };
 
-function extractHttpStatusFromText(text: string): number | null {
-  const match = text.match(/\b(4\d{2}|5\d{2})\b/);
-  if (match) {
-    const code = parseInt(match[1], 10);
-    if (code >= 400 && code < 600) return code;
-  }
-  return null;
+export function extractHttpStatus(text: string): number | null {
+  const match = text.match(
+    /\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?:\s+code)?|returned|responded(?:\s+with)?)\s*[:=]?\s*(\d{3})\b/i
+  );
+  if (!match) return null;
+  const code = Number.parseInt(match[1], 10);
+  return code >= 400 && code < 600 ? code : null;
 }
 
 function extractNetworkCodeFromText(text: string): string | null {
@@ -166,7 +166,7 @@ export function getSubscriptionImportErrorBadgeText(
   if (info.httpStatus && HTTP_STATUS_BADGE[info.httpStatus]) {
     return HTTP_STATUS_BADGE[info.httpStatus];
   }
-  const httpFromText = extractHttpStatusFromText(info.message) ?? extractHttpStatusFromText(info.detail || "");
+  const httpFromText = extractHttpStatus(info.message) ?? extractHttpStatus(info.detail || "");
   if (httpFromText && HTTP_STATUS_BADGE[httpFromText]) {
     return HTTP_STATUS_BADGE[httpFromText];
   }

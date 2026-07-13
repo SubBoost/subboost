@@ -98,7 +98,7 @@ export function parseSSR(uri: string): SSRNode {
   const params = parseSsrQuery(query);
 
   const remarks = safeDecodeSsrBase64(params.remarks || params.remark || "");
-  const name = remarks ? safeDecodeFormUrlEncoded(remarks) : `SSR-${server}:${port}`;
+  const name = remarks || `SSR-${server}:${port}`;
 
   const node: SSRNode = {
     name,
@@ -114,14 +114,13 @@ export function parseSSR(uri: string): SSRNode {
 
   const protoparam = safeDecodeSsrBase64(params.protoparam || params["protocol-param"] || "");
   if (protoparam) {
-    node["protocol-param"] = safeDecodeFormUrlEncoded(protoparam);
+    node["protocol-param"] = protoparam;
   }
 
   const obfsparam = safeDecodeSsrBase64(params.obfsparam || params["obfs-param"] || "");
   if (obfsparam) {
-    node["obfs-param"] = safeDecodeFormUrlEncoded(obfsparam);
+    node["obfs-param"] = obfsparam;
   }
 
   return node;
 }
-

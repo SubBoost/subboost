@@ -93,33 +93,3 @@ export function listEditableRuleOrderKeys(customRules: CustomRule[], customRuleS
   }
   return keys;
 }
-
-export function reconcileRuleOrder(
-  ruleOrder: string[] | undefined,
-  customRules: CustomRule[],
-  customRuleSets: CustomRuleSet[] = []
-): string[] {
-  const available = listEditableRuleOrderKeys(customRules, customRuleSets);
-  if (available.length === 0) return [];
-
-  const availableSet = new Set(available);
-  const next: string[] = [];
-  const seen = new Set<string>();
-
-  if (Array.isArray(ruleOrder)) {
-    for (const rawKey of ruleOrder) {
-      const key = toTrimmedString(rawKey);
-      if (!key || seen.has(key) || !availableSet.has(key)) continue;
-      seen.add(key);
-      next.push(key);
-    }
-  }
-
-  for (const key of available) {
-    if (seen.has(key)) continue;
-    seen.add(key);
-    next.push(key);
-  }
-
-  return next;
-}

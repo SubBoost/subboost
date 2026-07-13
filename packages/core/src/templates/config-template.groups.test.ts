@@ -188,8 +188,8 @@ describe("validateSubBoostTemplateConfig custom groups", () => {
       "customProxyGroups.includeInGroupMembers 必须是布尔值"
     );
 
-    expectInvalid(
-      {
+    const migratedLegacyGroup = validateSubBoostTemplateConfig(
+      validConfig({
         customProxyGroups: [
           {
             id: "legacy",
@@ -199,9 +199,12 @@ describe("validateSubBoostTemplateConfig custom groups", () => {
             rules: [],
           } as never,
         ],
-      },
-      "模板配置包含已移除字段: customProxyGroups[0].rules"
+      })
     );
+    expect(migratedLegacyGroup.ok).toBe(true);
+    if (migratedLegacyGroup.ok) {
+      expect(migratedLegacyGroup.config.customProxyGroups[0]).not.toHaveProperty("rules");
+    }
 
     const validCustomGroup = validateSubBoostTemplateConfig(
       validConfig({
@@ -253,6 +256,12 @@ describe("validateSubBoostTemplateConfig custom groups", () => {
     }
 
     const removedField = `filtered${"ProxyGroups"}`;
-    expectInvalid({ [removedField]: [] } as never, `模板配置包含已移除字段: ${removedField}`);
+    const migratedEmptyFilteredGroups = validateSubBoostTemplateConfig(
+      validConfig({ [removedField]: [] } as never)
+    );
+    expect(migratedEmptyFilteredGroups.ok).toBe(true);
+    if (migratedEmptyFilteredGroups.ok) {
+      expect(migratedEmptyFilteredGroups.config).not.toHaveProperty(removedField);
+    }
   });
 });

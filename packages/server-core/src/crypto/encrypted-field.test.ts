@@ -24,4 +24,32 @@ describe("encrypted field crypto", () => {
     expect(() => decryptEncryptedFieldV2(oldShapeCiphertext, masterKey)).toThrow("Invalid ciphertext v2 format");
   });
 
+  it("round-trips an empty plaintext", () => {
+    const ciphertext = encryptEncryptedFieldV2("", masterKey);
+
+    expect(ciphertext.endsWith(":")).toBe(true);
+    expect(decryptEncryptedFieldV2(ciphertext, masterKey)).toBe("");
+  });
+
+  it("rejects missing segments and invalid hex encodings", () => {
+    expect(() =>
+      decryptEncryptedFieldV2(
+        "v2:00112233445566778899aabb:00112233445566778899aabbccddeeff",
+        masterKey
+      )
+    ).toThrow("Invalid ciphertext v2 format");
+    expect(() =>
+      decryptEncryptedFieldV2(
+        "v2:zz112233445566778899aabb:00112233445566778899aabbccddeeff:",
+        masterKey
+      )
+    ).toThrow("Invalid ciphertext v2 encoding");
+    expect(() =>
+      decryptEncryptedFieldV2(
+        "v2:00112233445566778899aabb:00112233445566778899aabbccddeeff:f",
+        masterKey
+      )
+    ).toThrow("Invalid ciphertext v2 encoding");
+  });
+
 });

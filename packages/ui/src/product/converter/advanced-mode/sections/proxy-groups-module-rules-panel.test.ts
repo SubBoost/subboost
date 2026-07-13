@@ -229,8 +229,9 @@ describe("ProxyGroupsModuleRulesPanel", () => {
     mocks.captures.buttons.find((button) => button["aria-label"] === "恢复默认目标 Removed 规则集").onClick();
     expect(props.onResetRuleTarget).toHaveBeenCalledWith("removed-rule");
 
-    mocks.captures.manualRows[0].onMove(mocks.captures.manualRows[0].item, { name: "自动选择" });
-    expect(props.onMoveManualRule).toHaveBeenCalledWith("manual-1", "自动选择");
+    const manualTarget = { kind: "module", id: "auto", name: "自动选择" };
+    mocks.captures.manualRows[0].onMove(mocks.captures.manualRows[0].item, manualTarget);
+    expect(props.onMoveManualRule).toHaveBeenCalledWith("manual-1", manualTarget);
     mocks.captures.manualRows[0].onRemove({ index: 0 });
     expect(props.onRemoveManualRule).toHaveBeenCalledWith(0);
   });

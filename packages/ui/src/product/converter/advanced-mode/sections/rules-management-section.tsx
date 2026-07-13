@@ -52,7 +52,7 @@ export function RulesManagementSection({
     setRuleOrder,
   } = useConfigStore();
   const [orderDrafts, setOrderDrafts] = React.useState<Record<string, string>>({});
-  const allRulesMode = hasFullRuleOrderKeys(ruleOrder);
+  const allRulesMode = ruleOrder.length === 0 || hasFullRuleOrderKeys(ruleOrder);
 
   const entries = React.useMemo(
     () =>
@@ -85,6 +85,7 @@ export function RulesManagementSection({
   const preMatchKeys = React.useMemo(() => preMatchEntries.map((entry) => entry.key), [preMatchEntries]);
   const editableEntries = React.useMemo(() => entries.filter((entry) => entry.editable), [entries]);
   const editableKeys = React.useMemo(() => editableEntries.map((entry) => entry.key), [editableEntries]);
+  const movableKeys = allRulesMode ? preMatchKeys : editableKeys;
 
   const applyRuleOrder = React.useCallback(
     (nextRuleOrder: string[]) => {
@@ -102,30 +103,30 @@ export function RulesManagementSection({
 
   const moveRule = React.useCallback(
     (key: string, direction: "up" | "down") => {
-      const from = preMatchKeys.indexOf(key);
+      const from = movableKeys.indexOf(key);
       if (from < 0) return;
-      const to = clamp(direction === "up" ? from - 1 : from + 1, 0, preMatchKeys.length - 1);
+      const to = clamp(direction === "up" ? from - 1 : from + 1, 0, movableKeys.length - 1);
       if (to === from) return;
-      const next = preMatchKeys.slice();
+      const next = movableKeys.slice();
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
       applyRuleOrder(next);
     },
-    [applyRuleOrder, preMatchKeys]
+    [applyRuleOrder, movableKeys]
   );
 
   const setRuleAbsoluteOrder = React.useCallback(
     (key: string, absoluteOrder: number) => {
-      const from = preMatchKeys.indexOf(key);
+      const from = movableKeys.indexOf(key);
       if (from < 0 || !Number.isFinite(absoluteOrder)) return;
-      const to = clamp(Math.floor(absoluteOrder) - 1, 0, preMatchEntries.length - 1);
+      const to = clamp(Math.floor(absoluteOrder) - 1, 0, movableKeys.length - 1);
       if (to === from) return;
-      const next = preMatchKeys.slice();
+      const next = movableKeys.slice();
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
       applyRuleOrder(next);
     },
-    [applyRuleOrder, preMatchEntries.length, preMatchKeys]
+    [applyRuleOrder, movableKeys]
   );
 
   const handleToggleAllRulesMode = React.useCallback(
@@ -194,11 +195,11 @@ export function RulesManagementSection({
 
           <div className="max-h-[460px] overflow-y-auto overflow-x-hidden rounded-lg border border-white/10 bg-black/10 pr-1 custom-scrollbar">
             {entries.map((entry, index) => {
-              const fullIndex = preMatchKeys.indexOf(entry.key);
+              const movableIndex = movableKeys.indexOf(entry.key);
               const canEditOrder = entry.key !== "special:match" && (allRulesMode || entry.editable);
-              const canMoveUp = canEditOrder && fullIndex > 0;
-              const canMoveDown = canEditOrder && fullIndex >= 0 && fullIndex < preMatchKeys.length - 1;
-              const absoluteOrder = index + 1;
+              const canMoveUp = canEditOrder && movableIndex > 0;
+              const canMoveDown = canEditOrder && movableIndex >= 0 && movableIndex < movableKeys.length - 1;
+              const absoluteOrder = allRulesMode ? index + 1 : movableIndex + 1;
               const displayDetail = getRuleDisplayDetail(entry);
               const shouldShowSourceLabel =
                 entry.sourceLabel.trim() !== entry.target.trim() &&

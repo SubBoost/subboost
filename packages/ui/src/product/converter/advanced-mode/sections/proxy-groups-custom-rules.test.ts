@@ -276,9 +276,15 @@ describe("ProxyGroupsCustomRules", () => {
           "Legacy Target",
         ],
         existingRules: [],
-        onImport: mocks.store.addCustomRules,
+        onImport: expect.any(Function),
       }),
     );
+    mocks.captures.batchDialogs[0].onImport([
+      { id: "batch-1", type: "DOMAIN", value: "batch.example", target: "Custom Group" },
+    ]);
+    expect(mocks.store.addCustomRules).toHaveBeenCalledWith([
+      expect.objectContaining({ target: { kind: "custom", id: "custom-1" } }),
+    ]);
 
     mocks.captures.buttons
       .find((props) => props.children === "批量导入")
@@ -348,7 +354,7 @@ describe("ProxyGroupsCustomRules", () => {
       id: "rule-1",
       type: "DOMAIN" as const,
       value: " edited.com ",
-      target: "Custom Group",
+      target: { kind: "custom", id: "custom-1" },
       noResolve: true,
     };
     const { html, setters } = renderRules({
@@ -412,7 +418,7 @@ describe("ProxyGroupsCustomRules", () => {
     expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("rule-1", {
       type: "DOMAIN",
       value: "edited.com",
-      target: "Custom Group",
+      target: { kind: "custom", id: "custom-1" },
       noResolve: true,
     });
     expect(setters[5]).toHaveBeenCalledWith(null);

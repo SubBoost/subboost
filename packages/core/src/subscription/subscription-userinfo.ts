@@ -17,7 +17,8 @@ export function parseSubscriptionUserInfo(header: string): SubscriptionUserInfo 
     if (key && value) {
       const numeric = parseHeaderNumericValue(value);
       if (numeric !== undefined) {
-        info[key] = numeric;
+        const normalizedNumeric = key === "expire" ? normalizeExpireTimestampSeconds(numeric) : numeric;
+        if (normalizedNumeric !== undefined) info[key] = normalizedNumeric;
         continue;
       }
 
@@ -72,9 +73,23 @@ function isFiniteNonNegativeNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+const MIN_EXPIRE_TIMESTAMP_SECONDS = 946684800; // 2000-01-01
+const MAX_EXPIRE_TIMESTAMP_SECONDS = 253402300799; // 9999-12-31T23:59:59Z
+const MIN_EXPIRE_TIMESTAMP_MILLISECONDS = MIN_EXPIRE_TIMESTAMP_SECONDS * 1000;
+const MAX_EXPIRE_TIMESTAMP_MILLISECONDS = MAX_EXPIRE_TIMESTAMP_SECONDS * 1000;
+
+function normalizeExpireTimestampSeconds(value: unknown): number | undefined {
+  if (!isFiniteNonNegativeNumber(value)) return undefined;
+  const integer = Math.floor(value);
+  if (integer > MIN_EXPIRE_TIMESTAMP_SECONDS && integer <= MAX_EXPIRE_TIMESTAMP_SECONDS) return integer;
+  if (integer > MIN_EXPIRE_TIMESTAMP_MILLISECONDS && integer <= MAX_EXPIRE_TIMESTAMP_MILLISECONDS) {
+    return Math.floor(integer / 1000);
+  }
+  return undefined;
+}
+
 function isValidExpireTimestampSeconds(value: unknown): value is number {
-  // expire 通常为秒级 Unix 时间戳；过滤掉 0/1970 等无意义值
-  return isFiniteNonNegativeNumber(value) && value > 946684800; // 2000-01-01
+  return typeof value === "number" && normalizeExpireTimestampSeconds(value) === value;
 }
 
 function hasMeaningfulTrafficSnapshot(info: SubscriptionUserInfo): boolean {
@@ -257,7 +272,8 @@ export function normalizeSubscriptionUserInfo(info: SubscriptionUserInfo | null 
   if (isFiniteNonNegativeNumber(info.upload)) out.upload = info.upload;
   if (isFiniteNonNegativeNumber(info.download)) out.download = info.download;
   if (isFiniteNonNegativeNumber(info.total)) out.total = info.total;
-  if (isValidExpireTimestampSeconds(info.expire)) out.expire = info.expire;
+  const expire = normalizeExpireTimestampSeconds(info.expire);
+  if (expire !== undefined) out.expire = expire;
   return out;
 }
 

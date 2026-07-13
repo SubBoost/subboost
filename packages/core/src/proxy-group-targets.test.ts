@@ -42,6 +42,9 @@ describe("proxy group target helpers", () => {
     expect(resolveProxyGroupTargetName({ kind: "custom", id: "media" }, options)).toBe("Media");
     expect(resolveProxyGroupTargetName({ kind: "custom", id: "missing" }, options)).toBe("DIRECT");
     expect(resolveProxyGroupTargetName({ kind: "module", id: "missing" }, options)).toBe("DIRECT");
+    expect(resolveProxyGroupTargetName({ kind: "module", id: "toString" }, options)).toBe("DIRECT");
+    expect(resolveProxyGroupTargetName({ kind: "module", id: "constructor" }, options)).toBe("DIRECT");
+    expect(resolveProxyGroupTargetName({ kind: "module", id: "hasOwnProperty" }, options)).toBe("DIRECT");
     expect(resolveProxyGroupTargetName({ kind: "node" } as never, options)).toBe("DIRECT");
     expect(ruleTargetMatchesName(" Proxy ", "Proxy")).toBe(true);
     expect(ruleTargetMatchesName({ kind: "module", id: "auto" }, "Auto")).toBe(false);

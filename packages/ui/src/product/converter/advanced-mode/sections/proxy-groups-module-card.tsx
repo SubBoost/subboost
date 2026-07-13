@@ -176,7 +176,7 @@ export function ProxyGroupsModuleCard({
   onAddRuleToCustomGroup: (groupId: string, rule: RuleSetDraft) => void;
   onRemoveExtraRule: (ruleId: string) => void;
   onMoveRule: (ruleId: string, target: { kind: "module" | "custom"; id: string }) => void;
-  onMoveManualRule: (ruleId: string, targetName: string) => void;
+  onMoveManualRule: (ruleId: string, target: ProxyGroupRuleTarget) => void;
   onRemoveManualRule: (index: number) => void;
   onRestoreRule: (ruleId: string) => void;
   onResetRuleTarget: (ruleId: string) => void;

@@ -319,7 +319,7 @@ describe("ProxyGroupsRulesLibrary", () => {
         id: "telegram",
         name: "Telegram",
         behavior: "ipcidr",
-        path: "geoip/telegram.mrs",
+        path: "https://raw.example/geoip/telegram.mrs",
         noResolve: true,
       },
     ]);
@@ -340,7 +340,7 @@ describe("ProxyGroupsRulesLibrary", () => {
         id: "telegram",
         name: "Telegram",
         behavior: "ipcidr",
-        path: "geoip/telegram.mrs",
+        path: "https://raw.example/geoip/telegram.mrs",
         noResolve: true,
       },
     ]);

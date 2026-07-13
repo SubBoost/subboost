@@ -55,7 +55,10 @@ export function resolveProxyGroupTargetName(
   if (!normalized) return options.fallbackTarget || "";
 
   if (normalized.kind === "module") {
-    return options.moduleNames[normalized.id]?.trim() || options.fallbackTarget || "";
+    const moduleName = Object.prototype.hasOwnProperty.call(options.moduleNames, normalized.id)
+      ? options.moduleNames[normalized.id]
+      : undefined;
+    return (typeof moduleName === "string" ? moduleName.trim() : "") || options.fallbackTarget || "";
   }
 
   const customName = (options.customProxyGroups || []).find((group) => group.id === normalized.id)?.name?.trim();

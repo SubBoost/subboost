@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import yamlParser from "js-yaml";
 import { collectDnsPolicyEntries, configToYaml } from "./yaml";
 import type { ClashConfig } from "@subboost/core/types/config";
 
@@ -71,6 +72,25 @@ describe("configToYaml", () => {
     } as unknown as ClashConfig);
 
     expect(yaml).toBe(["proxies:", "", "proxy-groups:", "", "rule-providers:", "", "rules:"].join("\n"));
+  });
+
+  it("quotes rule scalars that YAML would otherwise truncate or reinterpret", () => {
+    const rules = [
+      "DOMAIN-SUFFIX,example.com,Netflix #1",
+      "DOMAIN,example.net,Group: Primary",
+      "MATCH,Select",
+    ];
+    const output = configToYaml({
+      proxies: [],
+      "proxy-groups": [],
+      "rule-providers": {},
+      rules,
+    } as unknown as ClashConfig);
+
+    expect((yamlParser.load(output) as ClashConfig).rules).toEqual(rules);
+    expect(output).toContain('  - "DOMAIN-SUFFIX,example.com,Netflix #1"');
+    expect(output).toContain('  - "DOMAIN,example.net,Group: Primary"');
+    expect(output).toContain("  - MATCH,Select");
   });
 
   it("collects DNS policy entries from clean string and array values only", () => {

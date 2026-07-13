@@ -36,6 +36,12 @@ describe("subscription user info helpers", () => {
     });
   });
 
+  it("normalizes millisecond expiry values and rejects implausible magnitudes", () => {
+    expect(parseSubscriptionUserInfo("expire=1760000000000").expire).toBe(1760000000);
+    expect(parseSubscriptionUserInfo("expire=9999999999999999").expire).toBeUndefined();
+    expect(normalizeSubscriptionUserInfo({ expire: 1760000000000 }).expire).toBe(1760000000);
+  });
+
   it("normalizes plausibility and merges traffic snapshots", () => {
     expect(hasSubscriptionUserInfo(null)).toBe(false);
     expect(hasSubscriptionUserInfo(undefined)).toBe(false);

@@ -28,7 +28,7 @@ export const DEFAULT_DNS_CONFIG: DNSConfig = {
     "https://doh.pub/dns-query",
   ],
   fallback: [
-    "https://000000.dns.nextdns.io/dns-query#h3=true",
+    "https://dns.quad9.net/dns-query",
     "https://dns.alidns.com/dns-query",
     "https://doh.pub/dns-query",
     "https://public.dns.iij.jp/dns-query",
@@ -128,4 +128,3 @@ export const DEFAULT_DNS_CONFIG: DNSConfig = {
     "speedtest.cros.wr.pvp.net",
   ],
 };
-

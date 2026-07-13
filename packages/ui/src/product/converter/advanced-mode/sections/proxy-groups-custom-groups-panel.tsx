@@ -48,6 +48,7 @@ export function ProxyGroupsCustomGroupsPanel({
     proxyGroupNameOverrides = {},
     customRules = [],
     customRuleSets = [],
+    builtinRuleEdits = {},
     customProxyGroups = [],
     addCustomProxyGroup,
     removeCustomProxyGroup,
@@ -125,7 +126,7 @@ export function ProxyGroupsCustomGroupsPanel({
 
   const moveManualRule = React.useCallback(
     (item: { rule: { id: string }; index: number }, target: ProxyGroupRuleTarget) => {
-      updateCustomRule(item.rule.id, { target: target.name });
+      updateCustomRule(item.rule.id, { target: { kind: target.kind, id: target.id } });
     },
     [updateCustomRule],
   );
@@ -248,7 +249,20 @@ export function ProxyGroupsCustomGroupsPanel({
                   customProxyGroups,
                 }) === group.name,
             );
-            const totalRules = groupRuleSets.length + manualRules.length;
+            const movedBuiltinRules = Object.entries(builtinRuleEdits).flatMap(([key, edit]) => {
+              if (edit?.enabled === false || !edit?.target) return [];
+              const match = key.match(/^module:([^:]+):(.+)$/);
+              if (!match) return [];
+              const sourceModule = PROXY_GROUP_MODULES.find((module) => module.id === match[1]);
+              const rule = sourceModule?.rules.find((item) => item.id === match[2]);
+              if (!sourceModule || !rule) return [];
+              const targetName = resolveProxyGroupTargetName(edit.target, {
+                moduleNames,
+                customProxyGroups,
+              });
+              return targetName === group.name ? [{ sourceModule, rule }] : [];
+            });
+            const totalRules = groupRuleSets.length + movedBuiltinRules.length + manualRules.length;
             const description = group.description?.trim() || "自定义代理组";
             const nodeCount = nodeCounts?.get(group.name) ?? 0;
 
@@ -326,6 +340,44 @@ export function ProxyGroupsCustomGroupsPanel({
                       }
                     />
                   ))}
+                  {movedBuiltinRules.map(({ sourceModule, rule }) => (
+                    <ProxyGroupRuleSetRow
+                      key={`builtin:${sourceModule.id}:${rule.id}`}
+                      name={rule.name}
+                      path={rule.path}
+                      source="preset"
+                      behavior={rule.behavior}
+                      noResolve={rule.noResolve}
+                      state="moved"
+                      actions={
+                        <>
+                          <ProxyGroupRuleMoveMenu
+                            title="移动规则集"
+                            ariaLabel={`移动 ${rule.name} 规则集`}
+                            targets={ruleSetMoveTargets}
+                            kinds={["module", "custom"]}
+                            currentTarget={{ kind: "custom", id: group.id, name: group.name }}
+                            onMove={(target) => {
+                              if (isRuleSetMoveTarget(target)) {
+                                moveModuleRule(sourceModule.id, rule.id, target);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-white/35 hover:text-red-300"
+                            onClick={() => removeModuleRule(group.id, rule.id)}
+                            title="删除规则集"
+                            aria-label={`删除 ${rule.name} 规则集`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      }
+                    />
+                  ))}
                   {manualRules.map((item) => (
                     <ProxyGroupManualRuleRow
                       key={`manual:${item.rule.id}`}
@@ -391,7 +443,9 @@ export function ProxyGroupsCustomGroupsPanel({
                 onAddRuleToCustomGroup={() => undefined}
                 onRemoveExtraRule={() => undefined}
                 onMoveRule={() => undefined}
-                onMoveManualRule={(ruleId, targetName) => updateCustomRule(ruleId, { target: targetName })}
+                onMoveManualRule={(ruleId, target) =>
+                  updateCustomRule(ruleId, { target: { kind: target.kind, id: target.id } })
+                }
                 onRemoveManualRule={removeCustomRule}
                 onRestoreRule={() => undefined}
                 onResetRuleTarget={() => undefined}

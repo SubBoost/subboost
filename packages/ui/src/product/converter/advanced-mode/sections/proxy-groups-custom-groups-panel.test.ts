@@ -66,8 +66,12 @@ vi.mock("@subboost/ui/components/ui/input", () => ({
 vi.mock("@subboost/ui/components/ui/toaster", () => ({ toast: mocks.toast }));
 vi.mock("@subboost/core/generator/proxy-groups", () => ({
   PROXY_GROUP_MODULES: [
-    { id: "auto", name: "Auto" },
-    { id: "fallback", name: "Fallback" },
+    {
+      id: "auto",
+      name: "Auto",
+      rules: [{ id: "builtin-a", name: "Builtin A", behavior: "domain", path: "geosite/builtin-a.mrs" }],
+    },
+    { id: "fallback", name: "Fallback", rules: [] },
   ],
 }));
 vi.mock("@subboost/core/proxy-group-name", () => ({
@@ -176,6 +180,7 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
       customRules: [{ id: "manual-1", target: "🧩 Custom" }],
       customProxyGroups: [customGroup, targetGroup],
       customRuleSets: [sourceRule],
+      builtinRuleEdits: {},
       dialerProxyGroups: [{ name: "Dialer" }],
       addCustomProxyGroup: vi.fn(),
       removeCustomProxyGroup: vi.fn(),
@@ -290,11 +295,40 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
 
   });
 
+  it("shows builtin rules moved into a custom group and wires their actions", () => {
+    mocks.store.builtinRuleEdits = {
+      "module:auto:builtin-a": { target: { kind: "custom", id: "custom-1" } },
+    };
+
+    renderPanel({ 0: new Set(["custom-1"]) });
+
+    expect(mocks.captures.ruleRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Builtin A", source: "preset", state: "moved" }),
+      ]),
+    );
+    const builtinMove = mocks.captures.moveMenus.find((menu: any) => menu.ariaLabel === "移动 Builtin A 规则集");
+    builtinMove.onMove({ kind: "module", id: "fallback", name: "Fallback" });
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("auto", "builtin-a", {
+      kind: "module",
+      id: "fallback",
+      name: "Fallback",
+    });
+
+    mocks.captures.buttons.find((button: any) => button["aria-label"] === "删除 Builtin A 规则集").onClick();
+    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith("custom-1", "builtin-a");
+  });
+
   it("updates manual rules, deletes rule rows, and renders empty state", () => {
     renderPanel({ 0: new Set(["custom-1"]) });
 
-    mocks.captures.manualRows[0].onMove({ rule: { id: "manual-1" }, index: 0 }, { name: "Auto" });
-    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", { target: "Auto" });
+    mocks.captures.manualRows[0].onMove(
+      { rule: { id: "manual-1" }, index: 0 },
+      { kind: "module", id: "auto", name: "Auto" },
+    );
+    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", {
+      target: { kind: "module", id: "auto" },
+    });
     mocks.captures.manualRows[0].onRemove({ index: 0 });
     expect(mocks.store.removeCustomRule).toHaveBeenCalledWith(0);
 

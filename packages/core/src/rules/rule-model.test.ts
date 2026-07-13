@@ -10,13 +10,16 @@ import {
 
 describe("rule model normalization", () => {
   it("normalizes rule set paths, URLs, and builtin edits", () => {
-    expect(extractRuleSetPathFromUrl(" https://example.com/meta/geosite/google.mrs?download=1 ")).toBe("geosite/google.mrs");
+    expect(extractRuleSetPathFromUrl(" https://example.com/meta/geosite/google.mrs?download=1 ")).toBe(
+      "https://example.com/meta/geosite/google.mrs?download=1"
+    );
     expect(extractRuleSetPathFromUrl("custom/list.txt")).toBe("custom/list.txt");
     expect(normalizeRuleSetPathInput("////geoip/private.mrs")).toBe("geoip/private.mrs");
     expect(isValidRuleSetPathOrUrl("geosite/google.mrs")).toBe(true);
     expect(isValidRuleSetPathOrUrl("https://example.com/rules/list.txt")).toBe(true);
     expect(isValidRuleSetPathOrUrl("plain.txt")).toBe(false);
     expect(buildRuleSetUrlFromPath("https://cdn.example.com/custom.mrs", "https://base.example.com/")).toBe("https://cdn.example.com/custom.mrs");
+    expect(normalizeRuleSetPathInput("geosite/google.mrs.bak")).toBe("geosite/google.mrs.bak");
     expect(buildRuleSetUrlFromPath("/geosite/google.mrs", "https://base.example.com////")).toBe("https://base.example.com/geosite/google.mrs");
     expect(normalizeBuiltinRuleEdits(null)).toEqual({});
     expect(

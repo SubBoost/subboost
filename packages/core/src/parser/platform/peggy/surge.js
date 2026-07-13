@@ -191,7 +191,7 @@ username = & {
 password = comma match:[^,]+ { proxy.password = match.join("").replace(/^"(.*)"$/, '$1').replace(/^'(.*?)'$/, '$1'); }
 
 tls = comma "tls" equals flag:bool { proxy.tls = flag; }
-sni = comma "sni" equals sni:("off"/domain) { 
+sni = comma "sni" equals sni:("off"/server) {
     if (sni === "off") {
         proxy["disable-sni"] = true;
     } else {
@@ -214,7 +214,7 @@ method = comma "encrypt-method" equals cipher:cipher {
 }
 cipher = ("aes-128-cfb"/"aes-128-ctr"/"aes-128-gcm"/"aes-192-cfb"/"aes-192-ctr"/"aes-192-gcm"/"aes-256-cfb"/"aes-256-ctr"/"aes-256-gcm"/"bf-cfb"/"camellia-128-cfb"/"camellia-192-cfb"/"camellia-256-cfb"/"cast5-cfb"/"chacha20-ietf-poly1305"/"chacha20-ietf"/"chacha20-poly1305"/"chacha20"/"des-cfb"/"idea-cfb"/"none"/"rc2-cfb"/"rc4-md5"/"rc4"/"salsa20"/"seed-cfb"/"xchacha20-ietf-poly1305"/"2022-blake3-aes-128-gcm"/"2022-blake3-aes-256-gcm");
 
-ws = comma "ws" equals flag:bool { obfs.type = "ws"; }
+ws = comma "ws" equals flag:bool { if (flag) obfs.type = "ws"; }
 ws_headers = comma "ws-headers" equals headers:$[^,]+ {
     const pairs = headers.split("|");
     const result = {};

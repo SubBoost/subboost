@@ -173,14 +173,14 @@ describe("custom routing rule set contracts", () => {
     expect(parseRuleSetTargetValue("module:")).toBeNull();
     expect(parseRuleSetTargetValue("bad:value")).toBeNull();
     expect(extractRuleSetPathFromUrl("https://example.com/geo/geosite/youtube.mrs?raw=1")).toBe(
-      "geosite/youtube.mrs"
+      "https://example.com/geo/geosite/youtube.mrs?raw=1"
     );
     expect(normalizeRuleSetPathInput("/geoip/private.mrs")).toBe("geoip/private.mrs");
     expect(buildRuleSetUrlFromPath("geosite/youtube.mrs", "https://rules.example.com/geo/")).toBe(
       "https://rules.example.com/geo/geosite/youtube.mrs"
     );
     expect(buildRuleSetUrlFromPath("https://cdn.example.com/geosite/youtube.mrs", DEFAULT_RULE_PROVIDER_BASE_URL)).toBe(
-      `${DEFAULT_RULE_PROVIDER_BASE_URL}/geosite/youtube.mrs`
+      "https://cdn.example.com/geosite/youtube.mrs"
     );
   });
 
@@ -231,7 +231,7 @@ describe("custom routing rule set contracts", () => {
       id: "private",
       name: "private",
       behavior: "ipcidr",
-      path: "geoip/private.mrs",
+      path: "https://rules.example.com/geo/geoip/private.mrs",
       target: {
         kind: "module",
         id: moduleId,
@@ -246,7 +246,7 @@ describe("custom routing rule set contracts", () => {
       id: "youtube",
       name: "YouTube",
       behavior: "domain",
-      path: "geosite/youtube.mrs",
+      path: "https://rules.example.com/geo/geosite/youtube.mrs?download=1",
       target: {
         kind: "custom",
         id: "custom",

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { safeParseJsonObject } from "@subboost/core/json";
+import { extractHttpStatus } from "@subboost/core/subscription/import-error";
 
 // Product-neutral failure policy shared by server adapters.
 export const AUTO_UPDATE_EXTERNAL_FAILURE_THRESHOLD = 3;
@@ -94,13 +95,6 @@ export function parseAutoUpdateFailureSourceState(raw: string | null | undefined
 
 export function serializeAutoUpdateFailureSourceState(state: AutoUpdateFailureSourceState): string | null {
   return Object.keys(state).length > 0 ? JSON.stringify(state) : null;
-}
-
-function extractHttpStatus(text: string): number | null {
-  const match = text.match(/\bHTTP\s+(\d{3})\b/i) ?? text.match(/\b(4\d{2}|5\d{2})\b/);
-  if (!match) return null;
-  const status = Number.parseInt(match[1], 10);
-  return Number.isFinite(status) ? status : null;
 }
 
 export function classifyStableExternalAutoUpdateFailure(

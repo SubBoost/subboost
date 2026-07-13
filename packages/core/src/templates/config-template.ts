@@ -3,6 +3,8 @@ import { normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
 import { ensureCustomRuleId, isCustomRuleType } from "@subboost/core/rules/custom-rule-utils";
 import { resolveProxyGroupAdvancedModeEnabled } from "@subboost/core/proxy-group-advanced-mode";
 import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
+import { normalizeProxyGroupTargetRef } from "@subboost/core/proxy-group-targets";
+import { migrateLegacyConfig } from "@subboost/core/migrations/legacy-config";
 import {
   isValidRuleSetPathOrUrl,
   normalizeRuleModelFromConfig,
@@ -15,6 +17,7 @@ import {
   type CustomProxyGroup,
   type CustomRule,
   type LoadBalanceStrategy,
+  type ProxyGroupRuleTarget,
   type ProxyGroupGroupType,
   type TemplateType,
 } from "@subboost/core/types/config";
@@ -30,20 +33,13 @@ const BUILTIN_MODULE_IDS = new Set(PROXY_GROUP_MODULES.map((module) => module.id
 const BUILTIN_RULE_KEYS = new Set(
   PROXY_GROUP_MODULES.flatMap((module) => module.rules.map((rule) => `module:${module.id}:${rule.id}`))
 );
-const REMOVED_TEMPLATE_FIELDS = new Set([
-  "moduleRuleOverrides",
-  "moduleRuleExclusions",
-  "allRulesOrderEditingEnabled",
-  "filteredProxyGroups",
-]);
-
-export function validateSubBoostTemplateConfig(value: unknown): ValidationResult {
-  if (!isRecord(value)) return invalid("模板配置必须是对象");
+export function validateSubBoostTemplateConfig(rawValue: unknown): ValidationResult {
+  const migratedValue = migrateLegacyConfig(rawValue);
+  if (!isRecord(migratedValue)) return invalid("模板配置必须是对象");
+  const value = migratedValue;
   if (value.schema !== SUBBOOST_TEMPLATE_CONFIG_SCHEMA) {
     return invalid("模板配置 schema 无效");
   }
-  const removedField = findRemovedTemplateField(value);
-  if (removedField) return invalid(`模板配置包含已移除字段: ${removedField}`);
 
   const template = parseTemplateType(value.template);
   if (!template) return invalid("模板类型无效");
@@ -155,20 +151,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function findRemovedTemplateField(value: Record<string, unknown>): string | null {
-  for (const field of REMOVED_TEMPLATE_FIELDS) {
-    if (field in value) return field;
-  }
-
-  if (!Array.isArray(value.customProxyGroups)) return null;
-  for (let index = 0; index < value.customProxyGroups.length; index += 1) {
-    const group = value.customProxyGroups[index];
-    if (isRecord(group) && "rules" in group) return `customProxyGroups[${index}].rules`;
-  }
-
-  return null;
-}
-
 function parseTemplateType(value: unknown): TemplateType | null {
   if (value === "minimal" || value === "standard" || value === "full") return value;
   return null;
@@ -183,6 +165,16 @@ function parseRequiredString(
   const trimmed = value.trim();
   if (!opts.allowEmpty && !trimmed) return invalid(`${field} 不能为空`);
   return { ok: true, value: opts.allowEmpty ? value : trimmed };
+}
+
+function parseRuleTarget(
+  value: unknown,
+  field: string
+): { ok: true; value: ProxyGroupRuleTarget } | { ok: false; error: string } {
+  const ref = normalizeProxyGroupTargetRef(value);
+  if (ref) return { ok: true, value: ref };
+  if (typeof value === "string") return parseRequiredString(value, field);
+  return invalid(`${field} 必须是字符串或有效代理组引用`);
 }
 
 function parseBoolean(value: unknown, field: string): { ok: true; value: boolean } | { ok: false; error: string } {
@@ -289,7 +281,7 @@ function parseCustomRules(value: unknown): { ok: true; value: CustomRule[] } | {
     if (typeof item.type !== "string" || !isCustomRuleType(item.type)) return invalid("customRules 包含无效类型");
     const ruleValue = parseRequiredString(item.value, "customRules.value");
     if (!ruleValue.ok) return ruleValue;
-    const target = parseRequiredString(item.target, "customRules.target");
+    const target = parseRuleTarget(item.target, "customRules.target");
     if (!target.ok) return target;
     const noResolve = parseOptionalBoolean(item.noResolve, "customRules.noResolve");
     if (!noResolve.ok) return noResolve;
@@ -324,6 +316,8 @@ function parseCustomProxyGroups(value: unknown): { ok: true; value: CustomProxyG
     if (!groupType.ok) return groupType;
     const strategy = parseOptionalLoadBalanceStrategy(item.strategy, "customProxyGroups.strategy");
     if (!strategy.ok) return strategy;
+    const enabled = parseOptionalBoolean(item.enabled, "customProxyGroups.enabled");
+    if (!enabled.ok) return enabled;
     if (item.memberSource !== undefined && item.memberSource !== "filtered-nodes") {
       return invalid("customProxyGroups.memberSource 无效");
     }
@@ -335,6 +329,7 @@ function parseCustomProxyGroups(value: unknown): { ok: true; value: CustomProxyG
       id: id.value,
       name: name.value,
       emoji: emoji.value,
+      ...(enabled.value !== undefined ? { enabled: enabled.value } : {}),
       ...(description ? { description } : {}),
       ...(item.memberSource === "filtered-nodes" ? { memberSource: "filtered-nodes" as const } : {}),
       ...(typeof item.includeInGroupMembers === "boolean"
@@ -378,7 +373,7 @@ function parseCustomRuleSets(value: unknown): { ok: true; value: true } | { ok: 
     if (!path.ok) return path;
     const normalizedPath = normalizeRuleSetPathInput(path.value);
     if (!isValidRuleSetPathOrUrl(normalizedPath)) return invalid("customRuleSets.path 无效");
-    const target = parseRequiredString(item.target, "customRuleSets.target");
+    const target = parseRuleTarget(item.target, "customRuleSets.target");
     if (!target.ok) return target;
     const noResolve = parseOptionalBoolean(item.noResolve, "customRuleSets.noResolve");
     if (!noResolve.ok) return noResolve;
@@ -393,8 +388,9 @@ function parseBuiltinRuleEdits(value: unknown): { ok: true; value: true } | { ok
     const key = rawKey.trim();
     if (!BUILTIN_RULE_KEYS.has(key)) return invalid("builtinRuleEdits 包含未知内置规则");
     if (!isRecord(rawEdit)) return invalid("builtinRuleEdits 的值必须是对象");
-    if ("target" in rawEdit && typeof rawEdit.target !== "string") {
-      return invalid("builtinRuleEdits.target 必须是字符串");
+    if ("target" in rawEdit) {
+      const target = parseRuleTarget(rawEdit.target, "builtinRuleEdits.target");
+      if (!target.ok) return target;
     }
     if ("enabled" in rawEdit && rawEdit.enabled !== false) {
       return invalid("builtinRuleEdits.enabled 只能是 false");

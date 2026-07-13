@@ -1,5 +1,7 @@
 import {
+  type CustomProxyGroup,
   type CustomRuleSet,
+  type ProxyGroupTargetRef,
 } from "@subboost/core/types/config";
 import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
 import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
@@ -15,6 +17,7 @@ import {
   resolveMoveTargetName,
   resolveRuleSetContainerTargetName,
   retargetBuiltinRuleEdits,
+  ruleTargetMatchesContainer,
   updateBuiltinRuleEdit,
 } from "./proxy-group-rule-set-helpers";
 
@@ -61,6 +64,14 @@ function isSupportedProxyGroupOrderKey(key: string): boolean {
     key.startsWith("dialer:") ||
     key.startsWith("name:")
   );
+}
+
+function resolveRuleSetContainerTargetRef(
+  id: string,
+  customProxyGroups: CustomProxyGroup[],
+): ProxyGroupTargetRef | null {
+  if (isBuiltinProxyGroup(id)) return { kind: "module", id };
+  return customProxyGroups.some((group) => group.id === id) ? { kind: "custom", id } : null;
 }
 
 export function createProxyGroupActions(
@@ -172,7 +183,8 @@ export function createProxyGroupActions(
           state.customProxyGroups,
           state.proxyGroupNameOverrides,
         );
-        if (!target) return state;
+        const targetRef = resolveRuleSetContainerTargetRef(id, state.customProxyGroups);
+        if (!target || !targetRef) return state;
         const proxyModule = PROXY_GROUP_MODULES.find((item) => item.id === id);
         let nextBuiltinRuleEdits = state.builtinRuleEdits;
         const customDrafts: RuleSetDraft[] = [];
@@ -189,7 +201,7 @@ export function createProxyGroupActions(
           }
           customDrafts.push(normalized);
         }
-        const nextCustomRuleSets = appendUniqueCustomRuleSets(state.customRuleSets, customDrafts, target);
+        const nextCustomRuleSets = appendUniqueCustomRuleSets(state.customRuleSets, customDrafts, targetRef);
         if (
           nextCustomRuleSets.length === state.customRuleSets.length &&
           nextBuiltinRuleEdits === state.builtinRuleEdits
@@ -222,8 +234,11 @@ export function createProxyGroupActions(
           state.customProxyGroups,
           state.proxyGroupNameOverrides,
         );
-        if (!target) return state;
-        const index = state.customRuleSets.findIndex((item) => item.id === rid && item.target === target);
+        const targetRef = resolveRuleSetContainerTargetRef(id, state.customProxyGroups);
+        if (!target || !targetRef) return state;
+        const index = state.customRuleSets.findIndex(
+          (item) => item.id === rid && ruleTargetMatchesContainer(item.target, targetRef, target),
+        );
         if (index < 0) return state;
 
         const normalized = normalizeRuleSetDraft({
@@ -234,7 +249,7 @@ export function createProxyGroupActions(
         if (!normalized) return state;
 
         const nextCustomRuleSets = state.customRuleSets.map((item, itemIndex) =>
-          itemIndex === index ? { ...normalized, target } : item
+          itemIndex === index ? { ...normalized, target: targetRef } : item
         );
 
         return {
@@ -271,8 +286,9 @@ export function createProxyGroupActions(
           state.customProxyGroups,
           state.proxyGroupNameOverrides,
         );
-        if (!target) return state;
-        const movedBuiltinKey = findBuiltinRuleEditKeyByTarget(state.builtinRuleEdits, target, rid);
+        const targetRef = resolveRuleSetContainerTargetRef(id, state.customProxyGroups);
+        if (!target || !targetRef) return state;
+        const movedBuiltinKey = findBuiltinRuleEditKeyByTarget(state.builtinRuleEdits, targetRef, target, rid);
         if (movedBuiltinKey) {
           const nextBuiltinRuleEdits = updateBuiltinRuleEdit(state.builtinRuleEdits, movedBuiltinKey, { enabled: false });
           return {
@@ -284,7 +300,7 @@ export function createProxyGroupActions(
           };
         }
         const nextCustomRuleSets = state.customRuleSets.filter(
-          (ruleSet) => !(ruleSet.id === rid && ruleSet.target === target)
+          (ruleSet) => !(ruleSet.id === rid && ruleTargetMatchesContainer(ruleSet.target, targetRef, target))
         );
         if (nextCustomRuleSets.length === state.customRuleSets.length) return state;
         return {
@@ -317,7 +333,8 @@ export function createProxyGroupActions(
           state.customProxyGroups,
           state.proxyGroupNameOverrides,
         );
-        if (!sourceTarget) return state;
+        const sourceTargetRef = resolveRuleSetContainerTargetRef(sourceId, state.customProxyGroups);
+        if (!sourceTarget || !sourceTargetRef) return state;
         if (sourceTarget === targetName) return state;
         if (target.kind === "module" && targetId === sourceId) return state;
 
@@ -330,7 +347,8 @@ export function createProxyGroupActions(
         }
 
         const customRuleSetIndex = state.customRuleSets.findIndex(
-          (ruleSet) => ruleSet.id === rid && ruleSet.target === sourceTarget
+          (ruleSet) =>
+            ruleSet.id === rid && ruleTargetMatchesContainer(ruleSet.target, sourceTargetRef, sourceTarget)
         );
         if (customRuleSetIndex >= 0) {
           const targetModule = target.kind === "module"
@@ -350,13 +368,13 @@ export function createProxyGroupActions(
               (ruleSet, index) =>
                 index !== customRuleSetIndex &&
                 ruleSet.id === rid &&
-                ruleSet.target === targetName
+                ruleTargetMatchesContainer(ruleSet.target, target, targetName)
             )
           ) {
             nextCustomRuleSets = state.customRuleSets.filter((_, index) => index !== customRuleSetIndex);
           } else {
             nextCustomRuleSets = state.customRuleSets.map((ruleSet, index) =>
-              index === customRuleSetIndex ? { ...ruleSet, target: targetName } : ruleSet
+              index === customRuleSetIndex ? { ...ruleSet, target } : ruleSet
             );
           }
           return {
@@ -372,10 +390,15 @@ export function createProxyGroupActions(
           };
         }
 
-        const movedBuiltinKey = findBuiltinRuleEditKeyByTarget(state.builtinRuleEdits, sourceTarget, rid);
+        const movedBuiltinKey = findBuiltinRuleEditKeyByTarget(
+          state.builtinRuleEdits,
+          sourceTargetRef,
+          sourceTarget,
+          rid,
+        );
         if (movedBuiltinKey) {
           const nextBuiltinRuleEdits = updateBuiltinRuleEdit(state.builtinRuleEdits, movedBuiltinKey, {
-            target: targetName,
+            target,
             enabled: true,
           });
           return {
@@ -392,7 +415,7 @@ export function createProxyGroupActions(
         if (!sourceModule || !isPresetModuleRule(sourceModule, rid)) return state;
         const key = getModuleRuleOrderKey(sourceId, rid);
         const nextBuiltinRuleEdits = updateBuiltinRuleEdit(state.builtinRuleEdits, key, {
-          target: targetName,
+          target,
           enabled: true,
         });
         return {
@@ -417,8 +440,11 @@ export function createProxyGroupActions(
         if (!mod || !isPresetModuleRule(mod, rid)) return state;
 
         const key = getModuleRuleOrderKey(id, rid);
-        if (state.builtinRuleEdits?.[key]?.enabled !== false) return state;
-        const nextBuiltinRuleEdits = updateBuiltinRuleEdit(state.builtinRuleEdits, key, { enabled: true });
+        const currentEdit = state.builtinRuleEdits?.[key];
+        if (currentEdit?.enabled !== false) return state;
+        const nextBuiltinRuleEdits = updateBuiltinRuleEdit(state.builtinRuleEdits, key, {
+          enabled: true,
+        });
         return {
           builtinRuleEdits: nextBuiltinRuleEdits,
           ruleOrder: normalizeRuleOrderForState({
@@ -459,7 +485,9 @@ export function createProxyGroupActions(
         for (const rule of proxyModule.rules) {
           const key = getModuleRuleOrderKey(id, rule.id);
           if (nextBuiltinRuleEdits?.[key]?.enabled === false) {
-            nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, { enabled: true });
+            nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, {
+              enabled: true,
+            });
           }
         }
         if (nextBuiltinRuleEdits === state.builtinRuleEdits) return state;

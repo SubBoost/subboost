@@ -20,7 +20,7 @@ import {
   CUSTOM_RULE_TYPES,
 } from "@subboost/core/rules/custom-rule-utils";
 import { useConfigStore } from "@subboost/ui/store/config-store";
-import type { CustomRule } from "@subboost/core/types/config";
+import type { CustomProxyGroup, CustomRule, ProxyGroupRuleTarget } from "@subboost/core/types/config";
 import {
   useProductInteractionAdapter,
   type ProductRuleKind,
@@ -86,6 +86,20 @@ function getTargetOptions(enabledGroupNames: string[], selected?: string) {
   const options = ["DIRECT", "REJECT", ...enabledGroupNames];
   if (selected && !options.includes(selected)) options.push(selected);
   return Array.from(new Set(options));
+}
+
+function toStableRuleTarget(
+  targetName: string,
+  moduleNames: Record<string, string>,
+  customProxyGroups: CustomProxyGroup[],
+): ProxyGroupRuleTarget {
+  const normalized = targetName.trim();
+  for (const [id, name] of Object.entries(moduleNames)) {
+    if (name.trim() === normalized) return { kind: "module", id };
+  }
+  const customGroup = customProxyGroups.find((group) => group.name.trim() === normalized);
+  if (customGroup) return { kind: "custom", id: customGroup.id };
+  return normalized;
 }
 
 export function ProxyGroupsCustomRules() {
@@ -174,7 +188,7 @@ export function ProxyGroupsCustomRules() {
       id: createCustomRuleId(),
       type: addedRuleType,
       value,
-      target: newRuleTarget,
+      target: toStableRuleTarget(newRuleTarget, moduleNames, customProxyGroups),
       noResolve: newRuleNoResolve,
     });
     interactions.ruleAdded?.({
@@ -213,7 +227,7 @@ export function ProxyGroupsCustomRules() {
     updateCustomRule(editingRuleId, {
       type: editingRuleDraft.type,
       value,
-      target: editingRuleDraft.target,
+      target: toStableRuleTarget(resolveTargetName(editingRuleDraft.target), moduleNames, customProxyGroups),
       noResolve: Boolean(editingRuleDraft.noResolve),
     });
     cancelEditingRule();
@@ -245,7 +259,14 @@ export function ProxyGroupsCustomRules() {
         defaultNoResolve={newRuleNoResolve}
         targetOptions={batchTargetOptions}
         existingRules={customRules}
-        onImport={addCustomRules}
+        onImport={(rules) =>
+          addCustomRules(
+            rules.map((rule) => ({
+              ...rule,
+              target: toStableRuleTarget(resolveTargetName(rule.target), moduleNames, customProxyGroups),
+            })),
+          )
+        }
       />
 
       <div className={RULE_ADD_ROW_FRAME_CLASS}>

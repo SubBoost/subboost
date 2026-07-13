@@ -187,7 +187,7 @@ describe("createProxyGroupActions", () => {
 
     expect(getState().builtinRuleEdits).toEqual({});
     expect(getState().customRuleSets).toEqual([
-      { id: "custom-ai", name: "Custom AI", behavior: "domain", path: "geosite/custom-ai.mrs", target: "🤖 AI 服务" },
+      { id: "custom-ai", name: "Custom AI", behavior: "domain", path: "geosite/custom-ai.mrs", target: { kind: "module", id: "ai" } },
     ]);
 
     const beforeDuplicateAdd = getState();
@@ -207,7 +207,7 @@ describe("createProxyGroupActions", () => {
       name: "Custom AI IP",
       behavior: "ipcidr",
       path: "geoip/custom-ai.mrs",
-      target: "🤖 AI 服务",
+      target: { kind: "module", id: "ai" },
       noResolve: true,
     });
 
@@ -249,6 +249,12 @@ describe("createProxyGroupActions", () => {
     expect(getState().builtinRuleEdits).toEqual({
       "module:ai:openai": { target: "Custom", enabled: false },
     });
+
+    actions.restoreModuleRule("ai", "openai");
+
+    expect(getState().builtinRuleEdits).toEqual({
+      "module:ai:openai": { target: "Custom" },
+    });
   });
 
   it("keeps missing rule-set targets as no-ops and retargets moved builtin edits", () => {
@@ -279,7 +285,7 @@ describe("createProxyGroupActions", () => {
     actions.moveModuleRule("ai", "openai", { kind: "module", id: "youtube" });
     expect(getState().enabledProxyGroups).toContain("youtube");
     expect(getState().builtinRuleEdits).toEqual({
-      "module:ai:openai": { target: "📹 油管视频" },
+      "module:ai:openai": { target: { kind: "module", id: "youtube" } },
     });
   });
 
@@ -339,7 +345,7 @@ describe("createProxyGroupActions", () => {
 
     actions.moveModuleRule("streaming-west", "apple-tvplus", { kind: "module", id: "google" });
     expect(getState().ruleOrder).toContain(appleTvPlusKey);
-    expect(getState().builtinRuleEdits[appleTvPlusKey]).toEqual({ target: "🔍 谷歌服务" });
+    expect(getState().builtinRuleEdits[appleTvPlusKey]).toEqual({ target: { kind: "module", id: "google" } });
     expect(getAppliedOrder().indexOf(appleTvPlusKey)).toBe(appleTvPlusIndex);
     actions.resetModuleRuleTarget("streaming-west", "apple-tvplus");
     expect(getState().builtinRuleEdits).toEqual({});
@@ -366,7 +372,7 @@ describe("createProxyGroupActions", () => {
     ]);
 
     expect(getState().customRuleSets).toEqual([
-      { id: "custom", name: "custom", behavior: "ipcidr", path: "geoip/custom.mrs", target: "Custom Module", noResolve: true },
+      { id: "custom", name: "custom", behavior: "ipcidr", path: "geoip/custom.mrs", target: { kind: "custom", id: "custom-module" }, noResolve: true },
     ]);
 
     const beforePresetNoop = getState();
@@ -421,7 +427,7 @@ describe("createProxyGroupActions", () => {
         name: "Telegram",
         behavior: "ipcidr",
         path: "geoip/telegram.mrs",
-        target: "Custom",
+        target: { kind: "custom", id: "custom-1" },
         noResolve: true,
       },
     ]);
@@ -433,11 +439,11 @@ describe("createProxyGroupActions", () => {
     expect(getState().customRuleSets[0]).toMatchObject({
       id: "telegram",
       name: "Telegram Custom",
-      target: "Custom",
+      target: { kind: "custom", id: "custom-1" },
     });
 
     actions.moveModuleRule("custom-1", "telegram", { kind: "custom", id: "custom-2" });
-    expect(getState().customRuleSets[0].target).toBe("Target");
+    expect(getState().customRuleSets[0].target).toEqual({ kind: "custom", id: "custom-2" });
 
     actions.removeModuleRule("custom-2", "telegram");
     expect(getState().customRuleSets).toEqual([]);
@@ -447,7 +453,7 @@ describe("createProxyGroupActions", () => {
     const { actions, getState } = createHarness({
       builtinRuleEdits: {
         "module:ai:openai": { enabled: false },
-        "module:ai:anthropic": { enabled: false },
+        "module:ai:anthropic": { target: "Custom", enabled: false },
         "module:youtube:youtube": { enabled: false },
       },
       moduleRuleEditWarningAccepted: false,
@@ -455,11 +461,17 @@ describe("createProxyGroupActions", () => {
 
     actions.restoreModuleDefaultRules("ai");
     actions.restoreModuleDefaultRules("missing");
-    expect(getState().builtinRuleEdits).toEqual({ "module:youtube:youtube": { enabled: false } });
+    expect(getState().builtinRuleEdits).toEqual({
+      "module:ai:anthropic": { target: "Custom" },
+      "module:youtube:youtube": { enabled: false },
+    });
 
     actions.restoreModuleDefaultRules("");
     actions.restoreModuleDefaultRules("ai");
-    expect(getState().builtinRuleEdits).toEqual({ "module:youtube:youtube": { enabled: false } });
+    expect(getState().builtinRuleEdits).toEqual({
+      "module:ai:anthropic": { target: "Custom" },
+      "module:youtube:youtube": { enabled: false },
+    });
 
     actions.acceptModuleRuleEditWarning();
     expect(getState().moduleRuleEditWarningAccepted).toBe(true);
@@ -505,20 +517,22 @@ describe("createProxyGroupActions", () => {
     actions.moveModuleRule("ai", "openai", { kind: "module", id: "youtube" });
 
     expect(getState().enabledProxyGroups).toContain("youtube");
-    expect(getState().builtinRuleEdits).toEqual({ "module:ai:openai": { target: "📹 油管视频" } });
+    expect(getState().builtinRuleEdits).toEqual({
+      "module:ai:openai": { target: { kind: "module", id: "youtube" } },
+    });
 
     actions.moveModuleRule("ai", "anthropic", { kind: "custom", id: "custom-1" });
 
     expect(getState().customRuleSets).toEqual([]);
     expect(getState().builtinRuleEdits).toEqual({
-      "module:ai:openai": { target: "📹 油管视频" },
-      "module:ai:anthropic": { target: "Custom" },
+      "module:ai:openai": { target: { kind: "module", id: "youtube" } },
+      "module:ai:anthropic": { target: { kind: "custom", id: "custom-1" } },
     });
 
     actions.moveModuleRule("ai", "anthropic", { kind: "custom", id: "custom-1" });
     expect(getState().builtinRuleEdits).toEqual({
-      "module:ai:openai": { target: "📹 油管视频" },
-      "module:ai:anthropic": { target: "Custom" },
+      "module:ai:openai": { target: { kind: "module", id: "youtube" } },
+      "module:ai:anthropic": { target: { kind: "custom", id: "custom-1" } },
     });
 
     const beforeIgnoredMoves = getState();
@@ -546,7 +560,7 @@ describe("createProxyGroupActions", () => {
 
     expect(getState().enabledProxyGroups).toEqual(["select", "auto", "youtube"]);
     expect(getState().customRuleSets).toEqual([
-      { id: "custom-ai", name: "Custom AI", behavior: "domain", path: "geosite/custom-ai.mrs", target: "📹 油管视频" },
+      { id: "custom-ai", name: "Custom AI", behavior: "domain", path: "geosite/custom-ai.mrs", target: { kind: "module", id: "youtube" } },
     ]);
   });
 
@@ -594,7 +608,9 @@ describe("createProxyGroupActions", () => {
     actions.moveModuleRule("private", "private-ip", { kind: "custom", id: "custom-1" });
 
     expect(getState().customRuleSets).toEqual([]);
-    expect(getState().builtinRuleEdits).toEqual({ "module:private:private-ip": { target: "Custom" } });
+    expect(getState().builtinRuleEdits).toEqual({
+      "module:private:private-ip": { target: { kind: "custom", id: "custom-1" } },
+    });
   });
 
   it("renames non-core module groups and rewrites custom rule targets", () => {

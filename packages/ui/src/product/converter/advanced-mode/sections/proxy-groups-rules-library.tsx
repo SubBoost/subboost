@@ -562,7 +562,13 @@ export function ProxyGroupsRulesLibrary() {
                           .filter((r) => builtinRuleEdits?.[getModuleRuleOrderKey(mod.id, r.id)]?.enabled !== false)
                           .map((r) => r.id),
                         ...customRuleSets
-                          .filter((r) => r.target === resolveModuleFullName(mod))
+                          .filter(
+                            (rule) =>
+                              resolveProxyGroupTargetName(rule.target, {
+                                moduleNames,
+                                customProxyGroups,
+                              }) === resolveModuleFullName(mod),
+                          )
                           .map((r) => r.id),
                       ],
                     );

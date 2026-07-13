@@ -36,6 +36,11 @@ describe("config line tokenizer helpers", () => {
     });
     expect(() => tokenizeConfigLine("broken")).toThrow("无效的配置行格式");
     expect(() => tokenizeConfigLine("Bad = ss, example.com, 70000")).toThrow("配置行中的地址或端口无效");
+    for (const invalidPort of ["1.5", "0x50", "8e3", "+80", "-1"]) {
+      expect(() => tokenizeConfigLine(`Bad = ss, example.com, ${invalidPort}`), invalidPort).toThrow(
+        "配置行中的地址或端口无效"
+      );
+    }
     expect(tokenizeConfigLine("Ignored = ss, ignored.example.com, 8388, =empty, flag")).toMatchObject({
       params: {},
       extras: ["flag"],

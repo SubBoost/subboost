@@ -254,7 +254,7 @@ describe("validateSubBoostTemplateConfig field validation", () => {
           "module:cn:geolocation-cn": { target: 1 },
         } as never,
       },
-      "builtinRuleEdits.target 必须是字符串"
+      "builtinRuleEdits.target 必须是字符串或有效代理组引用"
     );
     expectInvalid(
       {

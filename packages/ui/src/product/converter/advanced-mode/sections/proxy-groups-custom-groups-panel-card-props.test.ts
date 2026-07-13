@@ -170,7 +170,7 @@ describe("ProxyGroupsCustomGroupsPanel card props", () => {
     card.onAddRuleToCustomGroup();
     card.onRemoveExtraRule();
     card.onMoveRule();
-    card.onMoveManualRule("manual-1", "Auto");
+    card.onMoveManualRule("manual-1", { kind: "module", id: "auto", name: "Auto" });
     card.onRemoveManualRule(0);
     card.onRestoreRule();
     card.onResetRuleTarget();
@@ -185,7 +185,9 @@ describe("ProxyGroupsCustomGroupsPanel card props", () => {
 
     expect(mocks.store.updateCustomProxyGroup).toHaveBeenCalledWith("custom-1", { enabled: true });
     expect(mocks.store.removeCustomProxyGroup).toHaveBeenCalledWith("custom-1");
-    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", { target: "Auto" });
+    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", {
+      target: { kind: "module", id: "auto" },
+    });
     expect(mocks.store.removeCustomRule).toHaveBeenCalledWith(0);
     expect(mocks.store.updateCustomProxyGroup).toHaveBeenCalledWith("custom-1", {
       groupType: "load-balance",

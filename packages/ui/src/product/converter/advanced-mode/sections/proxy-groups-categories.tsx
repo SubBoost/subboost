@@ -582,8 +582,8 @@ export function ProxyGroupsCategories() {
                               onMoveRule={(ruleId, target) =>
                                 moveModuleRule(module.id, ruleId, target)
                               }
-                              onMoveManualRule={(ruleId, targetName) =>
-                                updateCustomRule(ruleId, { target: targetName })
+                              onMoveManualRule={(ruleId, target) =>
+                                updateCustomRule(ruleId, { target: { kind: target.kind, id: target.id } })
                               }
                               onRemoveManualRule={removeCustomRule}
                               onRestoreRule={(ruleId) =>

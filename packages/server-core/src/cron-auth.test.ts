@@ -19,6 +19,10 @@ describe("server-core cron auth helpers", () => {
       ok: false,
       reason: "unauthorized",
     });
+    expect(validateCronSecret({ cronSecret: "a-much-longer-secret", authorization: "Bearer short" })).toEqual({
+      ok: false,
+      reason: "unauthorized",
+    });
     expect(validateCronSecret({ cronSecret: "secret", authorization: "bearer secret  " })).toEqual({
       ok: true,
     });
