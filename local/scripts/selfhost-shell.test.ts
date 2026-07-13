@@ -3,8 +3,7 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 const publicRoot = path.resolve(__dirname, "../..");
-const BASH_NON_INTERACTIVE_COMMAND =
-  "if command -v setsid >/dev/null 2>&1; then exec setsid \"$BASH\" -s; fi; exec \"$BASH\" -s";
+const BASH_NON_INTERACTIVE_COMMAND = "exec \"$BASH\" -s";
 
 function runBash(script: string) {
   return spawnSync("bash", ["-lc", BASH_NON_INTERACTIVE_COMMAND], {
@@ -12,6 +11,7 @@ function runBash(script: string) {
     encoding: "utf8",
     input: script,
     timeout: 30_000,
+    detached: true,
     env: {
       ...process.env,
       LC_ALL: "C.UTF-8",
