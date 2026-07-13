@@ -48,7 +48,7 @@ export const CATEGORY_INFO: Record<string, { name: string; order: number }> = {
   custom: { name: "自定义分组", order: 8 },
 };
 
-export interface GenerateOptions {
+export interface ProxyGroupGenerateOptions {
   nodes: ParsedNode[];
   proxyProviderNames?: string[];
   enabledModules: string[];
@@ -66,6 +66,9 @@ export interface GenerateOptions {
   proxyGroupNameOverrides?: Record<string, string>;
   ruleOrder?: string[];
 }
+
+/** @deprecated Use `ProxyGroupGenerateOptions`; retained for 2.x source compatibility. */
+export type GenerateOptions = ProxyGroupGenerateOptions;
 
 export { isSubscriptionInfoNodeName };
 
@@ -130,7 +133,7 @@ const PROXY_GROUP_ORDER: string[] = [
 /**
  * 生成代理组配置
  */
-export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
+export function generateProxyGroups(options: ProxyGroupGenerateOptions): ProxyGroup[] {
   const {
     nodes,
     proxyProviderNames = [],
@@ -479,7 +482,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
 /**
  * 生成规则提供者配置
  */
-export function generateRuleProviders(options: GenerateOptions): Record<string, RuleProvider> {
+export function generateRuleProviders(options: ProxyGroupGenerateOptions): Record<string, RuleProvider> {
   const {
     enabledModules,
     ruleProviderBaseUrl,

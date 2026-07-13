@@ -5,7 +5,7 @@ import type { CustomProxyGroup, CustomRule } from "@subboost/core/types/config";
 
 export type ProxyGroupRuleTargetKind = "module" | "custom";
 
-export type ProxyGroupRuleTarget = {
+export type ProxyGroupRuleTargetOption = {
   kind: ProxyGroupRuleTargetKind;
   id: string;
   name: string;
@@ -48,10 +48,10 @@ export function buildManualRuleTargets({
   hiddenProxyGroups?: string[];
   customProxyGroups: CustomProxyGroup[];
   proxyGroupNameOverrides?: Record<string, string>;
-}): ProxyGroupRuleTarget[] {
+}): ProxyGroupRuleTargetOption[] {
   const hidden = new Set(hiddenProxyGroups || []);
   const enabled = new Set(enabledProxyGroups);
-  const targets: ProxyGroupRuleTarget[] = [];
+  const targets: ProxyGroupRuleTargetOption[] = [];
 
   for (const proxyModule of PROXY_GROUP_MODULES) {
     if (!enabled.has(proxyModule.id) || hidden.has(proxyModule.id)) continue;

@@ -14,7 +14,7 @@ import { useProductInteractionAdapter } from "@subboost/ui/product/interactions"
 import {
   buildManualRuleTargets,
   listCustomRulesForTarget,
-  type ProxyGroupRuleTarget,
+  type ProxyGroupRuleTargetOption,
 } from "./proxy-group-rule-targets";
 import {
   ProxyGroupManualRuleRow,
@@ -125,7 +125,7 @@ export function ProxyGroupsCustomGroupsPanel({
   }, [customProxyGroups, hiddenProxyGroups, proxyGroupNameOverrides]);
 
   const moveManualRule = React.useCallback(
-    (item: { rule: { id: string }; index: number }, target: ProxyGroupRuleTarget) => {
+    (item: { rule: { id: string }; index: number }, target: ProxyGroupRuleTargetOption) => {
       updateCustomRule(item.rule.id, { target: { kind: target.kind, id: target.id } });
     },
     [updateCustomRule],

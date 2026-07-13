@@ -17,7 +17,7 @@ import type { CustomProxyGroup, RuleSetDraft } from "@subboost/ui/store/config-s
 import { cn } from "@subboost/ui/lib/utils";
 import type {
   CustomRuleListItem,
-  ProxyGroupRuleTarget,
+  ProxyGroupRuleTargetOption,
 } from "./proxy-group-rule-targets";
 import { ProxyGroupsModuleRulesPanel } from "./proxy-groups-module-rules-panel";
 import {
@@ -163,7 +163,7 @@ export function ProxyGroupsModuleCard({
   hiddenPresetRuleIds: HiddenPresetRuleIds;
   customProxyGroups: CustomProxyGroup[];
   manualRules: CustomRuleListItem[];
-  manualRuleTargets: ProxyGroupRuleTarget[];
+  manualRuleTargets: ProxyGroupRuleTargetOption[];
   enabledProxyGroups: string[];
   hiddenProxyGroups: string[];
   proxyGroupNameOverrides: Record<string, string>;
@@ -176,7 +176,7 @@ export function ProxyGroupsModuleCard({
   onAddRuleToCustomGroup: (groupId: string, rule: RuleSetDraft) => void;
   onRemoveExtraRule: (ruleId: string) => void;
   onMoveRule: (ruleId: string, target: { kind: "module" | "custom"; id: string }) => void;
-  onMoveManualRule: (ruleId: string, target: ProxyGroupRuleTarget) => void;
+  onMoveManualRule: (ruleId: string, target: ProxyGroupRuleTargetOption) => void;
   onRemoveManualRule: (index: number) => void;
   onRestoreRule: (ruleId: string) => void;
   onResetRuleTarget: (ruleId: string) => void;

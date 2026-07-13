@@ -22,7 +22,7 @@ import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
 import type { CustomProxyGroup, RuleSetDraft } from "@subboost/ui/store/config-store";
 import type {
   CustomRuleListItem,
-  ProxyGroupRuleTarget,
+  ProxyGroupRuleTargetOption,
 } from "./proxy-group-rule-targets";
 import {
   ProxyGroupManualRuleRow,
@@ -46,7 +46,9 @@ type CnCandidateRule = {
   parentModuleId?: string;
 };
 
-function isModuleRuleMoveTarget(target: ProxyGroupRuleTarget): target is ProxyGroupRuleTarget & MoveTarget {
+function isModuleRuleMoveTarget(
+  target: ProxyGroupRuleTargetOption,
+): target is ProxyGroupRuleTargetOption & MoveTarget {
   return target.kind === "module" || target.kind === "custom";
 }
 
@@ -110,7 +112,7 @@ export function ProxyGroupsModuleRulesPanel({
   hiddenPresetRuleIds: HiddenPresetRuleIds;
   customProxyGroups: CustomProxyGroup[];
   manualRules: CustomRuleListItem[];
-  manualRuleTargets: ProxyGroupRuleTarget[];
+  manualRuleTargets: ProxyGroupRuleTargetOption[];
   proxyGroupNameOverrides: Record<string, string>;
   moduleRuleEditWarningAccepted: boolean;
   acceptModuleRuleEditWarning: () => void;
@@ -119,7 +121,7 @@ export function ProxyGroupsModuleRulesPanel({
   onAddRuleToCustomGroup: (groupId: string, rule: RuleSetDraft) => void;
   onRemoveRule: (ruleId: string) => void;
   onMoveRule: (ruleId: string, target: MoveTarget) => void;
-  onMoveManualRule: (ruleId: string, target: ProxyGroupRuleTarget) => void;
+  onMoveManualRule: (ruleId: string, target: ProxyGroupRuleTargetOption) => void;
   onRemoveManualRule: (index: number) => void;
   onRestoreRule: (ruleId: string) => void;
   onResetRuleTarget: (ruleId: string) => void;

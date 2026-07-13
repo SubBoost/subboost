@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildApiErrorBody } from "@subboost/server-core/http";
 
-export type ApiErrorCode =
+export type LocalApiErrorCode =
   | "BAD_REQUEST"
   | "VALIDATION_ERROR"
   | "UNAUTHORIZED"
@@ -16,7 +16,7 @@ export function json(data: unknown, status = 200): NextResponse {
   return NextResponse.json(data, { status });
 }
 
-export function apiError(error: string, code: ApiErrorCode, status: number): NextResponse {
+export function apiError(error: string, code: LocalApiErrorCode, status: number): NextResponse {
   return NextResponse.json(buildApiErrorBody(error, code), { status });
 }
 

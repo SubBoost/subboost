@@ -13,7 +13,7 @@ describe("migrateLegacyConfig", () => {
   });
 
   it("migrates filtered groups and every supported legacy rule shape", () => {
-    const result = migrateLegacyConfig({
+    const result = migrateLegacyConfig<Record<string, unknown>>({
       filteredProxyGroups: [
         {
           id: "us-only",
