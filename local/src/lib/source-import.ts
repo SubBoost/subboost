@@ -19,6 +19,7 @@ import {
   selectDnsAddressesAfterFakeIpRecheck,
   shouldRecheckFakeIpDnsAnswers,
 } from "@subboost/server-core/subscription/ssrf-ip";
+import { getAllowUnsafeSubscriptionSources } from "@local/lib/source-import-settings";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
@@ -68,7 +69,10 @@ function normalizeHostname(hostname: string): string {
   return hostname.replace(/^\[|\]$/g, "").toLowerCase();
 }
 
-async function validatePublicFetchTarget(url: string): Promise<SourceImportTransportResult | null> {
+async function validatePublicFetchTarget(
+  url: string,
+  allowUnsafeSubscriptionSources: boolean
+): Promise<SourceImportTransportResult | null> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -83,6 +87,8 @@ async function validatePublicFetchTarget(url: string): Promise<SourceImportTrans
   if (parsed.username || parsed.password) {
     return toSecurityFailure("订阅 URL 不允许包含用户名或密码");
   }
+
+  if (allowUnsafeSubscriptionSources) return null;
 
   const hostname = normalizeHostname(parsed.hostname);
   if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) {
@@ -109,7 +115,10 @@ async function validatePublicFetchTarget(url: string): Promise<SourceImportTrans
   return null;
 }
 
-async function fetchTextDirect(request: SourceImportTransportRequest): Promise<SourceImportTransportResult> {
+async function fetchTextDirect(
+  request: SourceImportTransportRequest,
+  allowUnsafeSubscriptionSources: boolean
+): Promise<SourceImportTransportResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), request.timeoutMs);
 
@@ -117,7 +126,7 @@ async function fetchTextDirect(request: SourceImportTransportRequest): Promise<S
     let currentUrl = request.url;
     let response: Response | null = null;
     for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-      const guardFailure = await validatePublicFetchTarget(currentUrl);
+      const guardFailure = await validatePublicFetchTarget(currentUrl, allowUnsafeSubscriptionSources);
       if (guardFailure) return guardFailure;
 
       response = await fetch(currentUrl, {
@@ -168,10 +177,11 @@ async function fetchTextDirect(request: SourceImportTransportRequest): Promise<S
 }
 
 export async function importSourceUrlDirect(request: SourceImportRequest): Promise<SourceImportResult> {
+  const allowUnsafeSubscriptionSources = await getAllowUnsafeSubscriptionSources();
   return importSubscriptionFromUrl(request, {
     timeoutMs: DEFAULT_TIMEOUT_MS,
     maxBytes: DEFAULT_MAX_BYTES,
-    fetchText: fetchTextDirect,
+    fetchText: (transportRequest) => fetchTextDirect(transportRequest, allowUnsafeSubscriptionSources),
   });
 }
 
@@ -180,12 +190,16 @@ export async function fetchSourceUserInfoHeadersDirect(source: {
   userinfoUserAgent?: string;
 }): Promise<Record<string, string> | undefined> {
   if (!source.userinfoUrl) return undefined;
-  const response = await fetchTextDirect({
-    url: source.userinfoUrl,
-    userAgent: source.userinfoUserAgent?.trim() || SUBSCRIPTION_IMPORT_USER_AGENTS[0],
-    purpose: "userinfo",
-    timeoutMs: USERINFO_TIMEOUT_MS,
-    maxBytes: USERINFO_MAX_BYTES,
-  });
+  const allowUnsafeSubscriptionSources = await getAllowUnsafeSubscriptionSources();
+  const response = await fetchTextDirect(
+    {
+      url: source.userinfoUrl,
+      userAgent: source.userinfoUserAgent?.trim() || SUBSCRIPTION_IMPORT_USER_AGENTS[0],
+      purpose: "userinfo",
+      timeoutMs: USERINFO_TIMEOUT_MS,
+      maxBytes: USERINFO_MAX_BYTES,
+    },
+    allowUnsafeSubscriptionSources
+  );
   return response.ok ? response.headers : undefined;
 }

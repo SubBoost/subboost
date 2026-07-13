@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@local/lib/source-import-settings", () => ({
+  getAllowUnsafeSubscriptionSources: vi.fn(async () => false),
+}));
+
 import { importSourceUrlDirect } from "@local/lib/source-import";
 
 beforeEach(() => {
@@ -19,4 +24,3 @@ describe("local source import network guard", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
-

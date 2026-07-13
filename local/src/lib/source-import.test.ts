@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchSourceUserInfoHeadersDirect, importSourceUrlDirect } from "./source-import";
 
 const mocks = vi.hoisted(() => ({
+  getAllowUnsafeSubscriptionSources: vi.fn(),
   lookup: vi.fn(),
   importSubscriptionFromUrl: vi.fn(),
 }));
 
 vi.mock("node:dns/promises", () => ({
   lookup: mocks.lookup,
+}));
+
+vi.mock("@local/lib/source-import-settings", () => ({
+  getAllowUnsafeSubscriptionSources: mocks.getAllowUnsafeSubscriptionSources,
 }));
 
 vi.mock("@subboost/server-core/subscription", async (importOriginal) => {
@@ -59,6 +64,7 @@ async function runTransport(url: string, overrides: Record<string, unknown> = {}
 describe("local source import transport", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(false);
     mocks.lookup.mockResolvedValue([{ address: "93.184.216.34" }]);
     globalThis.fetch = vi.fn();
   });
@@ -108,6 +114,38 @@ describe("local source import transport", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it("allows all local and reserved address sources when the high-risk setting is enabled", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
+    const allowedUrls = [
+      "http://localhost:8080/sub",
+      "http://127.0.0.1/sub",
+      "http://[::1]/sub",
+      "http://router.local/sub",
+      "http://10.1.2.3/sub",
+      "http://169.254.169.254/latest/meta-data",
+      "http://100.64.0.1/sub",
+      "http://192.0.2.1/sub",
+      "http://198.18.0.1/sub",
+      "http://224.0.0.1/sub",
+      "http://[fc00::1]/sub",
+      "http://[fe80::1]/sub",
+      "http://[::ffff:192.168.0.1]/sub",
+    ];
+
+    for (const url of allowedUrls) {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce(response("ss://node", { status: 200 }));
+      await expect(runTransport(url)).resolves.toMatchObject({ ok: true, content: "ss://node" });
+    }
+    expect(mocks.lookup).not.toHaveBeenCalled();
+  });
+
+  it("keeps URL scheme and embedded-credential checks enabled for high-risk sources", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
+    await expect(runTransport("ftp://127.0.0.1/sub")).resolves.toMatchObject({ ok: false });
+    await expect(runTransport("http://user:pass@127.0.0.1/sub")).resolves.toMatchObject({ ok: false });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it("rechecks fake-ip DNS answers with DoH before fetching the subscription", async () => {
     mocks.lookup.mockResolvedValueOnce([{ address: "198.18.3.6" }]);
     vi.mocked(globalThis.fetch)
@@ -149,6 +187,21 @@ describe("local source import transport", () => {
       publicReason: "禁止访问本机或内网地址",
     });
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets the explicit high-risk setting bypass fake-ip DNS blocking", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(response("ss://node", { status: 200 }));
+
+    await expect(runTransport("https://fake-ip-private.example/sub")).resolves.toMatchObject({
+      ok: true,
+      content: "ss://node",
+    });
+    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://fake-ip-private.example/sub",
+      expect.objectContaining({ method: "GET", redirect: "manual" })
+    );
   });
 
   it("rejects additional private IPv4 and IPv6 address ranges", async () => {
@@ -303,6 +356,19 @@ describe("local source import transport", () => {
     });
   });
 
+  it("applies the enabled high-risk setting to redirect targets", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response("", { status: 302, headers: { location: "http://127.0.0.1/sub" } }))
+      .mockResolvedValueOnce(response("ss://node", { status: 200 }));
+
+    await expect(runTransport("https://example.com/private-redirect")).resolves.toMatchObject({
+      ok: true,
+      content: "ss://node",
+    });
+    expect(mocks.getAllowUnsafeSubscriptionSources).toHaveBeenCalledTimes(1);
+  });
+
   it("returns userinfo headers with HEAD and skips when no userinfo URL is configured", async () => {
     await expect(fetchSourceUserInfoHeadersDirect({})).resolves.toBeUndefined();
 
@@ -338,5 +404,13 @@ describe("local source import transport", () => {
         headers: expect.objectContaining({ "User-Agent": expect.any(String) }),
       })
     );
+
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      response("", { status: 200, headers: { "Subscription-Userinfo": "upload=2; total=4096" } })
+    );
+    await expect(fetchSourceUserInfoHeadersDirect({ userinfoUrl: "http://127.0.0.1/userinfo" })).resolves.toMatchObject({
+      "subscription-userinfo": "upload=2; total=4096",
+    });
   });
 });

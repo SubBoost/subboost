@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   homeAdapter: null as any,
   readJsonResponse: vi.fn(),
   readSourceImportResponse: vi.fn(),
+  switches: [] as any[],
   templateAdapter: null as any,
   userState: {
     fetchUser: vi.fn(),
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("lucide-react", () => ({
   LogOut: () => React.createElement("span", null, "LogOut"),
+  Network: () => React.createElement("span", null, "Network"),
   ServerCog: () => React.createElement("span", null, "ServerCog"),
   ShieldCheck: () => React.createElement("span", null, "ShieldCheck"),
 }));
@@ -34,6 +36,13 @@ vi.mock("@subboost/ui/components/ui/card", () => ({
   CardContent: (props: any) => React.createElement("div", props, props.children),
   CardHeader: (props: any) => React.createElement("header", props, props.children),
   CardTitle: (props: any) => React.createElement("h2", props, props.children),
+}));
+
+vi.mock("@subboost/ui/components/ui/switch", () => ({
+  Switch: (props: any) => {
+    mocks.switches.push(props);
+    return React.createElement("button", { disabled: props.disabled, role: "switch" });
+  },
 }));
 
 vi.mock("@subboost/ui/dashboard/subscription-dashboard-surface", () => ({
@@ -85,6 +94,7 @@ describe("local app pages and adapters", () => {
     mocks.homeAdapter = null;
     mocks.templateAdapter = null;
     mocks.buttons = [];
+    mocks.switches = [];
     mocks.userState = {
       fetchUser: vi.fn(),
       logout: vi.fn(),
@@ -217,13 +227,17 @@ describe("local app pages and adapters", () => {
   it("renders local settings for anonymous and authenticated states", async () => {
     let html = renderToStaticMarkup(React.createElement(SettingsPage));
     expect(html).toContain("未登录");
+    expect(html).toContain("允许本机和局域网订阅");
+    expect(html).toContain("本机、局域网及其他保留地址都可作为订阅源");
     expect(html).toContain("/api/health/live");
     expect(mocks.buttons.find((button: any) => button.variant === "destructive")).toMatchObject({
       disabled: true,
     });
+    expect(mocks.switches[0]).toMatchObject({ checked: false, disabled: true });
 
     vi.stubGlobal("window", { location: { href: "" } });
     mocks.buttons = [];
+    mocks.switches = [];
     mocks.userState = {
       fetchUser: vi.fn(),
       logout: vi.fn(),
@@ -234,6 +248,7 @@ describe("local app pages and adapters", () => {
     expect(html).toContain("2 / 9999");
     const logoutButton = mocks.buttons.find((button: any) => button.variant === "destructive");
     expect(logoutButton).toMatchObject({ disabled: false });
+    expect(mocks.switches[0]).toMatchObject({ checked: false, disabled: true });
     logoutButton.onClick();
     await Promise.resolve();
     await Promise.resolve();

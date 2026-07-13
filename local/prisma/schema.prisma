@@ -14,6 +14,7 @@ model LocalAdmin {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?
+  allowUnsafeSubscriptionSources Boolean @default(false)
 
   subscriptions Subscription[]
   templates      LocalTemplate[]
