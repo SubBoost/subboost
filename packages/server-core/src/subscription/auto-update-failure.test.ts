@@ -75,7 +75,7 @@ describe("classifyStableExternalAutoUpdateFailure", () => {
   it("separates stable external failures from project-side or transient failures", () => {
     expect(classifyStableExternalAutoUpdateFailure({ errorMessage: "当前解析任务较多" })).toEqual({
       isStableExternalFailure: false,
-      reason: "项目侧队列或代理资源暂不可用",
+      reason: "服务暂时不可用",
     });
     expect(classifyStableExternalAutoUpdateFailure({ httpStatus: 502 })).toEqual({
       isStableExternalFailure: false,

@@ -262,9 +262,8 @@ describe("SubscriptionDashboardSurface", () => {
     mocks.userStore = { user, isLoading: false, fetchUser: vi.fn() };
     const { html } = renderSurface(createAdapter(), { 0: [], 1: false });
     expect(html).toContain("暂无订阅");
-    expect(html).toContain("完整订阅链接是持有者凭证");
-    expect(html).toContain("所有请求均归属您的账号");
-    expect(html).toContain("账号临时封禁");
+    expect(html).not.toContain("完整订阅链接是持有者凭证");
+    expect(html).not.toContain("账号临时封禁");
     expect(html).toContain("announcement");
     expect(html).toContain("extra-action");
     expect(mocks.captures.stats).toEqual({ subscriptionCount: 0, user });

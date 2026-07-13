@@ -109,10 +109,9 @@ export function classifyStableExternalAutoUpdateFailure(
 
   if (
     text.includes("当前解析任务较多") ||
-    text.includes("服务暂时不可用，请稍后再试") ||
-    text.includes("没有可用的代理服务器")
+    text.includes("服务暂时不可用，请稍后再试")
   ) {
-    return { isStableExternalFailure: false, reason: "项目侧队列或代理资源暂不可用" };
+    return { isStableExternalFailure: false, reason: "服务暂时不可用" };
   }
 
   if (

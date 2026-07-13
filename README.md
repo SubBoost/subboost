@@ -39,12 +39,6 @@
 - Deployment docs: [Advanced deployment - compiles from source, slower with higher requirements](https://docs.subboost.org/deploy/advanced)
 - Configuration guide: [Clash configuration simple enough for a paramecium: configure precise routing and chained proxies from the UI in one click](https://ryanvan.com/t/topic/59?u=ryan)
 
-## Subscription Link Security
-
-A complete subscription URL and its token are bearer credentials: anyone who obtains the full URL may read the generated configuration and use that subscription. Protect it like a password. Never place the complete URL in public repositories, issues, chat messages, screenshots, or logs. If exposure is suspected, delete and recreate the affected subscription to issue a new token.
-
-Every request made with a token, including anonymous requests and requests from third-party clients, is attributed to the subscription owner for access controls and abuse prevention. Repeated rate-limit violations may temporarily ban the owner's account. This is the intended authorization model. Do not publish a complete URL or give it to an untrusted third party; even when using it in a trusted client or with a trusted person, the owner remains responsible for the resulting traffic and abuse risk.
-
 ## Development Notes
 
 Developers can start a local development environment from source:
