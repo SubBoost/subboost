@@ -351,6 +351,9 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
         <div>
           <h1 className="text-2xl font-bold mb-1">我的订阅</h1>
           <p className="text-white/50">管理您的订阅链接</p>
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-amber-200/70">
+            完整订阅链接是持有者凭证；所有请求均归属您的账号，泄漏后反复触发限流可能导致账号临时封禁。
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {adapter.renderHeaderActions?.({ user })}
