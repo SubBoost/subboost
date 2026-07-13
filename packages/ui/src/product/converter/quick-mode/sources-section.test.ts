@@ -76,6 +76,7 @@ vi.mock("lucide-react", () => ({
   AlertCircle: () => null,
   Check: () => null,
   ChevronDown: () => null,
+  ChevronRight: () => null,
   ChevronUp: () => null,
   HelpCircle: () => null,
   Loader2: () => null,
@@ -142,6 +143,18 @@ vi.mock("@subboost/ui/product/converter/subscription-import-error", () => ({
     return null;
   },
 }));
+vi.mock("@subboost/ui/product/converter/provider-mode-status-bar", () => ({
+  ProviderModeStatusBar: (props: any) => {
+    mocks.captures.statusBars.push(props);
+    return null;
+  },
+}));
+vi.mock("@subboost/ui/product/converter/provider-settings-fields", () => ({
+  ProviderSettingsFields: (props: any) => {
+    mocks.captures.providerSettings.push(props);
+    return null;
+  },
+}));
 vi.mock("@subboost/ui/product/subscription/subscription-userinfo-display", () => ({
   getSubscriptionUserInfoDisplay: mocks.getSubscriptionUserInfoDisplay,
 }));
@@ -204,6 +217,8 @@ function renderSection(overrides: Record<number, unknown> = {}) {
   mocks.captures.inputs = [];
   mocks.captures.textareas = [];
   mocks.captures.switches = [];
+  mocks.captures.statusBars = [];
+  mocks.captures.providerSettings = [];
   mocks.captures.rawButtons = [];
   try {
     const html = renderToStaticMarkup(React.createElement(SourcesSection));
@@ -216,7 +231,7 @@ function renderSection(overrides: Record<number, unknown> = {}) {
 describe("quick mode SourcesSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.captures = { buttons: [], inputs: [], textareas: [], switches: [], rawButtons: [] };
+    mocks.captures = { buttons: [], inputs: [], textareas: [], switches: [], statusBars: [], providerSettings: [], rawButtons: [] };
     mocks.getSubscriptionUserInfoDisplay.mockReturnValue({ traffic: "1 GB", expire: "2026-01-01" });
     mocks.markSourceAsPendingImport.mockImplementation((source) => ({ ...source, pendingImport: true }));
     mocks.moveSubscriptionSource.mockImplementation((sources) => sources.slice().reverse());
@@ -239,14 +254,35 @@ describe("quick mode SourcesSection", () => {
     expect(mocks.captures.errorBadge).toEqual(expect.objectContaining({ errorMessage: "parse failed" }));
     expect(mocks.captures.dialog).toEqual(expect.objectContaining({ open: true }));
     expect(mocks.captures.inputs.some((props: any) => props.value === "https://example.com/sub")).toBe(true);
+    // 对话框换位后，url 输入行是对话框里的第一个 Input
+    expect(mocks.captures.inputs[0]).toEqual(expect.objectContaining({ value: "https://example.com/sub" }));
     expect(mocks.captures.inputs.some((props: any) => props.value === "HK")).toBe(true);
     expect(mocks.captures.inputs.some((props: any) => props.readOnly)).toBe(true);
     expect(mocks.captures.textareas.some((props: any) => props.value === "ss://node")).toBe(true);
+    // 主界面 url 编辑框：textarea + 内嵌状态栏
+    expect(mocks.captures.textareas.some((props: any) => props.value === "https://example.com/sub")).toBe(true);
+    expect(mocks.captures.statusBars).toEqual([
+      expect.objectContaining({
+        source: expect.objectContaining({ id: "s1", useProxyProviders: false }),
+        defaultProviderKey: "url_s1",
+      }),
+    ]);
     expect(mocks.captures.switches).toEqual([expect.objectContaining({ checked: false })]);
   });
 
   it("updates source content and metadata through captured inputs", () => {
     renderSection({ 1: "s1" });
+
+    const mainUrlEditor = mocks.captures.textareas.find((props: any) => props.placeholder === "https://example.com/sub");
+    mainUrlEditor.onChange({ target: { value: "https://main.example/sub\n" } });
+    expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ content: "https://main.example/sub" }));
+
+    const enterEvent = { key: "Enter", preventDefault: vi.fn() };
+    mainUrlEditor.onKeyDown(enterEvent);
+    expect(enterEvent.preventDefault).toHaveBeenCalled();
+
+    mocks.captures.statusBars[0].onCheckedChange(true);
+    expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ useProxyProviders: true }));
 
     const mainUrlInput = mocks.captures.inputs.find((props: any) => props.placeholder === "https://example.com/sub" && props.value === urlSource.content);
     mainUrlInput.onChange({ target: { value: "https://new.example/sub" } });
@@ -321,8 +357,8 @@ describe("quick mode SourcesSection", () => {
     expect(mocks.captures.dialog).toEqual(expect.objectContaining({ open: false }));
 
     mocks.store.setSources.mockClear();
-    const emptyInput = mocks.captures.inputs.find((props: any) => props.placeholder === "https://example.com/sub");
-    emptyInput.onChange({ target: { value: "" } });
+    const emptyEditor = mocks.captures.textareas.find((props: any) => props.placeholder === "https://example.com/sub");
+    emptyEditor.onChange({ target: { value: "" } });
     expect(mocks.store.setSources).toHaveBeenCalledWith(expect.any(Array));
   });
 

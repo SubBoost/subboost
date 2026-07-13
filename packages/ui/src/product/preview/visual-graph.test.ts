@@ -91,6 +91,22 @@ vi.mock("@subboost/core/generator/proxy-groups", () => ({
 	    { id: "ad", name: "🛑 广告拦截", emoji: "🛑", groupType: "select", category: "other" },
 	  ],
   generateProxyGroups: vi.fn(() => mocks.generatedProxyGroups),
+  buildProviderProxyGroups: (attachments: any[], reservedNames: Iterable<string>) => {
+    const reserved = new Set(reservedNames);
+    const groups: any[] = [];
+    const names: string[] = [];
+    for (const attachment of attachments) {
+      if (!attachment || attachment.mode !== "grouped") continue;
+      const base = attachment.groupName || attachment.key;
+      let name = base;
+      let suffix = 2;
+      while (reserved.has(name)) name = `${base} ${suffix++}`;
+      reserved.add(name);
+      names.push(name);
+      groups.push({ name, type: "select", use: [attachment.key] });
+    }
+    return { groups, names };
+  },
 }));
 vi.mock("@subboost/core/generator/module-rules", () => ({
   getModuleRuleOrderKey: (moduleId: string, ruleId: string) => `module:${moduleId}:${ruleId}`,
@@ -98,6 +114,11 @@ vi.mock("@subboost/core/generator/module-rules", () => ({
 }));
 vi.mock("@subboost/core/proxy-group-name", () => ({
   resolveProxyGroupModuleName: (module: { id: string; name: string }, override?: string) => override || module.name,
+  splitLeadingEmoji: (raw: string) => {
+    const match = typeof raw === "string" ? raw.match(/^(\S+)\s+(.+)$/) : null;
+    if (match) return { hasEmojiPrefix: true, emoji: match[1], label: match[2] };
+    return { hasEmojiPrefix: false, emoji: "", label: raw ?? "" };
+  },
 }));
 vi.mock("@subboost/core/rules/custom-routing-rule-sets", () => ({
   collectCustomRoutingRuleSets: vi.fn(() => mocks.customRuleSets),
@@ -159,6 +180,7 @@ describe("VisualGraph", () => {
     mocks.effectiveRules = [{ id: "r1", name: "Rule One", behavior: "domain" }];
     mocks.store = {
       nodes,
+      sources: [],
       enabledProxyGroups: ["select", "auto"],
       dialerProxyGroups: [{ id: "d1", name: "Relay", enabled: true, relayNodes: ["Relay"], targetNodes: ["Beta"], type: "select" }],
       customRules: [{ id: "manual" }],
@@ -180,6 +202,64 @@ describe("VisualGraph", () => {
 
     expect(html).toContain("添加节点后显示可视化关系图");
     expect(mocks.captures.proxyGroupsPreview).toBeUndefined();
+  });
+
+  it("shows airport groups derived from grouped provider sources", () => {
+    mocks.store.proxyGroupOrder = [];
+    mocks.store.sources = [
+      {
+        id: "s1",
+        type: "url",
+        content: "https://a.example.com/sub",
+        useProxyProviders: true,
+        providerMode: "grouped",
+        providerGroupName: "✈️ 测试机场",
+      },
+      {
+        id: "s2",
+        type: "url",
+        content: "https://b.example.com/sub",
+        useProxyProviders: true,
+        providerMode: "bare",
+      },
+    ];
+    renderGraph();
+
+    const groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    const providerGroups = groups.filter((group: any) => group.category === "provider");
+    // 仅分组模式的 provider 生成机场组卡片
+    expect(providerGroups).toHaveLength(1);
+    expect(providerGroups[0]).toMatchObject({
+      id: "name:✈️ 测试机场",
+      name: "✈️ 测试机场",
+      emoji: "✈️",
+      groupType: "select",
+      rules: [],
+    });
+    // 插在自动选择之后
+    const autoIndex = groups.findIndex((group: any) => group.id === "module:auto");
+    const airportIndex = groups.findIndex((group: any) => group.id === "name:✈️ 测试机场");
+    expect(airportIndex).toBe(autoIndex + 1);
+  });
+
+  it("reorders airport groups via proxyGroupOrder using generator-compatible name keys", () => {
+    mocks.store.proxyGroupOrder = ["name:✈️ 测试机场", "module:select"];
+    mocks.store.sources = [
+      {
+        id: "s1",
+        type: "url",
+        content: "https://a.example.com/sub",
+        useProxyProviders: true,
+        providerMode: "grouped",
+        providerGroupName: "✈️ 测试机场",
+      },
+    ];
+    renderGraph();
+
+    const groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    // 拖拽序（name: 前缀 key）能命中机场组：机场组排到最前，不再被追加到末尾
+    expect(groups[0]).toMatchObject({ id: "name:✈️ 测试机场" });
+    expect(groups[1]).toMatchObject({ id: "module:select" });
   });
 
   it("builds display groups, node previews, custom rules, and drag callbacks", () => {

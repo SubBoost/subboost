@@ -347,6 +347,19 @@ export function useSubscriptionLink({
                     ? { subscriptionUserInfo: sourceSubscriptionUserInfo }
                     : {}),
                   ...(s.type === "url" && s.useProxyProviders ? { useProxyProviders: true } : {}),
+                  ...(s.type === "url" && typeof s.providerKey === "string" && s.providerKey.trim()
+                    ? { providerKey: s.providerKey.trim() }
+                    : {}),
+                  ...(s.type === "url" &&
+                  (s.providerMode === "grouped" || s.providerMode === "inline" || s.providerMode === "bare")
+                    ? { providerMode: s.providerMode }
+                    : {}),
+                  ...(s.type === "url" && typeof s.providerGroupName === "string" && s.providerGroupName.trim()
+                    ? { providerGroupName: s.providerGroupName.trim() }
+                    : {}),
+                  ...(s.type === "url" && typeof s.providerFilter === "string"
+                    ? { providerFilter: s.providerFilter }
+                    : {}),
                   ...(s.type === "url" && typeof s.userinfoUrl === "string" && s.userinfoUrl.trim()
                     ? { userinfoUrl: tryNormalizeSubscriptionUrlInput(s.userinfoUrl) ?? s.userinfoUrl.trim() }
                     : {}),

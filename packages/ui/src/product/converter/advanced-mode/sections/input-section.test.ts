@@ -163,6 +163,12 @@ vi.mock("@subboost/ui/product/converter/subscription-import-error", () => ({
     return null;
   },
 }));
+vi.mock("@subboost/ui/product/converter/provider-mode-status-bar", () => ({
+  ProviderModeStatusBar: (props: any) => {
+    mocks.captures.statusBars.push(props);
+    return null;
+  },
+}));
 vi.mock("./input-source-editor-dialog", () => ({
   InputSourceEditorDialog: (props: any) => {
     mocks.captures.editor = props;
@@ -204,6 +210,7 @@ function renderSection(overrides: Record<number, unknown> = {}, props = { isExpa
   mocks.captures.inputs = [];
   mocks.captures.rawButtons = [];
   mocks.captures.textareas = [];
+  mocks.captures.statusBars = [];
   try {
     const html = renderToStaticMarkup(React.createElement(InputSection, props));
     return { html, setters: stateMock.setters };
@@ -222,7 +229,7 @@ describe("advanced mode InputSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stateMock.runEffects = false;
-    mocks.captures = { buttons: [], inputs: [], textareas: [] };
+    mocks.captures = { buttons: [], inputs: [], textareas: [], statusBars: [] };
     mocks.userInfoDisplay = { traffic: "1 GB", expire: "2026-01-01" };
     mocks.markSourceAsPendingImport.mockImplementation((source) => ({ ...source, pendingImport: true }));
     mocks.moveSubscriptionSource.mockImplementation((sources) => sources.slice().reverse());
@@ -250,7 +257,13 @@ describe("advanced mode InputSection", () => {
         previewName: "[{tag}] {name}:HK:节点名称",
       })
     );
-    expect(mocks.captures.inputs.some((props: any) => props.value === "https://example.com/sub")).toBe(true);
+    expect(mocks.captures.textareas.some((props: any) => props.value === "https://example.com/sub")).toBe(true);
+    expect(mocks.captures.statusBars).toEqual([
+      expect.objectContaining({
+        source: expect.objectContaining({ id: "s1", useProxyProviders: false }),
+        defaultProviderKey: "url_s1",
+      }),
+    ]);
     expect(mocks.captures.textareas.some((props: any) => props.value === "ss://node")).toBe(true);
     expect(mocks.captures.buttons.at(-1)).toEqual(expect.objectContaining({ variant: "outline", size: "sm" }));
   });
@@ -258,10 +271,22 @@ describe("advanced mode InputSection", () => {
   it("updates source content and metadata through captured fields", () => {
     renderSection({ 1: "s1" });
 
-    const mainUrlInput = mocks.captures.inputs.find((props: any) => props.placeholder === "https://example.com/sub");
-    mainUrlInput.onChange({ target: { value: "https://new.example/sub" } });
+    const mainUrlEditor = mocks.captures.textareas.find((props: any) => props.placeholder === "https://example.com/sub");
+    mainUrlEditor.onChange({ target: { value: "https://new.example/sub\n" } });
     expect(mocks.store.setSources).toHaveBeenCalledWith(expect.any(Array));
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ content: "https://new.example/sub" }));
+
+    const enterEvent = { key: "Enter", preventDefault: vi.fn() };
+    mainUrlEditor.onKeyDown(enterEvent);
+    expect(enterEvent.preventDefault).toHaveBeenCalled();
+
+    mocks.captures.statusBars[0].onCheckedChange(true);
+    expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(
+      expect.objectContaining({ useProxyProviders: true, providerMode: "grouped" })
+    );
+
+    mocks.captures.statusBars[0].onUpdateMeta("s1", { providerKey: "my_airport" });
+    expect(mocks.store.setSources).toHaveBeenCalledWith(expect.any(Array));
 
     const textArea = mocks.captures.textareas.find((props: any) => props.value === "ss://node");
     textArea.onChange({ target: { value: "trojan://node" } });

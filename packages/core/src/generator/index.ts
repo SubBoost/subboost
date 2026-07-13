@@ -8,6 +8,7 @@ import {
   buildDefaultUserConfig,
 } from "@subboost/core/config/defaults";
 import {
+  buildProviderProxyGroups,
   generateProxyGroups,
   generateRules,
   generateRuleProviders,
@@ -32,6 +33,7 @@ import type {
   UserConfig,
 } from "@subboost/core/types/config";
 import type { DialerProxyGroup } from "@subboost/core/types/template-config";
+import type { ProxyProviderAttachment } from "@subboost/core/subscription/proxy-providers";
 import { collectDnsPolicyEntries, configToYaml } from "./yaml";
 import { isMihomoSupportedProxyNode, normalizeMihomoVlessForGeneration } from "../mihomo/proxy-sanitizer";
 import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-targets";
@@ -39,6 +41,10 @@ import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-t
 export interface GenerateOptions {
   nodes: ParsedNode[];
   proxyProviders?: Record<string, unknown>;
+  // 各 provider 的接入方式（key 对应 proxyProviders 的键）：
+  // grouped=生成机场组挂入节点选择；inline=直接 use 注入所有策略组；bare=仅生成不挂接。
+  // 未提供条目的 key 按 inline 处理（与历史行为一致）。
+  proxyProviderAttachments?: ProxyProviderAttachment[];
   template?: TemplateType;
   userConfig?: Partial<UserConfig>;
   dialerProxyGroups?: DialerProxyGroup[];
@@ -179,6 +185,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
   const {
     nodes,
     proxyProviders,
+    proxyProviderAttachments = [],
     template = "standard",
     userConfig = {},
     dialerProxyGroups = [],
@@ -203,6 +210,19 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
   const proxyProviderNames = resolvedProxyProviders
     ? Object.keys(resolvedProxyProviders).map((k) => k.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b))
     : [];
+
+  // provider 接入模式：grouped/inline/bare；未声明的 key 按 inline（历史行为）
+  const attachmentByKey = new Map<string, ProxyProviderAttachment>();
+  for (const attachment of proxyProviderAttachments) {
+    if (!attachment || typeof attachment.key !== "string" || !attachment.key.trim()) continue;
+    attachmentByKey.set(attachment.key.trim(), attachment);
+  }
+  const providerModeOf = (key: string) => {
+    const mode = attachmentByKey.get(key)?.mode;
+    return mode === "grouped" || mode === "bare" ? mode : "inline";
+  };
+  const inlineProviderNames = proxyProviderNames.filter((key) => providerModeOf(key) === "inline");
+  const groupedProviderKeys = proxyProviderNames.filter((key) => providerModeOf(key) === "grouped");
 
   // 解析用户自定义的基础配置（提前解析：用于规范化补齐）
   const baseConfigYaml = (hasExplicitBaseConfigYaml ? userConfig.dnsYaml : config.dnsYaml) ?? "";
@@ -338,18 +358,40 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     return out.length > 0 ? out : undefined;
   })();
 
+  // 生成机场组（proxy-providers 分组模式）：与可视化预览共用同一构建函数，保证组名一致
+  const groupedAttachments = groupedProviderKeys
+    .map((key) => attachmentByKey.get(key))
+    .filter((attachment): attachment is ProxyProviderAttachment => Boolean(attachment));
+  const { groups: providerGroups, names: providerGroupNames } = buildProviderProxyGroups(groupedAttachments, [
+    "DIRECT",
+    "REJECT",
+    ...nodeNameSet,
+    ...moduleGroupNameSet,
+    ...customGroupNameSet,
+    ...sanitizedDialerProxyGroups.map((g) => g.name.trim()).filter(Boolean),
+  ]);
+  // key→机场组名映射（供 Provider 组面板手动追加 provider-group 成员时解析组名）
+  const providerGroupNameByKey: Record<string, string> = {};
+  for (const providerGroup of providerGroups) {
+    const key = Array.isArray(providerGroup.use) ? providerGroup.use[0] : undefined;
+    if (typeof key === "string" && key) providerGroupNameByKey[key] = providerGroup.name;
+  }
+
   // 生成中转代理组
   const dialerGroups = generateDialerProxyGroups(
     sanitizedDialerProxyGroups,
     config.testUrl,
     config.testInterval,
-    proxyProviderNames
+    inlineProviderNames
   ) as unknown as ProxyGroup[];
 
   // 生成选项
   const generateOpts = {
     nodes: outputNodes,
-    proxyProviderNames,
+    proxyProviderNames: inlineProviderNames,
+    providerGroupNames,
+    allProviderKeys: proxyProviderNames,
+    providerGroupNameByKey,
     enabledModules: config.enabledGroups,
     ruleProviderBaseUrl: config.ruleProviderBaseUrl,
     testUrl: config.testUrl,
@@ -376,8 +418,9 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     const allGroups = generateProxyGroups(generateOpts);
 
     const mergedGroups = (() => {
-      // 如果没有中转组，直接返回
-      if (dialerGroups.length === 0) {
+      // 机场组与中转组一起插入到“节点选择/自动选择”之后
+      const extraGroups = [...providerGroups, ...dialerGroups];
+      if (extraGroups.length === 0) {
         return allGroups;
       }
 
@@ -390,11 +433,11 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
         // 在节点选择和自动选择之后插入中转组
         const before = allGroups.slice(0, insertAfter + 1);
         const after = allGroups.slice(insertAfter + 1);
-        return [...before, ...dialerGroups, ...after];
+        return [...before, ...extraGroups, ...after];
       }
 
       // 如果找不到，就放在最前面
-      return [...dialerGroups, ...allGroups];
+      return [...extraGroups, ...allGroups];
     })();
 
     const orderKeys = Array.isArray(options.proxyGroupOrder)

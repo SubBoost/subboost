@@ -27,7 +27,7 @@ import {
 } from "./rules";
 import { getModuleRuleOrderKey } from "./module-rules";
 import { buildRuleSetUrlFromPath } from "@subboost/core/rules/rule-model";
-import { buildTypedProxyGroup } from "./proxy-group-type";
+import { buildTypedProxyGroup, uniqueProxyNames } from "./proxy-group-type";
 
 export { PROXY_GROUP_MODULES };
 export type { ProxyGroupModule, ProxyGroupRule };
@@ -51,6 +51,12 @@ export const CATEGORY_INFO: Record<string, { name: string; order: number }> = {
 export interface GenerateOptions {
   nodes: ParsedNode[];
   proxyProviderNames?: string[];
+  // 机场组（proxy-providers 分组模式）的组名：仅用于把机场组注入“节点选择”候选与可选成员池，
+  // 组本体在 generator/index.ts 中生成并插入（携带 use/icon 完整信息）。
+  providerGroupNames?: string[];
+  // provider 手动追加（高级模式 Provider 组面板）用：全部 provider key、以及 key→机场组名 映射。
+  allProviderKeys?: string[];
+  providerGroupNameByKey?: Record<string, string>;
   enabledModules: string[];
   ruleProviderBaseUrl: string;
   testUrl: string;
@@ -68,6 +74,36 @@ export interface GenerateOptions {
 }
 
 export { isSubscriptionInfoNodeName };
+
+/**
+ * 构建机场组（proxy-providers 分组模式）：select + use。
+ * 组名与保留名（既有组/节点等）冲突时自动加序号后缀。
+ * generator/index.ts 与可视化预览共用，保证两边组名一致。
+ */
+export function buildProviderProxyGroups(
+  attachments: Array<{ key: string; mode: string; groupName?: string }>,
+  reservedNames: Iterable<string>
+): { groups: ProxyGroup[]; names: string[] } {
+  const reserved = new Set(reservedNames);
+  const groups: ProxyGroup[] = [];
+  const names: string[] = [];
+  for (const attachment of attachments) {
+    if (!attachment || attachment.mode !== "grouped") continue;
+    const key = typeof attachment.key === "string" ? attachment.key.trim() : "";
+    if (!key) continue;
+    const rawGroupName = typeof attachment.groupName === "string" ? attachment.groupName.trim() : "";
+    const baseName = rawGroupName || key;
+    let groupName = baseName;
+    let suffix = 2;
+    while (reserved.has(groupName)) {
+      groupName = `${baseName} ${suffix++}`;
+    }
+    reserved.add(groupName);
+    names.push(groupName);
+    groups.push({ name: groupName, type: "select", use: [key] });
+  }
+  return { groups, names };
+}
 
 function getEnabledCustomProxyGroups(customProxyGroups: CustomProxyGroup[]): CustomProxyGroup[] {
   return customProxyGroups.filter((group) => group && group.enabled !== false);
@@ -134,6 +170,9 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
   const {
     nodes,
     proxyProviderNames = [],
+    providerGroupNames = [],
+    allProviderKeys = [],
+    providerGroupNameByKey = {},
     enabledModules,
     testUrl,
     testInterval,
@@ -206,7 +245,31 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     ...filteredNodeNames,
     ...PROXY_GROUP_MODULES.filter((module) => enabledSet.has(module.id)).map((module) => moduleNames[module.id]),
     ...customGroupNames,
+    ...providerGroupNames,
   );
+
+  // 机场组（proxy-providers 分组模式）作为普通默认成员参与解析：{key,name} 列表供 resolve
+  // 把机场组名解析成 provider-group 成员（可排除/排序/经 extraMembers 追加）。
+  const providerKeyByName = new Map<string, string>();
+  for (const [key, name] of Object.entries(providerGroupNameByKey)) {
+    if (typeof name === "string" && name) providerKeyByName.set(name, key);
+  }
+  const providerGroups = providerGroupNames
+    .map((name) => ({ key: providerKeyByName.get(name) ?? "", name }))
+    .filter((item) => item.key);
+
+  // 默认注入机场组名：在 resolve 之前对 defaultProxyNames 做锚点插入（自动选择/节点选择之后），
+  // 使 excludedMembers/memberOrder/extraMembers 对机场组天然生效。算法与原 withProviderGroups 一致。
+  const withProviderGroupDefaults = (proxies: string[]) => {
+    if (providerGroupNames.length === 0) return proxies;
+    const missing = providerGroupNames.filter((name) => !proxies.includes(name));
+    if (missing.length === 0) return proxies;
+    const autoIndex = autoTarget ? proxies.indexOf(autoTarget) : -1;
+    const selectIndex = selectTarget ? proxies.indexOf(selectTarget) : -1;
+    const anchorIndex = autoIndex >= 0 ? autoIndex : selectIndex;
+    const insertAt = anchorIndex >= 0 ? anchorIndex + 1 : 0;
+    return [...proxies.slice(0, insertAt), ...missing, ...proxies.slice(insertAt)];
+  };
 
   const resolveGroupProxyNames = (
     defaultProxyNames: string[],
@@ -219,6 +282,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
       nodes,
       moduleNames,
       customProxyGroups: activeCustomProxyGroups,
+      providerGroups,
       advanced,
       self,
     }).proxyNames;
@@ -258,7 +322,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
             name: moduleName,
             type: "select",
             // “节点选择”组本身不应包含自己；默认先走“⚡ 自动选择”更符合开箱即用
-            proxies: resolveGroupProxyNames(defaultProxies, advanced, {
+            proxies: resolveGroupProxyNames(withProviderGroupDefaults(defaultProxies), advanced, {
               kind: "module",
               id: module.id,
               name: moduleName,
@@ -270,7 +334,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
           groups.push({
             name: moduleName,
             type: "select",
-            proxies: resolveGroupProxyNames(defaultProxies, advanced, {
+            proxies: resolveGroupProxyNames(withProviderGroupDefaults(defaultProxies), advanced, {
               kind: "module",
               id: module.id,
               name: moduleName,
@@ -323,7 +387,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
           groups.push({
             name: moduleName,
             type: "select",
-            proxies: resolveGroupProxyNames(defaultProxies, advanced, {
+            proxies: resolveGroupProxyNames(withProviderGroupDefaults(defaultProxies), advanced, {
               kind: "module",
               id: module.id,
               name: moduleName,
@@ -347,7 +411,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
             name: moduleName,
             type: "select",
             // 私有网络/国内服务：默认 DIRECT，但也提供自动选择
-            proxies: resolveGroupProxyNames(defaultProxies, advanced, {
+            proxies: resolveGroupProxyNames(withProviderGroupDefaults(defaultProxies), advanced, {
               kind: "module",
               id: module.id,
               name: moduleName,
@@ -407,8 +471,10 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
         type: "select",
         proxies: resolveCustom(
-          fallbackTargets("DIRECT", "REJECT", ...filteredNodeNames).filter(
-            (target) => target !== customGroup.name
+          withProviderGroupDefaults(
+            fallbackTargets("DIRECT", "REJECT", ...filteredNodeNames).filter(
+              (target) => target !== customGroup.name
+            )
           )
         ),
         ...providerUse,
@@ -419,8 +485,10 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
         name: customGroup.name,
         type: "select",
         proxies: resolveCustom(
-          fallbackTargets("REJECT", "DIRECT", ...filteredNodeNames).filter(
-            (target) => target !== customGroup.name
+          withProviderGroupDefaults(
+            fallbackTargets("REJECT", "DIRECT", ...filteredNodeNames).filter(
+              (target) => target !== customGroup.name
+            )
           )
         ),
         ...providerUse,
@@ -429,7 +497,7 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
     return {
       name: customGroup.name,
       type: "select",
-      proxies: resolveCustom(customBaseProxies.filter((target) => target !== customGroup.name)),
+      proxies: resolveCustom(withProviderGroupDefaults(customBaseProxies.filter((target) => target !== customGroup.name))),
       ...providerUse,
     };
   };
@@ -470,6 +538,37 @@ export function generateProxyGroups(options: GenerateOptions): ProxyGroup[] {
   if (!insertedCustom && inlineCustomProxyGroups.length > 0) {
     for (const customGroup of inlineCustomProxyGroups) {
       groups.push(createCustomProxyGroup(customGroup));
+    }
+  }
+
+  // Provider 组面板：把各组 advanced.extraMembers 里手动追加的 provider-inline 成员落到 use。
+  // provider-group（机场组）已作为普通成员由 resolveGroupProxyNames 处理（进 proxies 并参与排序），此处不再重复追加。
+  if (allProviderKeys.length > 0) {
+    const providerKeySet = new Set(allProviderKeys);
+    const advancedByGroupName = new Map<string, ProxyGroupAdvancedConfig>();
+    for (const proxyModule of PROXY_GROUP_MODULES) {
+      const adv = proxyGroupAdvanced[proxyModule.id];
+      if (adv?.extraMembers?.length) advancedByGroupName.set(moduleNames[proxyModule.id], adv);
+    }
+    for (const customGroup of activeCustomProxyGroups) {
+      const name = typeof customGroup.name === "string" ? customGroup.name.trim() : "";
+      if (name && customGroup.advanced?.extraMembers?.length) {
+        advancedByGroupName.set(name, customGroup.advanced);
+      }
+    }
+    for (const group of groups) {
+      const advanced = advancedByGroupName.get(group.name);
+      if (!advanced?.extraMembers?.length) continue;
+      const inlineKeys: string[] = [];
+      for (const ref of advanced.extraMembers) {
+        if (ref.kind === "provider-inline" && providerKeySet.has(ref.key)) {
+          inlineKeys.push(ref.key);
+        }
+      }
+      if (inlineKeys.length > 0) {
+        const existing = Array.isArray(group.use) ? group.use : [];
+        group.use = uniqueProxyNames([...existing, ...inlineKeys]);
+      }
     }
   }
 

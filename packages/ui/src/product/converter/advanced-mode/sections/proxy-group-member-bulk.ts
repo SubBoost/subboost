@@ -85,12 +85,14 @@ export function insertMemberAfterProtected(
   return insertMembersAfterProtected(currentMembers, [member]);
 }
 
+// provider-inline 语义上是"把该订阅的节点内联进本组"，批量节点操作按节点对待；
+// provider-group 引用的机场组是策略组，批量代理组操作按代理组对待。
 export function isNodeMember(member: ResolvedMember): boolean {
-  return member.kind === "node";
+  return member.kind === "node" || member.kind === "provider-inline";
 }
 
 export function isProxyGroupMember(member: ResolvedMember): boolean {
-  return member.kind === "module" || member.kind === "custom";
+  return member.kind === "module" || member.kind === "custom" || member.kind === "provider-group";
 }
 
 export function buildAddAllMembersPatch(options: {
@@ -121,6 +123,9 @@ export function buildRemoveAllMembersPatch(options: {
   const keys = new Set(options.membersToRemove.map((member) => member.key));
   let excludedMembers = normalizeList(options.advanced.excludedMembers);
   for (const member of options.membersToRemove) {
+    // provider-inline 注入 use、不在常规候选池，写 excludedMembers 只会变脏数据 → 仅从 extraMembers 删除。
+    // provider-group（机场组）是普通默认成员，必须写 excludedMembers 才能压过默认注入，走常规路径。
+    if (member.kind === "provider-inline") continue;
     excludedMembers = withMember(excludedMembers, member.ref);
   }
   return {

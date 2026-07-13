@@ -13,7 +13,7 @@ import {
   type UserConfig,
 } from "@subboost/core/types/config";
 import { stripImportedNodeControlFieldsFromList } from "@subboost/core/subscription/imported-node-controls";
-import { buildProxyProvidersFromConfig } from "@subboost/core/subscription/proxy-providers";
+import { buildProxyProviderPlanFromConfig } from "@subboost/core/subscription/proxy-providers";
 import { ensureCustomRuleId } from "@subboost/core/rules/custom-rule-utils";
 import { DEFAULT_SUBBOOST_CONFIG } from "@subboost/core/config/defaults";
 import { normalizeRuleModelFromConfig } from "@subboost/core/rules/rule-model";
@@ -237,8 +237,11 @@ export function buildGenerateOptionsFromConfig(
 ): GenerateOptions {
   const config = rawConfig;
   const { testUrl, testInterval } = getEffectiveTestOptions(config);
-  const proxyProviders =
-    opts.proxyProviders ?? buildProxyProvidersFromConfig(config, { testUrl, testInterval });
+  // attachments 始终从 config.sources 派生（描述各 provider 的接入方式）；
+  // opts.proxyProviders 显式传入时（server 路径）与之同源，key 保持一致
+  const providerPlan = buildProxyProviderPlanFromConfig(config, { testUrl, testInterval });
+  const proxyProviders = opts.proxyProviders ?? providerPlan?.providers;
+  const proxyProviderAttachments = providerPlan?.attachments;
 
   const template = normalizeTemplate(config.template, "standard");
 
@@ -310,6 +313,7 @@ export function buildGenerateOptionsFromConfig(
   return {
     nodes: sanitizedNodes,
     ...(proxyProviders ? { proxyProviders } : {}),
+    ...(proxyProviderAttachments && proxyProviderAttachments.length > 0 ? { proxyProviderAttachments } : {}),
     template,
     userConfig,
     ...(dialerProxyGroups.length > 0 ? { dialerProxyGroups } : {}),

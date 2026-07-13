@@ -32,6 +32,10 @@ export function getProxyGroupMemberKey(member: ProxyGroupMemberRef): string {
       return `module:${member.id}`;
     case "custom":
       return `custom:${member.id}`;
+    case "provider-inline":
+      return `provider-inline:${member.key}`;
+    case "provider-group":
+      return `provider-group:${member.key}`;
     case "direct":
       return "direct:DIRECT";
     case "reject":

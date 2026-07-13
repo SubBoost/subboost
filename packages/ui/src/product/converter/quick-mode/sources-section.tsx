@@ -1,5 +1,6 @@
+import * as React from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { Plus, X, AlertCircle, Check, Loader2, Maximize2, HelpCircle, Menu, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, X, AlertCircle, Check, Loader2, Maximize2, HelpCircle, Menu, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 import { Input } from "@subboost/ui/components/ui/input";
@@ -10,6 +11,8 @@ import { cn } from "@subboost/ui/lib/utils";
 import { DEFAULT_NODE_NAME_TEMPLATE } from "@subboost/core/node-name-template";
 import type { SourceType } from "@subboost/ui/store/config-store";
 import { SubscriptionImportErrorBadge } from "@subboost/ui/product/converter/subscription-import-error";
+import { ProviderModeStatusBar } from "@subboost/ui/product/converter/provider-mode-status-bar";
+import { ProviderSettingsFields } from "@subboost/ui/product/converter/provider-settings-fields";
 import { getSubscriptionUserInfoDisplay } from "@subboost/ui/product/subscription/subscription-userinfo-display";
 import { buildSourceDisplayLabel } from "@subboost/ui/product/converter/source-display-label";
 import { useSubscriptionSourcesController } from "@subboost/ui/product/converter/use-subscription-sources-controller";
@@ -35,6 +38,8 @@ export function SourcesSection() {
     updateSourceMeta,
     updateSourceType,
   } = useSubscriptionSourcesController({ mode: "quick" });
+
+  const [providerSettingsOpen, setProviderSettingsOpen] = React.useState(false);
 
   return (
     <>
@@ -189,12 +194,31 @@ export function SourcesSection() {
 
               {/* Source Input */}
               {source.type === "url" ? (
-                <Input
-                  value={source.content}
-                  onChange={(e) => updateSource(source.id, e.target.value)}
-                  placeholder={typeInfo.placeholder}
-                  className="text-xs h-9"
-                />
+                <div className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-all duration-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/50">
+                  <Textarea
+                    rows={1}
+                    wrap="off"
+                    value={source.content}
+                    onChange={(e) => updateSource(source.id, e.target.value.replace(/[\r\n]+/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
+                    placeholder={typeInfo.placeholder}
+                    className="block h-9 min-h-0 w-full resize-none overflow-x-auto rounded-none border-0 bg-transparent px-4 py-0 text-xs leading-9 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus:ring-0"
+                  />
+                  <ProviderModeStatusBar
+                    source={source}
+                    defaultProviderKey={`url_${source.id}`}
+                    onCheckedChange={(checked) =>
+                      updateSourceMeta(source.id, {
+                        useProxyProviders: checked,
+                        // UI 新开启时默认分组模式；旧数据（已保存无此字段）保持 inline 兼容
+                        ...(checked && !source.providerMode ? { providerMode: "grouped" as const } : {}),
+                      })
+                    }
+                    onUpdateMeta={updateSourceMeta}
+                  />
+                </div>
               ) : (
                 <Textarea
                   value={source.content}
@@ -272,6 +296,108 @@ export function SourcesSection() {
 
           {expandedSource && (
             <div className="space-y-3">
+              {expandedSource.type === "url" && (
+                <div className="space-y-1">
+                  <div className="text-xs text-white/60">{sourceTypeInfo[expandedSource.type].label}</div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      value={expandedSource.content}
+                      onChange={(e) => updateSource(expandedSource.id, e.target.value)}
+                      placeholder={sourceTypeInfo[expandedSource.type].placeholder}
+                      className="text-xs min-w-0 flex-1"
+                    />
+
+                    <div className="flex h-10 flex-none items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3">
+                      <div className="text-xs text-white/70 whitespace-nowrap">proxy-providers模式</div>
+                      <Popover.Root>
+                        <Popover.Trigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                            aria-label="proxy-providers 模式说明"
+                            title="proxy-providers 模式说明"
+                          >
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </Popover.Trigger>
+                        <Popover.Portal>
+                          <Popover.Content
+                            side="bottom"
+                            align="end"
+                            sideOffset={8}
+                            className="z-50 w-[360px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-md shadow-2xl p-3"
+                          >
+                            <div className="space-y-2 text-xs">
+                              <div className="flex items-center gap-2">
+                                <HelpCircle className="h-4 w-4 text-amber-300" />
+                                <div className="text-white font-medium">proxy-providers 模式</div>
+                              </div>
+                              <div className="text-white/60 leading-relaxed">
+                                部分订阅限制 CN IP 导入，url 无法在 SubBoost 内拉取解析。开启后 SubBoost
+                                不再拉取/解析该 url，而是在最终配置中写入{" "}
+                                <span className="font-mono">proxy-providers</span>，交由客户端自行拉取节点。
+                              </div>
+                              <div className="pt-2 border-t border-white/10 text-white/60 space-y-1">
+                                <div className="font-medium text-white/80">注意开启后：</div>
+                                <ul className="ml-4 list-disc space-y-1">
+                                  <li>无法在预览中查看/管理该 url 的节点</li>
+                                  <li>无法将这些节点用于中转代理组、分流组高级模式等高级功能</li>
+                                  <li>节点命名模板与 tag 在该模式下不生效</li>
+                                </ul>
+                              </div>
+                              <div className="pt-2 border-t border-white/10 text-[10px] text-white/40">
+                                若导入 url 报“未解析到有效节点/获取失败”等，可尝试开启此模式。
+                              </div>
+                            </div>
+                            <Popover.Arrow className="fill-white/10" />
+                          </Popover.Content>
+                        </Popover.Portal>
+                      </Popover.Root>
+                      <Switch
+                        checked={Boolean(expandedSource.useProxyProviders)}
+                        onCheckedChange={(checked) =>
+                          updateSourceMeta(expandedSource.id, {
+                            useProxyProviders: Boolean(checked),
+                            // UI 新开启时默认分组模式；旧数据（已保存无此字段）保持 inline 兼容
+                            ...(checked && !expandedSource.providerMode ? { providerMode: "grouped" as const } : {}),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* provider 设置：可折叠分组，开启 proxy-providers 模式后可用 */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setProviderSettingsOpen((open) => !open)}
+                      disabled={!expandedSource.useProxyProviders}
+                      className="flex items-center gap-2 py-1 px-2 rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      {providerSettingsOpen && expandedSource.useProxyProviders ? (
+                        <ChevronDown className="h-3.5 w-3.5 text-white/50" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 text-white/50" />
+                      )}
+                      <span className="text-xs font-medium">provider 设置</span>
+                      {!expandedSource.useProxyProviders && (
+                        <span className="text-[10px] text-white/40">开启 proxy-providers 模式后可用</span>
+                      )}
+                    </button>
+                    {providerSettingsOpen && expandedSource.useProxyProviders && (
+                      <div className="mt-1 pl-6">
+                        <ProviderSettingsFields
+                          source={expandedSource}
+                          defaultProviderKey={`url_${expandedSource.id}`}
+                          onUpdateMeta={updateSourceMeta}
+                          showFilter
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1">
                   <div className="text-xs text-white/60">标签（tag）</div>
@@ -300,110 +426,47 @@ export function SourcesSection() {
                 可用占位符：{"{tag}"}、{"{name}"}；留空则默认：{DEFAULT_NODE_NAME_TEMPLATE}
               </div>
 
-              <div className="space-y-1">
-                <div className="text-xs text-white/60">{sourceTypeInfo[expandedSource.type].label}</div>
-                {expandedSource.type === "url" ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
+              {expandedSource.type === "url" ? (
+                <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-xs text-white/60">流量/到期信息 URL（可选）</div>
                       <Input
-                        value={expandedSource.content}
-                        onChange={(e) => updateSource(expandedSource.id, e.target.value)}
-                        placeholder={sourceTypeInfo[expandedSource.type].placeholder}
-                        className="text-xs min-w-0 flex-1"
+                        value={expandedSource.userinfoUrl ?? ""}
+                        onChange={(e) => updateSourceMeta(expandedSource.id, { userinfoUrl: e.target.value })}
+                        placeholder="留空则默认使用当前订阅源 URL"
+                        className="text-xs"
                       />
-
-                      <div className="flex h-10 flex-none items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3">
-                        <div className="text-xs text-white/70 whitespace-nowrap">proxy-providers模式</div>
-                        <Popover.Root>
-                          <Popover.Trigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                              aria-label="proxy-providers 模式说明"
-                              title="proxy-providers 模式说明"
-                            >
-                              <HelpCircle className="h-3.5 w-3.5" />
-                            </button>
-                          </Popover.Trigger>
-                          <Popover.Portal>
-                            <Popover.Content
-                              side="bottom"
-                              align="end"
-                              sideOffset={8}
-                              className="z-50 w-[360px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-md shadow-2xl p-3"
-                            >
-                              <div className="space-y-2 text-xs">
-                                <div className="flex items-center gap-2">
-                                  <HelpCircle className="h-4 w-4 text-amber-300" />
-                                  <div className="text-white font-medium">proxy-providers 模式</div>
-                                </div>
-                                <div className="text-white/60 leading-relaxed">
-                                  部分订阅限制 CN IP 导入，url 无法在 SubBoost 内拉取解析。开启后 SubBoost
-                                  不再拉取/解析该 url，而是在最终配置中写入{" "}
-                                  <span className="font-mono">proxy-providers</span>，交由客户端自行拉取节点。
-                                </div>
-                                <div className="pt-2 border-t border-white/10 text-white/60 space-y-1">
-                                  <div className="font-medium text-white/80">注意开启后：</div>
-                                  <ul className="ml-4 list-disc space-y-1">
-                                    <li>无法在预览中查看/管理该 url 的节点</li>
-                                    <li>无法将这些节点用于中转代理组、分流组高级模式等高级功能</li>
-                                    <li>节点命名模板与 tag 在该模式下不生效</li>
-                                  </ul>
-                                </div>
-                                <div className="pt-2 border-t border-white/10 text-[10px] text-white/40">
-                                  若导入 url 报“未解析到有效节点/获取失败”等，可尝试开启此模式。
-                                </div>
-                              </div>
-                              <Popover.Arrow className="fill-white/10" />
-                            </Popover.Content>
-                          </Popover.Portal>
-                        </Popover.Root>
-                        <Switch
-                          checked={Boolean(expandedSource.useProxyProviders)}
-                          onCheckedChange={(checked) =>
-                            updateSourceMeta(expandedSource.id, { useProxyProviders: Boolean(checked) })
-                          }
-                        />
-                      </div>
                     </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <div className="text-xs text-white/60">流量/到期信息 URL（可选）</div>
-                        <Input
-                          value={expandedSource.userinfoUrl ?? ""}
-                          onChange={(e) => updateSourceMeta(expandedSource.id, { userinfoUrl: e.target.value })}
-                          placeholder="留空则默认使用当前订阅源 URL"
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-white/60">流量信息 User-Agent（可选）</div>
-                        <Input
-                          value={expandedSource.userinfoUserAgent ?? ""}
-                          onChange={(e) =>
-                            updateSourceMeta(expandedSource.id, { userinfoUserAgent: e.target.value })
-                          }
-                          placeholder="例如 clash.meta/v1.19.16"
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] text-white/40">
-                      有些订阅源不会直接返回 <span className="font-mono">subscription-userinfo</span>，但会提供独立的流量接口。
-                      设置后，SubBoost 会在导入/刷新时额外抓取该接口，用来更新这个源自己的流量与到期快照。
+                    <div className="space-y-1">
+                      <div className="text-xs text-white/60">流量信息 User-Agent（可选）</div>
+                      <Input
+                        value={expandedSource.userinfoUserAgent ?? ""}
+                        onChange={(e) =>
+                          updateSourceMeta(expandedSource.id, { userinfoUserAgent: e.target.value })
+                        }
+                        placeholder="例如 clash.meta/v1.19.16"
+                        className="text-xs"
+                      />
                     </div>
                   </div>
-                ) : (
+
+                  <div className="text-[11px] text-white/40">
+                    有些订阅源不会直接返回 <span className="font-mono">subscription-userinfo</span>，但会提供独立的流量接口。
+                    设置后，SubBoost 会在导入/刷新时额外抓取该接口，用来更新这个源自己的流量与到期快照。
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-xs text-white/60">{sourceTypeInfo[expandedSource.type].label}</div>
                   <Textarea
                     value={expandedSource.content}
                     onChange={(e) => updateSource(expandedSource.id, e.target.value)}
                     placeholder={sourceTypeInfo[expandedSource.type].placeholder}
                     className="min-h-[60vh] text-xs font-mono"
                   />
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 

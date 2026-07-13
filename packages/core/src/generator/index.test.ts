@@ -366,9 +366,13 @@ describe("generateClashConfig", () => {
     });
   });
 
-  it("applies persisted proxy group order across dialer, custom, and module groups", () => {
+  it("applies persisted proxy group order across dialer, custom, module, and provider groups", () => {
     const config = generateClashConfig({
       nodes: [ssNode({ name: "Relay" }), ssNode({ name: "Target", server: "target.example.com" })],
+      proxyProviders: {
+        air: { type: "http", url: "https://air.example.com/sub", path: "./air.yaml" },
+      },
+      proxyProviderAttachments: [{ key: "air", mode: "grouped", groupName: "✈️ Air" }],
       dialerProxyGroups: [
         {
           id: "chain",
@@ -386,14 +390,15 @@ describe("generateClashConfig", () => {
           groupType: "select",
         },
       ],
-      proxyGroupOrder: ["custom:custom", "dialer:chain", "module:auto", "missing", "module:auto"],
+      proxyGroupOrder: ["name:✈️ Air", "custom:custom", "dialer:chain", "module:auto", "missing", "module:auto"],
       userConfig: {
         dnsYaml: "",
         enabledGroups: ["select", "auto", "global", "final"],
       },
     });
 
-    expect(config["proxy-groups"]?.slice(0, 4).map((group) => group.name)).toEqual([
+    expect(config["proxy-groups"]?.slice(0, 5).map((group) => group.name)).toEqual([
+      "✈️ Air",
       "Custom",
       "Chain",
       "⚡ 自动选择",
@@ -614,5 +619,202 @@ describe("generateClashConfig", () => {
     expect(yaml).toContain("proxies:");
     expect(yaml).toContain("proxy-groups:");
     expect(yaml).toContain("rules:");
+  });
+
+  it("keeps legacy inline behavior when providers carry no attachments", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      proxyProviders: {
+        remote: { type: "http", url: "https://example.com/provider.yaml", path: "./remote.yaml" },
+      },
+      userConfig: { dnsYaml: "" },
+    });
+
+    const groups = config["proxy-groups"] ?? [];
+    const select = groups.find((group) => group.name === "🚀 节点选择");
+    expect(select).toMatchObject({ use: ["remote"] });
+    // 未声明 attachments 时不生成机场组
+    expect(groups.filter((group) => Array.isArray(group.use) && group.use.length === 1 && !group.proxies)).toHaveLength(0);
+  });
+
+  it("wires grouped, inline, and bare providers according to their attachments", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      proxyProviders: {
+        grouped_a: { type: "http", url: "https://a.example.com/sub", path: "./a.yaml" },
+        inline_b: { type: "http", url: "https://b.example.com/sub", path: "./b.yaml" },
+        bare_c: { type: "http", url: "https://c.example.com/sub", path: "./c.yaml" },
+      },
+      proxyProviderAttachments: [
+        { key: "grouped_a", mode: "grouped", groupName: "✈️ 测试机场" },
+        { key: "inline_b", mode: "inline" },
+        { key: "bare_c", mode: "bare" },
+      ],
+      userConfig: { dnsYaml: "" },
+    });
+
+    const groups = config["proxy-groups"] ?? [];
+
+    // 机场组：select + use，插在节点选择/自动选择之后
+    const airport = groups.find((group) => group.name === "✈️ 测试机场");
+    expect(airport).toMatchObject({
+      type: "select",
+      use: ["grouped_a"],
+    });
+    expect(airport).not.toHaveProperty("icon");
+    const airportIndex = groups.findIndex((group) => group.name === "✈️ 测试机场");
+    const selectIndex = groups.findIndex((group) => group.name === "🚀 节点选择");
+    const autoIndex = groups.findIndex((group) => group.name === "⚡ 自动选择");
+    expect(airportIndex).toBeGreaterThan(Math.max(selectIndex, autoIndex));
+
+    // 机场组进入「节点选择」候选；provider 注入只保留 inline
+    const select = groups.find((group) => group.name === "🚀 节点选择");
+    expect(select?.proxies).toContain("✈️ 测试机场");
+    expect(select).toMatchObject({ use: ["inline_b"] });
+    // 机场组默认进入所有内置手选类分流组候选
+    for (const group of groups) {
+      if (group.name === "✈️ 测试机场") continue;
+      if (group.type !== "select") continue;
+      expect(group.proxies).toContain("✈️ 测试机场");
+    }
+    for (const group of groups) {
+      if (group.name === "✈️ 测试机场") continue;
+      if (!Array.isArray(group.use)) continue;
+      expect(group.use).toEqual(["inline_b"]);
+    }
+    // bare 不出现在任何 use 里
+    expect(groups.some((group) => Array.isArray(group.use) && group.use.includes("bare_c"))).toBe(false);
+  });
+
+  it("excludes a default airport group from a group via advanced.excludedMembers", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      proxyProviders: {
+        grouped_a: { type: "http", url: "https://a.example.com/sub", path: "./a.yaml" },
+      },
+      proxyProviderAttachments: [{ key: "grouped_a", mode: "grouped", groupName: "✈️ 测试机场" }],
+      proxyGroupAdvanced: {
+        select: { excludedMembers: [{ kind: "provider-group", key: "grouped_a" }] },
+      },
+      userConfig: { dnsYaml: "" },
+    });
+    const groups = config["proxy-groups"] ?? [];
+    // 「节点选择」排除了机场组 → 其 proxies 不含机场组名；机场组本体仍生成，其它组仍含
+    const select = groups.find((group) => group.name === "🚀 节点选择");
+    expect(select?.proxies).not.toContain("✈️ 测试机场");
+    expect(groups.some((group) => group.name === "✈️ 测试机场")).toBe(true);
+    const auto = groups.find((group) => group.name === "⚡ 自动选择");
+    // ⚡ 自动选择是 url-test，不注入机场组；换个手选组验证仍默认含
+    const anotherSelect = groups.find(
+      (group) => group.type === "select" && group.name !== "🚀 节点选择" && group.name !== "✈️ 测试机场",
+    );
+    expect(anotherSelect?.proxies).toContain("✈️ 测试机场");
+    void auto;
+  });
+
+  it("reorders a default airport group within a group via advanced.memberOrder", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      proxyProviders: {
+        grouped_a: { type: "http", url: "https://a.example.com/sub", path: "./a.yaml" },
+      },
+      proxyProviderAttachments: [{ key: "grouped_a", mode: "grouped", groupName: "✈️ 测试机场" }],
+      proxyGroupAdvanced: {
+        select: {
+          memberOrder: [
+            { kind: "provider-group", key: "grouped_a" },
+            { kind: "module", id: "auto" },
+          ],
+        },
+      },
+      userConfig: { dnsYaml: "" },
+    });
+    const groups = config["proxy-groups"] ?? [];
+    const select = groups.find((group) => group.name === "🚀 节点选择");
+    const proxies = select?.proxies ?? [];
+    // memberOrder 把机场组排到自动选择之前
+    expect(proxies.indexOf("✈️ 测试机场")).toBeLessThan(proxies.indexOf("⚡ 自动选择"));
+  });
+
+  it("suffixes airport group names that collide with existing groups or nodes", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode({ name: "撞名机场" })],
+      proxyProviders: {
+        p1: { type: "http", url: "https://a.example.com/sub", path: "./a.yaml" },
+        p2: { type: "http", url: "https://b.example.com/sub", path: "./b.yaml" },
+      },
+      proxyProviderAttachments: [
+        { key: "p1", mode: "grouped", groupName: "撞名机场" },
+        { key: "p2", mode: "grouped", groupName: "撞名机场" },
+      ],
+      userConfig: { dnsYaml: "" },
+    });
+
+    const groups = config["proxy-groups"] ?? [];
+    const airportNames = groups.filter((group) => Array.isArray(group.use)).map((group) => group.name);
+    expect(airportNames).toEqual(["撞名机场 2", "撞名机场 3"]);
+  });
+
+  it("places the airport group right after 自动选择 (core area) and adds it to custom groups", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      proxyProviders: {
+        grouped_a: { type: "http", url: "https://a.example.com/sub", path: "./a.yaml" },
+      },
+      proxyProviderAttachments: [{ key: "grouped_a", mode: "grouped", groupName: "✈️ 测试机场" }],
+      customProxyGroups: [{ id: "cg1", name: "🧩 我的分组", emoji: "🧩", groupType: "select", enabled: true }],
+      userConfig: { dnsYaml: "" },
+    });
+
+    const groups = config["proxy-groups"] ?? [];
+    const names = groups.map((group) => group.name);
+    // 机场组紧跟“⚡ 自动选择”之后（核心区内）
+    const autoIndex = names.indexOf("⚡ 自动选择");
+    expect(names[autoIndex + 1]).toBe("✈️ 测试机场");
+    // 自定义分组默认也带上机场组候选
+    const custom = groups.find((group) => group.name === "🧩 我的分组");
+    expect(custom?.proxies).toContain("✈️ 测试机场");
+  });
+
+  it("appends manually added provider members (Provider 组 panel) to use and proxies", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      proxyProviders: {
+        grouped_a: { type: "http", url: "https://a.example.com/sub", path: "./a.yaml" },
+        bare_b: { type: "http", url: "https://b.example.com/sub", path: "./b.yaml" },
+      },
+      proxyProviderAttachments: [
+        { key: "grouped_a", mode: "grouped", groupName: "✈️ 测试机场" },
+        { key: "bare_b", mode: "bare" },
+      ],
+      customProxyGroups: [
+        {
+          id: "cg1",
+          name: "🧩 我的分组",
+          emoji: "🧩",
+          groupType: "select",
+          enabled: true,
+          advanced: {
+            // 手动把 bare provider 以内联方式并入本组，并追加分组模式机场组
+            extraMembers: [
+              { kind: "provider-inline", key: "bare_b" },
+              { kind: "provider-group", key: "grouped_a" },
+            ],
+          },
+        },
+      ],
+      userConfig: { dnsYaml: "" },
+    });
+
+    const groups = config["proxy-groups"] ?? [];
+    const custom = groups.find((group) => group.name === "🧩 我的分组");
+    // 内联的 bare provider 落到该组 use（bare 默认不注入，靠手动追加）
+    expect(custom?.use).toContain("bare_b");
+    // 机场组名落到 proxies（去重，不因候选已含而重复）
+    const airportCount = (custom?.proxies ?? []).filter((name) => name === "✈️ 测试机场").length;
+    expect(airportCount).toBe(1);
+    // 其他组不受影响：不会平白多出 bare_b 的 use
+    const select = groups.find((group) => group.name === "🚀 节点选择");
+    expect(select?.use ?? []).not.toContain("bare_b");
   });
 });

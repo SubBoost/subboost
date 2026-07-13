@@ -23,6 +23,10 @@ describe("resolveProxyGroupMembers", () => {
     expect(normalizeProxyGroupMemberRef({ kind: "node", name: " Node A " })).toEqual({ kind: "node", name: "Node A" });
     expect(normalizeProxyGroupMemberRef({ kind: "module", id: " auto " })).toEqual({ kind: "module", id: "auto" });
     expect(normalizeProxyGroupMemberRef({ kind: "custom", id: " media " })).toEqual({ kind: "custom", id: "media" });
+    expect(normalizeProxyGroupMemberRef({ kind: "provider-inline", key: " lxy " })).toEqual({ kind: "provider-inline", key: "lxy" });
+    expect(normalizeProxyGroupMemberRef({ kind: "provider-group", key: " lxy " })).toEqual({ kind: "provider-group", key: "lxy" });
+    expect(normalizeProxyGroupMemberRef({ kind: "provider-inline", key: " " })).toBeNull();
+    expect(normalizeProxyGroupMemberRef({ kind: "provider-group" })).toBeNull();
     expect(normalizeProxyGroupMemberRef({ kind: "direct" })).toEqual({ kind: "direct" });
     expect(normalizeProxyGroupMemberRef({ kind: "reject" })).toEqual({ kind: "reject" });
     expect(normalizeProxyGroupMemberRef(null)).toBeNull();
@@ -424,5 +428,63 @@ describe("resolveProxyGroupMembers", () => {
       "reject:REJECT",
     ]);
     expect(result.excluded.map((member) => member.key)).toEqual(["direct:DIRECT"]);
+  });
+
+  it("resolves airport group names as provider-group members when providerGroups is passed", () => {
+    const result = resolveProxyGroupMembers({
+      defaultProxyNames: ["DIRECT", "✈️ 香港机场"],
+      nodes: [],
+      providerGroups: [{ key: "lxy", name: "✈️ 香港机场" }],
+    });
+    const airport = result.included.find((member) => member.kind === "provider-group");
+    expect(airport).toMatchObject({ kind: "provider-group", key: "provider-group:lxy", name: "✈️ 香港机场" });
+    expect(airport?.ref).toEqual({ kind: "provider-group", key: "lxy" });
+  });
+
+  it("ignores airport group names when providerGroups is not passed (old behavior)", () => {
+    const result = resolveProxyGroupMembers({
+      defaultProxyNames: ["DIRECT", "✈️ 香港机场"],
+      nodes: [],
+    });
+    expect(result.proxyNames).toEqual(["DIRECT"]);
+    expect(result.included.some((member) => member.kind === "provider-group")).toBe(false);
+  });
+
+  it("excludes a default airport group via excludedMembers", () => {
+    const result = resolveProxyGroupMembers({
+      defaultProxyNames: ["DIRECT", "✈️ 香港机场"],
+      availableProxyNames: ["DIRECT", "✈️ 香港机场"],
+      nodes: [],
+      providerGroups: [{ key: "lxy", name: "✈️ 香港机场" }],
+      advanced: { excludedMembers: [{ kind: "provider-group", key: "lxy" }] },
+    });
+    expect(result.proxyNames).toEqual(["DIRECT"]);
+    expect(result.excluded.some((member) => member.key === "provider-group:lxy")).toBe(true);
+  });
+
+  it("reorders a provider-group member via memberOrder", () => {
+    const result = resolveProxyGroupMembers({
+      defaultProxyNames: ["DIRECT", "✈️ 香港机场", "REJECT"],
+      nodes: [],
+      providerGroups: [{ key: "lxy", name: "✈️ 香港机场" }],
+      advanced: {
+        memberOrder: [
+          { kind: "provider-group", key: "lxy" },
+          { kind: "direct" },
+          { kind: "reject" },
+        ],
+      },
+    });
+    expect(result.proxyNames).toEqual(["✈️ 香港机场", "DIRECT", "REJECT"]);
+  });
+
+  it("drops an orphan provider-group ref in extraMembers (key not in providerGroups)", () => {
+    const result = resolveProxyGroupMembers({
+      defaultProxyNames: ["DIRECT"],
+      nodes: [],
+      providerGroups: [{ key: "lxy", name: "✈️ 香港机场" }],
+      advanced: { extraMembers: [{ kind: "provider-group", key: "ghost" }] },
+    });
+    expect(result.included.some((member) => member.key === "provider-group:ghost")).toBe(false);
   });
 });

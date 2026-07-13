@@ -31,9 +31,11 @@ import {
   listCustomRulesForTarget,
 } from "./proxy-group-rule-targets";
 import { ProxyGroupsCustomGroupsPanel } from "./proxy-groups-custom-groups-panel";
+import { buildProviderGroupInfo } from "./provider-group-plan";
 import { ProxyGroupsCustomRoutingRules } from "./proxy-groups-custom-routing-rules";
 import { ProxyGroupAdvancedPanel } from "./proxy-group-advanced-panel";
 import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
+import { ProviderGroupReadonlyCard } from "./provider-group-readonly-card";
 
 const PROXY_GROUP_SECTION_LABEL_ROW_CLASS = "flex min-h-7 items-center gap-2";
 const PROXY_GROUP_SECTION_LABEL_CLASS = "text-xs text-white/50";
@@ -75,7 +77,22 @@ export function ProxyGroupsCategories() {
     setProxyGroupAdvancedModeEnabled,
     updateProxyGroupAdvanced,
     dialerProxyGroups = [],
+    sources = [],
   } = useConfigStore();
+
+  // provider 分组模式生成的机场组名（与生成器/面板共用同一构建逻辑，保证组名一致）
+  const providerGroupNames = React.useMemo(
+    () =>
+      buildProviderGroupInfo(sources, {
+        nodes,
+        proxyGroupNameOverrides,
+        customProxyGroups,
+        dialerProxyGroups,
+        testUrl,
+        testInterval,
+      }).names,
+    [sources, testUrl, testInterval, nodes, proxyGroupNameOverrides, customProxyGroups, dialerProxyGroups],
+  );
 
   const [expandedCategories, setExpandedCategories] = React.useState<
     Set<string>
@@ -157,6 +174,12 @@ export function ProxyGroupsCategories() {
     }
     return grouped;
   }, [hiddenProxyGroups]);
+  // 机场组只读卡片挂在“⚡ 自动选择”之后；若 auto 被隐藏则落到核心组末尾
+  const coreProviderAnchorId = React.useMemo(() => {
+    const coreModules = modulesByCategory["core"] || [];
+    if (coreModules.some((module) => module.id === "auto")) return "auto";
+    return coreModules[coreModules.length - 1]?.id ?? null;
+  }, [modulesByCategory]);
   const generatedProxyGroupNodeCounts = React.useMemo(() => {
     if (nodes.length === 0) return new Map<string, number>();
     const generated = generateProxyGroups({
@@ -525,8 +548,8 @@ export function ProxyGroupsCategories() {
                           };
 
                           return (
+                            <React.Fragment key={module.id}>
                             <ProxyGroupsModuleCard
-                              key={module.id}
                               module={module}
                               display={display}
                               isCore={isCore}
@@ -622,6 +645,12 @@ export function ProxyGroupsCategories() {
                                 />
                               )}
                             />
+                            {/* 机场组只读卡片：核心组分类中排在“⚡ 自动选择”之后 */}
+                            {categoryId === "core" && module.id === coreProviderAnchorId &&
+                              providerGroupNames.map((groupName) => (
+                                <ProviderGroupReadonlyCard key={`provider:${groupName}`} name={groupName} />
+                              ))}
+                            </React.Fragment>
                           );
                         })
                       ) : (
@@ -637,6 +666,7 @@ export function ProxyGroupsCategories() {
             })}
         </div>
       </div>
+
 
       <ProxyGroupsCustomRoutingRules />
     </>
