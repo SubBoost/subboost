@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
   const passwordHash = await bcrypt.hash(password, 12);
   const admin = await prisma.$transaction(async (transaction) => {
-    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(${1_397_704_283})`;
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(${1_397_704_283}) IS NULL AS "locked"`;
     if (await transaction.localAdmin.count()) return null;
     return transaction.localAdmin.create({
       data: { username, passwordHash, lastLoginAt: new Date() },

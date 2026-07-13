@@ -124,7 +124,7 @@ describe("local setup admin route", () => {
       body: { error: "已有管理员账号，请直接登录", code: "CONFLICT" },
     });
     expect(mocks.queryRaw).toHaveBeenCalledWith(
-      expect.arrayContaining(["SELECT pg_advisory_xact_lock(", ")"]),
+      expect.arrayContaining(["SELECT pg_advisory_xact_lock(", ') IS NULL AS "locked"']),
       1_397_704_283
     );
     expect(mocks.create).not.toHaveBeenCalled();
