@@ -77,6 +77,55 @@ describe("generateClashConfig", () => {
     ]);
   });
 
+  it("generates group listeners bound to existing proxy groups with validation and dedupe", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      dialerProxyGroups: [
+        { id: "d1", name: "美国中转", relayNodes: ["Node"], targetNodes: [], type: "select" },
+        { id: "d2", name: "香港中转", relayNodes: ["Node"], targetNodes: [], type: "select" },
+      ],
+      userConfig: {
+        dnsYaml: "",
+        mixedPort: 7890,
+        listenerPorts: { Node: 12000 },
+      },
+      groupListeners: [
+        { id: "a", target: "美国中转", port: 7891 },
+        { id: "b", target: "不存在的组", port: 7892 },
+        { id: "c", target: "美国中转", port: 7893 },
+        { id: "d", target: "香港中转", port: 12000 },
+        { id: "e", target: "香港中转", port: 7890 },
+        { id: "f", target: "香港中转", port: 7894 },
+      ],
+    });
+
+    expect(config.listeners).toEqual([
+      { name: "mixed0", type: "mixed", port: 12000, proxy: "Node" },
+      { name: "group-in-0", type: "mixed", listen: "0.0.0.0", port: 7891, proxy: "美国中转", udp: true },
+      { name: "group-in-1", type: "mixed", listen: "0.0.0.0", port: 7894, proxy: "香港中转", udp: true },
+    ]);
+  });
+
+  it("appends group listeners after base config listeners and node listeners", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode()],
+      dialerProxyGroups: [
+        { id: "d1", name: "美国中转", relayNodes: ["Node"], targetNodes: [], type: "select" },
+      ],
+      userConfig: {
+        dnsYaml: ["listeners:", "  - name: base-in", "    type: socks", "    port: 18000"].join("\n"),
+        listenerPorts: { Node: 12000 },
+      },
+      groupListeners: [{ id: "a", target: "美国中转", port: 7891 }],
+    });
+
+    expect(config.listeners).toEqual([
+      { name: "base-in", type: "socks", port: 18000 },
+      { name: "mixed0", type: "mixed", port: 12000, proxy: "Node" },
+      { name: "group-in-0", type: "mixed", listen: "0.0.0.0", port: 7891, proxy: "美国中转", udp: true },
+    ]);
+  });
+
   it("moves root nameserver-policy under dns and merges proxy providers", () => {
     const config = generateClashConfig({
       nodes: [ssNode()],

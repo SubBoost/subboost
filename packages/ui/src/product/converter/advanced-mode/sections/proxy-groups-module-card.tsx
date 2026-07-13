@@ -26,6 +26,7 @@ import {
   ProxyGroupNameEditor,
 } from "./proxy-group-name-editor";
 import { ProxyGroupSummary } from "./proxy-group-summary";
+import { GroupListenerPortBadge } from "./proxy-groups-group-listeners";
 import {
   ProxyGroupTypeMenu,
   getLoadBalanceStrategyLabel,
@@ -331,6 +332,7 @@ export function ProxyGroupsModuleCard({
                 <span className="min-w-0 break-words text-sm font-medium text-white">
                   {display.full}
                 </span>
+                <GroupListenerPortBadge name={display.full} />
                 <div className="flex shrink-0 items-center gap-1">
                   {!isCore && (
                     <Button

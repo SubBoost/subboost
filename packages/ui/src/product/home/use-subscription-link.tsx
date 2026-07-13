@@ -401,6 +401,7 @@ export function useSubscriptionLink({
             proxyGroupNameOverrides,
             proxyGroupOrder: useConfigStore.getState().proxyGroupOrder,
             listenerPorts,
+            groupListeners: useConfigStore.getState().groupListeners,
             dnsYaml,
             ruleProviderBaseUrl,
             testUrl,

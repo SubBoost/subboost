@@ -142,6 +142,10 @@ vi.mock("./proxy-groups-custom-routing-rules", () => ({
     return null;
   },
 }));
+vi.mock("./proxy-groups-group-listeners", () => ({
+  GroupListenerPortBadge: () => null,
+  ProxyGroupsGroupListeners: () => null,
+}));
 vi.mock("./proxy-groups-module-card", () => ({
   ProxyGroupsModuleCard: (props: any) => {
     mocks.captures.moduleCards.push(props);

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Lock } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
+import { GroupListenerPortBadge } from "./proxy-groups-group-listeners";
 
 /**
  * provider 分组模式生成的机场组：核心组分类里的只读卡片。
@@ -20,6 +21,7 @@ export function ProviderGroupReadonlyCard({ name }: { name: string }) {
           >
             Provider
           </Badge>
+          <GroupListenerPortBadge name={name} />
         </div>
         <span
           className="flex shrink-0 items-center gap-1 text-[10px] text-white/40"

@@ -53,6 +53,7 @@ function buildGenerateClashYamlOptions(
     proxyGroupAdvanced: state.proxyGroupAdvanced,
     proxyGroupNameOverrides: state.proxyGroupNameOverrides,
     proxyGroupOrder: state.proxyGroupOrder,
+    groupListeners: state.groupListeners,
   };
 }
 

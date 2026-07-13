@@ -95,6 +95,17 @@ export interface ListenerConfig {
   [key: string]: unknown;
 }
 
+/**
+ * 分组监听绑定：给一个"已存在的策略组"开本地 inbound 监听端口。
+ * 生成时映射为 listeners 条目：{ name: 自动, type: mixed, listen: 0.0.0.0, port, proxy: target, udp: true }。
+ */
+export interface GroupListenerBinding {
+  id: string;
+  // 绑定的策略组名（写入 listener 的 proxy 字段）
+  target: string;
+  port: number;
+}
+
 export interface SnifferConfig {
   enable?: boolean;
   "parse-pure-ip"?: boolean;

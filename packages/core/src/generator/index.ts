@@ -27,6 +27,7 @@ import type {
   ClashConfig,
   CustomProxyGroup,
   CustomRuleSet,
+  GroupListenerBinding,
   ProxyGroup,
   ProxyGroupAdvancedConfig,
   TemplateType,
@@ -54,6 +55,7 @@ export interface GenerateOptions {
   builtinRuleEdits?: BuiltinRuleEdits;
   proxyGroupNameOverrides?: Record<string, string>;
   proxyGroupOrder?: string[];
+  groupListeners?: GroupListenerBinding[];
 }
 
 type BaseConfig = Record<string, unknown>;
@@ -519,9 +521,53 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     availablePolicyTargets
   );
   const resolvedListeners = (() => {
-    if (!listeners) return baseTopLevelPatch.listeners;
-    if (baseTopLevelPatch.listeners === undefined) return listeners;
-    if (Array.isArray(baseTopLevelPatch.listeners)) return [...baseTopLevelPatch.listeners, ...listeners];
+    // 分组监听：给"已存在的策略组"绑定 inbound 端口；端口在节点监听与 mixed-port 之间去重。
+    const groupListenerEntries = (() => {
+      const list = Array.isArray(options.groupListeners) ? options.groupListeners : [];
+      if (list.length === 0) return [] as Array<Record<string, unknown>>;
+
+      const validTargets = new Set(availablePolicyTargets);
+      const usedPorts = new Set<number>(Array.isArray(listeners) ? listeners.map((l) => l.port) : []);
+      if (typeof config.mixedPort === "number" && Number.isInteger(config.mixedPort)) {
+        usedPorts.add(config.mixedPort);
+      }
+      const usedNames = new Set<string>(Array.isArray(listeners) ? listeners.map((l) => l.name) : []);
+      const usedTargets = new Set<string>();
+
+      const out: Array<Record<string, unknown>> = [];
+      let autoIndex = 0;
+      for (const binding of list) {
+        if (!binding || typeof binding !== "object") continue;
+
+        const target = typeof binding.target === "string" ? binding.target.trim() : "";
+        if (!target || !validTargets.has(target)) continue;
+        // 一组一端口：同 target 重复绑定只取首条
+        if (usedTargets.has(target)) continue;
+
+        const port = binding.port;
+        if (typeof port !== "number" || !Number.isInteger(port)) continue;
+        if (port < 1 || port > 65535) continue;
+        if (usedPorts.has(port)) continue;
+        usedPorts.add(port);
+        usedTargets.add(target);
+
+        let name = `group-in-${autoIndex++}`;
+        while (usedNames.has(name)) name = `group-in-${autoIndex++}`;
+        usedNames.add(name);
+
+        out.push({ name, type: "mixed", listen: "0.0.0.0", port, proxy: target, udp: true });
+      }
+      return out;
+    })();
+
+    const generatedListeners: Array<Record<string, unknown>> = [
+      ...(Array.isArray(listeners) ? (listeners as Array<Record<string, unknown>>) : []),
+      ...groupListenerEntries,
+    ];
+
+    if (generatedListeners.length === 0) return baseTopLevelPatch.listeners;
+    if (baseTopLevelPatch.listeners === undefined) return generatedListeners;
+    if (Array.isArray(baseTopLevelPatch.listeners)) return [...baseTopLevelPatch.listeners, ...generatedListeners];
     throw new BaseConfigYamlError("基础和 DNS 配置中的 listeners 必须是数组，才能与节点监听端口合并。");
   })();
 

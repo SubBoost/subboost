@@ -140,7 +140,8 @@ function hasMeaningfulConfig(state: ConfigState): boolean {
     state.ruleProviderBaseUrl !== initialState.ruleProviderBaseUrl ||
     state.cnIpNoResolve !== initialState.cnIpNoResolve ||
     state.experimentalCnUseCnRuleSet !== initialState.experimentalCnUseCnRuleSet ||
-    Object.keys(state.listenerPorts).length > 0
+    Object.keys(state.listenerPorts).length > 0 ||
+    state.groupListeners.length > 0
   );
 }
 
@@ -174,6 +175,7 @@ function buildHandoffState(state: ConfigState): Partial<ConfigState> {
     cnIpNoResolve: state.cnIpNoResolve,
     experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet,
     listenerPorts: state.listenerPorts,
+    groupListeners: state.groupListeners,
   };
 }
 
@@ -239,6 +241,9 @@ function normalizeHandoffState(raw: unknown): Partial<ConfigState> | null {
   }
   const listenerPorts = numberRecord(raw.listenerPorts);
   if (listenerPorts) out.listenerPorts = listenerPorts;
+  const groupListeners = objectArray<ConfigState["groupListeners"][number]>(raw.groupListeners);
+  if (groupListeners) out.groupListeners = groupListeners;
+
   return out;
 }
 

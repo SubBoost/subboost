@@ -58,6 +58,7 @@ describe("computeGeneratedYamlResult", () => {
         testInterval: 600,
         enabledProxyGroups: ["select", "ai"],
         ruleOrder: ["module:ai"],
+        groupListeners: [{ id: "g1", target: "美国中转", port: 7891 }],
       })
     );
 
@@ -83,6 +84,7 @@ describe("computeGeneratedYamlResult", () => {
           },
         },
         proxyProviderAttachments: [{ key: "url_source-1", mode: "inline" }],
+        groupListeners: [{ id: "g1", target: "美国中转", port: 7891 }],
         userConfig: expect.objectContaining({
           enabledGroups: ["select", "ai"],
           enabledRules: ["select", "ai"],

@@ -70,6 +70,10 @@ vi.mock("./proxy-groups-module-rules-panel", () => ({
     return React.createElement("div", null, "rules-panel");
   },
 }));
+vi.mock("./proxy-groups-group-listeners", () => ({
+  GroupListenerPortBadge: () => null,
+  ProxyGroupsGroupListeners: () => null,
+}));
 
 import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
 

@@ -13,6 +13,7 @@ import { createTemplateActions } from "./config-store/actions/template-actions";
 import { createCustomActions } from "./config-store/actions/custom-actions";
 import { createProxyGroupActions } from "./config-store/actions/proxy-group-actions";
 import { createDialerActions } from "./config-store/actions/dialer-actions";
+import { createGroupListenerActions } from "./config-store/actions/group-listener-actions";
 import { createSettingsActions } from "./config-store/actions/settings-actions";
 import { createHistoryActions } from "./config-store/actions/history-actions";
 import {
@@ -72,6 +73,7 @@ export const useConfigStore = create<ConfigState & ConfigActions>()(
         ...createCustomActions(set, get, setAndGenerateConfig),
         ...createProxyGroupActions(set, get, setAndGenerateConfig),
         ...createDialerActions(set, get, setAndGenerateConfig),
+        ...createGroupListenerActions(set, get, setAndGenerateConfig),
         ...createSettingsActions(set, get, setAndGenerateConfig),
         ...createHistoryActions(set, get),
       };

@@ -33,6 +33,7 @@ import {
 import { ProxyGroupsCustomGroupsPanel } from "./proxy-groups-custom-groups-panel";
 import { buildProviderGroupInfo } from "./provider-group-plan";
 import { ProxyGroupsCustomRoutingRules } from "./proxy-groups-custom-routing-rules";
+import { ProxyGroupsGroupListeners } from "./proxy-groups-group-listeners";
 import { ProxyGroupAdvancedPanel } from "./proxy-group-advanced-panel";
 import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
 import { ProviderGroupReadonlyCard } from "./provider-group-readonly-card";
@@ -667,6 +668,7 @@ export function ProxyGroupsCategories() {
         </div>
       </div>
 
+      <ProxyGroupsGroupListeners />
 
       <ProxyGroupsCustomRoutingRules />
     </>

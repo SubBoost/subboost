@@ -8,6 +8,7 @@ import {
   isProxyGroupGroupType,
   type CustomProxyGroup,
   type CustomRule,
+  type GroupListenerBinding,
   type ProxyGroupRuleTarget,
   type TemplateType,
   type UserConfig,
@@ -125,6 +126,31 @@ function normalizeListenerPorts(value: unknown): Record<string, number> | undefi
     out[name] = port;
   }
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function normalizeGroupListeners(value: unknown): GroupListenerBinding[] {
+  if (!Array.isArray(value)) return [];
+  const out: GroupListenerBinding[] = [];
+  const usedIds = new Set<string>();
+  const usedTargets = new Set<string>();
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    if (!isRecord(item)) continue;
+
+    const target = toTrimmedString(item.target);
+    const port = normalizePort(item.port);
+    if (!target || port === undefined) continue;
+    // 一组一端口：同 target 重复绑定只保留首个
+    if (usedTargets.has(target)) continue;
+    usedTargets.add(target);
+
+    let id = toTrimmedString(item.id) || `group_listener_${index + 1}`;
+    while (usedIds.has(id)) id = `${id}_${index + 1}`;
+    usedIds.add(id);
+
+    out.push({ id, target, port });
+  }
+  return out;
 }
 
 function normalizeEnabledList(value: unknown): string[] | undefined {
@@ -301,6 +327,7 @@ export function buildGenerateOptionsFromConfig(
 
   const dialerProxyGroups = normalizeDialerProxyGroups(config.dialerProxyGroups);
   const proxyGroupOrder = normalizeProxyGroupOrder(config.proxyGroupOrder);
+  const groupListeners = normalizeGroupListeners(config.groupListeners);
   const sanitizedNodes = stripImportedNodeControlFieldsFromList(opts.nodes);
   const proxyGroupAdvanced = isRecord(config.proxyGroupAdvanced)
     ? Object.fromEntries(
@@ -323,5 +350,6 @@ export function buildGenerateOptionsFromConfig(
     ...(Object.keys(builtinRuleEdits).length > 0 ? { builtinRuleEdits } : {}),
     ...(proxyGroupNameOverrides ? { proxyGroupNameOverrides } : {}),
     ...(proxyGroupOrder ? { proxyGroupOrder } : {}),
+    ...(groupListeners.length > 0 ? { groupListeners } : {}),
   };
 }

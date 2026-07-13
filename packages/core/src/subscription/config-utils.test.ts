@@ -448,6 +448,40 @@ describe("subscription config utils", () => {
     expect(options.dialerProxyGroups).toBeUndefined();
   });
 
+  it("normalizes group listeners: trims fields, drops invalid entries and dedupes targets", () => {
+    const options = buildGenerateOptionsFromConfig(
+      {
+        groupListeners: [
+          { id: " g1 ", target: " AI 组 ", port: 7891 },
+          { id: "g2", target: "Media", port: "7892" },
+          { id: "g3", target: "  ", port: 7893 },
+          { id: "g4", target: "AI 组", port: 7894 },
+          "bad",
+          { id: "g5", target: "Games", port: 0 },
+          { id: "g6", target: "Games", port: 65536 },
+          { target: "Games", port: 7895 },
+        ],
+      },
+      { nodes: [node()] },
+    );
+
+    expect(options.groupListeners).toEqual([
+      { id: "g1", target: "AI 组", port: 7891 },
+      { id: "group_listener_8", target: "Games", port: 7895 },
+    ]);
+  });
+
+  it("omits group listeners when none survive normalization", () => {
+    const options = buildGenerateOptionsFromConfig(
+      {
+        groupListeners: [{ id: "g1", target: "", port: 7891 }, 42],
+      },
+      { nodes: [node()] },
+    );
+
+    expect(options).not.toHaveProperty("groupListeners");
+  });
+
   it("uses legacy custom group fallback when rule model normalization returns no groups", async () => {
     vi.resetModules();
     vi.doMock("@subboost/core/rules/rule-model", () => ({
