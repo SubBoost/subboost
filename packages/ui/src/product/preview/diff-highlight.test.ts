@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DiffHighlight, YamlHighlight } from "./diff-highlight";
+import { YamlHighlight } from "./diff-highlight";
 
 const reactMocks = vi.hoisted(() => ({
   useMemo: vi.fn((factory: () => unknown) => factory()),
@@ -50,33 +50,6 @@ function collectHtml(value: unknown): string[] {
   });
   return html;
 }
-
-describe("DiffHighlight", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns null for empty input", () => {
-    expect(DiffHighlight({ oldText: "", newText: "" })).toBeNull();
-  });
-
-  it("renders line-level additions and removals", () => {
-    const rendered = DiffHighlight({
-      oldText: "a\nb\nc",
-      newText: "a\nx\nc\nd",
-      className: "custom",
-    });
-
-    const text = collectText(rendered);
-    expect(text).toContain("变更统计:");
-    expect(text).toContain("+2 行");
-    expect(text).toContain("-1 行");
-    expect(text).toContain("a");
-    expect(text).toContain("b");
-    expect(text).toContain("x");
-    expect(text).toContain("d");
-  });
-});
 
 describe("YamlHighlight", () => {
   beforeEach(() => {

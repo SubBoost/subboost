@@ -2,14 +2,14 @@ FROM node:22-alpine AS deps
 WORKDIR /package
 RUN apk add --no-cache openssl
 
+COPY package.json package-lock.json ./
 COPY packages/core packages/core
 COPY packages/server-core packages/server-core
 COPY packages/ui packages/ui
 COPY packages/config packages/config
-COPY local/package*.json local/
+COPY local/package.json local/package.json
 
-WORKDIR /package/local
-RUN npm install
+RUN npm ci
 
 FROM node:22-alpine AS builder
 WORKDIR /package
@@ -24,8 +24,7 @@ ENV APP_BUILD_SHA=${APP_BUILD_SHA}
 ENV APP_VERSION=${APP_VERSION}
 ENV APP_VERSION_TOKEN=${APP_VERSION_TOKEN}
 
-COPY --from=deps /package/local/node_modules local/node_modules
-RUN ln -s local/node_modules node_modules
+COPY --from=deps /package/node_modules node_modules
 COPY packages/core packages/core
 COPY packages/server-core packages/server-core
 COPY packages/ui packages/ui
@@ -34,6 +33,9 @@ COPY local local
 
 WORKDIR /package/local
 RUN npm run build
+
+FROM deps AS production-deps
+RUN npm prune --omit=dev
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -48,14 +50,14 @@ ENV APP_VERSION=${APP_VERSION}
 ENV APP_VERSION_TOKEN=${APP_VERSION_TOKEN}
 RUN apk add --no-cache openssl
 
-COPY --from=builder /package/local/.next/standalone ./
-COPY --from=deps /package/local/node_modules local/node_modules
-COPY --from=builder /package/local/.next/static local/.next/static
-COPY --from=builder /package/local/public local/public
-COPY --from=builder /package/local/prisma.config.ts local/prisma.config.ts
-COPY --from=builder /package/local/prisma local/prisma
-RUN if [ ! -e node_modules ] && [ -d local/node_modules ]; then ln -s local/node_modules node_modules; fi
+COPY --chown=node:node --from=builder /package/local/.next/standalone ./
+COPY --chown=node:node --from=production-deps /package/node_modules ./node_modules
+COPY --chown=node:node --from=builder /package/local/.next/static local/.next/static
+COPY --chown=node:node --from=builder /package/local/public local/public
+COPY --chown=node:node --from=builder /package/local/prisma.config.ts local/prisma.config.ts
+COPY --chown=node:node --from=builder /package/local/prisma local/prisma
 
 WORKDIR /app/local
+USER node
 EXPOSE 3000
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && node server.js"]
+CMD ["sh", "-c", "../node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && node server.js"]

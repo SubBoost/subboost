@@ -38,7 +38,7 @@ model Subscription {
   id                            String    @id @default(cuid())
   ownerId                       String
   name                          String
-  token                         String    @unique @default(cuid())
+  token                         String    @unique
   isPrimary                     Boolean   @default(false)
   encryptedUrls                 String    @db.Text
   encryptedNodes                String    @db.Text

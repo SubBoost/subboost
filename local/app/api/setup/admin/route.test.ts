@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   getStringField: vi.fn((body: Record<string, unknown>, key: string) => (typeof body[key] === "string" ? String(body[key]).trim() : "")),
   count: vi.fn(),
   create: vi.fn(),
+  queryRaw: vi.fn(),
+  transaction: vi.fn(),
   signSession: vi.fn(),
   sessionCookieOptions: vi.fn(),
 }));
@@ -19,6 +21,7 @@ vi.mock("@local/lib/http", () => ({
 }));
 vi.mock("@local/lib/prisma", () => ({
   prisma: {
+    $transaction: mocks.transaction,
     localAdmin: {
       count: mocks.count,
       create: mocks.create,
@@ -32,6 +35,7 @@ vi.mock("@local/lib/session", () => ({
 }));
 
 import { POST } from "./route";
+import { clearLocalRateLimitsForTests } from "@local/lib/rate-limit";
 
 async function readJson(response: Response) {
   return { status: response.status, body: await response.json(), headers: response.headers };
@@ -40,9 +44,14 @@ async function readJson(response: Response) {
 describe("local setup admin route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearLocalRateLimitsForTests();
     mocks.count.mockResolvedValue(0);
     mocks.hash.mockResolvedValue("hash");
     mocks.create.mockResolvedValue({ id: "admin-1", username: "ry" });
+    mocks.transaction.mockImplementation(async (callback) => callback({
+      $queryRaw: mocks.queryRaw,
+      localAdmin: { count: mocks.count, create: mocks.create },
+    }));
     mocks.signSession.mockResolvedValue("signed-session");
     mocks.sessionCookieOptions.mockReturnValue({ httpOnly: true, path: "/" });
   });
@@ -98,5 +107,26 @@ describe("local setup admin route", () => {
     });
     expect(mocks.signSession).toHaveBeenCalledWith({ adminId: "admin-1", username: "ry" });
     expect(result.headers.get("set-cookie")).toContain("subboost_local_session=signed-session");
+  });
+
+  it("rechecks setup state under a database lock", async () => {
+    mocks.readJsonBody.mockResolvedValue({
+      username: "ry",
+      password: "long-password",
+      passwordConfirm: "long-password",
+    });
+    mocks.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+    const result = await readJson(await POST(new Request("https://local.test/api/setup/admin")));
+
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: "已有管理员账号，请直接登录", code: "CONFLICT" },
+    });
+    expect(mocks.queryRaw).toHaveBeenCalledWith(
+      expect.arrayContaining(["SELECT pg_advisory_xact_lock(", ")"]),
+      1_397_704_283
+    );
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 });

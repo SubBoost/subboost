@@ -62,7 +62,7 @@ describe("local cron routes", () => {
   it("rejects cron calls when CRON_SECRET is missing in production", async () => {
     vi.stubEnv("CRON_SECRET", "");
     const response = await updateSubscriptionsRoute.POST(cronRequest());
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
     expect(await readJson(response)).toEqual({
       error: "CRON_SECRET not configured.",
       code: "CONFIGURATION_ERROR",
@@ -120,4 +120,3 @@ describe("local cron routes", () => {
     expect((await readJson(response)).success).toBe(true);
   });
 });
-

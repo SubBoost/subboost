@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLocalRateLimitsForTests } from "@local/lib/rate-limit";
 
 const mocks = vi.hoisted(() => ({
   bcryptCompare: vi.fn(),
@@ -49,6 +50,7 @@ async function readJson(response: Response) {
 describe("local auth and health routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearLocalRateLimitsForTests();
   });
 
   it("logs in a valid local admin and sets the session cookie", async () => {

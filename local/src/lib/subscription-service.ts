@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { generateClashYaml } from "@subboost/core/generator";
 import { buildGenerateOptionsFromConfig, getEffectiveTestOptions } from "@subboost/core/subscription/config-utils";
 import { buildProxyProvidersFromConfig } from "@subboost/core/subscription/proxy-providers";
@@ -118,9 +118,14 @@ function buildLocalSubscriptionConfig(
       existingConfig,
       idFactory: randomUUID,
       splitUrlLines: true,
+      mergeExistingConfig: false,
       defaultSmartNodeMatchingEnabled: true,
     }
   );
+}
+
+export function generateLocalSubscriptionToken(): string {
+  return randomBytes(32).toString("base64url");
 }
 
 export function readSubscriptionSecrets(row: SubscriptionRow) {
@@ -187,6 +192,7 @@ export async function createSubscription(ownerId: string, body: unknown): Promis
     data: {
       ownerId,
       name,
+      token: generateLocalSubscriptionToken(),
       encryptedUrls: encryptJson(urls),
       encryptedNodes: encryptJson(nodes),
       encryptedConfig: encryptJson(config),

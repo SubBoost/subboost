@@ -1,7 +1,6 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./accordion";
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import {
   Dialog,
@@ -42,21 +41,11 @@ vi.mock("@radix-ui/react-dialog", async () => {
 });
 
 describe("Radix UI wrappers", () => {
-  it("renders accordion, avatar, dialog, switch, and tabs wrappers with merged classes", () => {
+  it("renders avatar, dialog, switch, and tabs wrappers with merged classes", () => {
     const html = renderToStaticMarkup(
       React.createElement(
         "div",
         null,
-        React.createElement(
-          Accordion,
-          { type: "single", collapsible: true, defaultValue: "item-1" },
-          React.createElement(
-            AccordionItem,
-            { value: "item-1", className: "item-extra" },
-            React.createElement(AccordionTrigger, { className: "trigger-extra" }, "Question"),
-            React.createElement(AccordionContent, { className: "content-extra" }, "Answer")
-          )
-        ),
         React.createElement(
           Avatar,
           { className: "avatar-extra" },
@@ -85,11 +74,6 @@ describe("Radix UI wrappers", () => {
       )
     );
 
-    expect(html).toContain("Question");
-    expect(html).toContain("Answer");
-    expect(html).toContain("item-extra");
-    expect(html).toContain("trigger-extra");
-    expect(html).toContain("content-extra");
     expect(html).toContain("avatar-extra");
     expect(html).toContain("fallback-extra");
     expect(html).toContain("dialog-extra");

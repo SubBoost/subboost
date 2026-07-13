@@ -20,7 +20,7 @@ export function requireLocalCronAuth(request: Request): ReturnType<typeof apiErr
 
   if (auth.reason === "missing-secret") {
     if (isDevelopmentBypassAllowed()) return null;
-    return apiError("CRON_SECRET not configured.", "CONFIGURATION_ERROR", 500);
+    return apiError("CRON_SECRET not configured.", "CONFIGURATION_ERROR", 503);
   }
 
   return apiError("Invalid cron secret.", "UNAUTHORIZED", 401);

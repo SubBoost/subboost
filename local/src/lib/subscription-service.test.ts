@@ -287,6 +287,7 @@ describe("local subscription service", () => {
       data: expect.objectContaining({
         ownerId: "owner-1",
         name: "Created",
+        token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
         encryptedUrls: JSON.stringify(["https://example.com/sub"]),
         encryptedNodes: expect.stringContaining('"name":"Node"'),
         encryptedConfig: expect.stringContaining('"smartNodeMatchingEnabled":false'),
@@ -387,6 +388,30 @@ describe("local subscription service", () => {
       }),
       include: { autoUpdateState: true },
     });
+  });
+
+  it("replaces submitted config instead of retaining omitted stale fields", async () => {
+    mocks.prisma.subscription.findFirst.mockResolvedValueOnce(
+      row({
+        encryptedConfig: JSON.stringify({
+          staleSetting: true,
+          sources: [{ id: "old", type: "url", content: "https://old.example/sub" }],
+        }),
+      })
+    );
+
+    await updateSubscription("owner-1", "sub-1", {
+      config: {
+        freshSetting: true,
+        sources: [{ id: "new", type: "url", content: "https://new.example/sub" }],
+      },
+    });
+
+    const update = mocks.prisma.subscription.update.mock.calls.at(-1)?.[0];
+    const encryptedConfig = update?.data?.encryptedConfig;
+    expect(typeof encryptedConfig).toBe("string");
+    expect(JSON.parse(encryptedConfig)).toMatchObject({ freshSetting: true });
+    expect(JSON.parse(encryptedConfig)).not.toHaveProperty("staleSetting");
   });
 
   it("builds fetch callbacks for refresh source imports", async () => {
