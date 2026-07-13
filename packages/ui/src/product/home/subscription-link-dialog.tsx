@@ -133,8 +133,8 @@ export function SubscriptionLinkDialog({
               <p className="font-medium mb-1">注意事项</p>
               <ul className="text-xs text-amber-200/70 space-y-1">
                 <li>🔒 配置数据将加密存储于服务器</li>
-                <li>🔑 订阅链接相当于访问凭证，请勿公开分享</li>
-                <li>⏱️ 客户端高频拉取订阅会被封禁，请合理配置</li>
+                <li>🔑 完整订阅链接是持有者凭证，仅在自己控制或信任的客户端中使用</li>
+                <li>⏱️ 所有请求均归属您的账号；反复触发限流会临时封禁账号</li>
                 {isEditingExistingSubscription ? (
                   <>
                     <li>⚠️ 更新将覆盖原订阅配置与订阅源</li>
@@ -204,4 +204,3 @@ export function SubscriptionLinkDialog({
     </Dialog>
   );
 }
-

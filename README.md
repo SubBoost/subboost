@@ -43,7 +43,7 @@
 
 A complete subscription URL and its token are bearer credentials: anyone who obtains the full URL may read the generated configuration and use that subscription. Protect it like a password. Never place the complete URL in public repositories, issues, chat messages, screenshots, or logs. If exposure is suspected, delete and recreate the affected subscription to issue a new token.
 
-Requests made with a token are attributed to the user who owns the subscription for access controls and abuse prevention. This is the intended authorization model, so subscription owners are responsible for keeping complete subscription URLs confidential.
+Every request made with a token, including anonymous requests and requests from third-party clients, is attributed to the subscription owner for access controls and abuse prevention. Repeated rate-limit violations may temporarily ban the owner's account. This is the intended authorization model. Do not publish a complete URL or give it to an untrusted third party; even when using it in a trusted client or with a trusted person, the owner remains responsible for the resulting traffic and abuse risk.
 
 ## Development Notes
 

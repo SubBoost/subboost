@@ -140,6 +140,9 @@ describe("SubscriptionLinkDialog", () => {
     expect(html).toContain("启用自动更新");
     expect(html).toContain("自动更新间隔");
     expect(html).toContain("注意事项");
+    expect(html).toContain("完整订阅链接是持有者凭证");
+    expect(html).toContain("所有请求均归属您的账号");
+    expect(html).toContain("反复触发限流会临时封禁账号");
     expect(captures.inputs[0]).toMatchObject({ value: "我的配置", maxLength: 100 });
     expect(captures.inputs[1]).toMatchObject({ type: "number", min: 12, step: 1, value: 8 });
     expect(captures.switches).toHaveLength(2);
