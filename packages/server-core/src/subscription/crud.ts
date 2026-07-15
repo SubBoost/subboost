@@ -72,6 +72,38 @@ export function normalizeSubscriptionNodeList(value: unknown): ParsedNode[] {
   return Array.isArray(value) ? stripImportedNodeControlFieldsFromList(value as ParsedNode[]) : [];
 }
 
+export function validateSubscriptionNodeList(value: unknown): ParsedNode[] {
+  if (!Array.isArray(value)) throw new Error("节点列表必须是数组");
+
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    if (!isRecord(item)) throw new Error(`节点 #${index + 1} 必须是对象`);
+
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    const type = typeof item.type === "string" ? item.type.trim().toLowerCase() : "";
+    if (!name) throw new Error(`节点 #${index + 1} 缺少有效名称`);
+    if (!type) throw new Error(`节点 #${index + 1} 缺少有效类型`);
+
+    if (type === "relay") {
+      if (!Array.isArray(item.proxies) || item.proxies.length === 0 || item.proxies.some((proxy) => typeof proxy !== "string" || !proxy.trim())) {
+        throw new Error(`节点 #${index + 1} 的 relay proxies 必须是非空字符串数组`);
+      }
+      continue;
+    }
+
+    if (type === "direct" || type === "dns") continue;
+
+    if (typeof item.server !== "string" || !item.server.trim()) {
+      throw new Error(`节点 #${index + 1} 缺少有效服务器地址`);
+    }
+    if (typeof item.port !== "number" || !Number.isInteger(item.port) || item.port < 1 || item.port > 65535) {
+      throw new Error(`节点 #${index + 1} 的端口必须是 1 到 65535 的整数`);
+    }
+  }
+
+  return stripImportedNodeControlFieldsFromList(value as ParsedNode[]);
+}
+
 export function normalizeSubscriptionInfoForPersistence(value: unknown): Record<string, unknown> | null {
   return normalizeSubscriptionResponseInfo(value);
 }

@@ -13,6 +13,20 @@ import {
 
 const mocks = getSourceActionMocks();
 
+type DeferredFetchResult = {
+  content: string;
+  headers: Record<string, string>;
+  parseResult: ReturnType<typeof parseResult>;
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe("createSourceActions parseMultipleSources", () => {
   beforeEach(resetSourceActionMocks);
 
@@ -357,5 +371,36 @@ describe("createSourceActions parseMultipleSources", () => {
       parsed: true,
       nodeCount: 3,
     });
+  });
+
+  it("discards the entire batch when any source fingerprint changes before completion", async () => {
+    const first = deferred<DeferredFetchResult>();
+    const second = deferred<DeferredFetchResult>();
+    mocks.fetchUrlContentInBrowser.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const sources = [
+      source({ id: "s1", type: "url", content: "https://example.com/one" }),
+      source({ id: "s2", type: "url", content: "https://example.com/two" }),
+    ];
+    const { actions, getState } = createHarness({ sources, nodes: [node("Keep")] });
+
+    const running = actions.parseMultipleSources(sources);
+    actions.setSources(
+      getState().sources.map((item: SubscriptionSource) =>
+        item.id === "s2" ? { ...item, nameTemplate: "{name}-changed" } : item
+      )
+    );
+    first.resolve({ content: "one", headers: {}, parseResult: parseResult([node("One")]) });
+    await Promise.resolve();
+    second.resolve({ content: "two", headers: {}, parseResult: parseResult([node("Two")]) });
+    await running;
+
+    expect(getState().isLoading).toBe(false);
+    expect(getState().nodes.map((item: ParsedNode) => item.name)).toEqual(["Keep"]);
+    expect(getState().sources).toEqual([
+      expect.objectContaining({ id: "s1" }),
+      expect.objectContaining({ id: "s2", nameTemplate: "{name}-changed" }),
+    ]);
+    expect(getState().sources[0]).not.toHaveProperty("parsed");
+    expect(getState().sources[1]).not.toHaveProperty("parsed");
   });
 });

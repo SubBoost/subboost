@@ -30,6 +30,15 @@ describe("content parser registry helpers", () => {
     expect(isClashYamlContent("proxy-providers: {}")).toBe(true);
     expect(isClashYamlContent("- type: hysteria2\n  server: hy2.example.com\n  ports: 10000-10100")).toBe(true);
     expect(isClashYamlContent("ss://not-yaml")).toBe(false);
+    expect(isClashYamlContent(ssLink("proxies:"))).toBe(false);
+  });
+
+  it("does not misclassify a link fragment as YAML and falls through zero-node YAML parsers", () => {
+    expect(parseSubscription(ssLink("proxies:")).nodes[0]).toMatchObject({ name: "proxies:", type: "ss" });
+
+    const mixed = parseSubscription(`proxy-providers: {}\n${ssLink("Link after YAML")}`);
+    expect(mixed.nodes[0]).toMatchObject({ name: "Link after YAML", type: "ss" });
+    expect(mixed.errors.length).toBeGreaterThan(0);
   });
 
   it("detects and parses top-level inline flow proxy arrays", () => {

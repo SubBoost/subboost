@@ -44,11 +44,20 @@ describe("SSRF IP classification", () => {
       "ff00::1",
       "2001:db8::1",
       "2001:0db8::1",
+      "100::1",
+      "100:0:0:1::1",
+      "2001:2::1",
+      "3fff::1",
+      "5f00::1",
+      "4000::1",
       "::ffff:127.0.0.1",
       "::ffff:c0a8:1",
       "0:0:0:0:0:ffff:7f00:1",
       "0:0:0:0:0:ffff:c0a8:1",
       "::127.0.0.1",
+      "64:ff9b::127.0.0.1",
+      "64:ff9b:1:7f00:0:100::",
+      "2002:7f00:1::",
     ]) {
       expect(isPrivateOrReservedIp(ip), ip).toBe(true);
     }
@@ -56,6 +65,11 @@ describe("SSRF IP classification", () => {
     expect(isPrivateOrReservedIp("2001:db80::1")).toBe(false);
     expect(isPrivateOrReservedIp("::ffff:8.8.8.8")).toBe(false);
     expect(isPrivateOrReservedIp("::ffff:808:808")).toBe(false);
+    expect(isPrivateOrReservedIp("::8.8.8.8")).toBe(false);
+    expect(isPrivateOrReservedIp("64:ff9b::8.8.8.8")).toBe(false);
+    expect(isPrivateOrReservedIp("2002:0808:0808::")).toBe(false);
+    expect(isPrivateOrReservedIp("2001:3::1")).toBe(false);
+    expect(isPrivateOrReservedIp("2001:4:112::1")).toBe(false);
   });
 
   it("identifies the benchmark range commonly used by fake-ip DNS", () => {

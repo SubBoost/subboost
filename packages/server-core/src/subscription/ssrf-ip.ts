@@ -67,6 +67,37 @@ function ipv4FromHextets(high: number, low: number): string {
   ].join(".");
 }
 
+type Ipv6CidrRule = {
+  base: string;
+  mask: number;
+  unsafe: boolean;
+};
+
+// Ordered from the most-specific globally reachable exceptions to their
+// enclosing special-purpose ranges. Keep this table aligned with the IANA
+// IPv6 Special-Purpose Address Registry.
+const IPV6_SPECIAL_PURPOSE_RULES: readonly Ipv6CidrRule[] = [
+  { base: "2001:1::1", mask: 128, unsafe: false },
+  { base: "2001:1::2", mask: 128, unsafe: false },
+  { base: "2001:1::3", mask: 128, unsafe: false },
+  { base: "2001:3::", mask: 32, unsafe: false },
+  { base: "2001:4:112::", mask: 48, unsafe: false },
+  { base: "2001:20::", mask: 28, unsafe: false },
+  { base: "2001:30::", mask: 28, unsafe: false },
+  { base: "::", mask: 128, unsafe: true },
+  { base: "::1", mask: 128, unsafe: true },
+  { base: "64:ff9b:1::", mask: 48, unsafe: true },
+  { base: "100::", mask: 64, unsafe: true },
+  { base: "100:0:0:1::", mask: 64, unsafe: true },
+  { base: "2001::", mask: 23, unsafe: true },
+  { base: "2001:db8::", mask: 32, unsafe: true },
+  { base: "3fff::", mask: 20, unsafe: true },
+  { base: "5f00::", mask: 16, unsafe: true },
+  { base: "fc00::", mask: 7, unsafe: true },
+  { base: "fe80::", mask: 10, unsafe: true },
+  { base: "ff00::", mask: 8, unsafe: true },
+];
+
 function expandIpv6Hextets(ip: string): number[] | null {
   let normalized = ip.toLowerCase();
   if (normalized.includes(".")) {
@@ -99,25 +130,62 @@ function expandIpv6Hextets(ip: string): number[] | null {
   return hextets;
 }
 
+function ipv6InCidr(hextets: readonly number[], base: string, maskBits: number): boolean {
+  const baseHextets = expandIpv6Hextets(base);
+  if (!baseHextets) return false;
+  const fullHextets = Math.floor(maskBits / 16);
+  for (let index = 0; index < fullHextets; index += 1) {
+    if (hextets[index] !== baseHextets[index]) return false;
+  }
+  const remainingBits = maskBits % 16;
+  if (remainingBits === 0) return true;
+  const mask = (0xffff << (16 - remainingBits)) & 0xffff;
+  return (hextets[fullHextets] & mask) === (baseHextets[fullHextets] & mask);
+}
+
+function classifySpecialPurposeIpv6(hextets: readonly number[]): boolean | null {
+  for (const rule of IPV6_SPECIAL_PURPOSE_RULES) {
+    if (ipv6InCidr(hextets, rule.base, rule.mask)) return rule.unsafe;
+  }
+  return null;
+}
+
+function extractEmbeddedIpv4(hextets: readonly number[]): string | null {
+  const isIpv4Compatible = hextets.slice(0, 6).every((part) => part === 0);
+  const isIpv4Mapped = hextets.slice(0, 5).every((part) => part === 0) && hextets[5] === 0xffff;
+  const isWellKnownNat64 = hextets[0] === 0x0064 && hextets[1] === 0xff9b && hextets[2] === 0;
+  if (isIpv4Compatible || isIpv4Mapped || isWellKnownNat64) {
+    return ipv4FromHextets(hextets[6], hextets[7]);
+  }
+
+  // RFC 6052 /48 form: v4[0..15] occupies bits 48..63, the u octet
+  // at bits 64..71 is zero, and v4[16..31] occupies bits 72..87.
+  const isLocalUseNat64 = hextets[0] === 0x0064 && hextets[1] === 0xff9b && hextets[2] === 1;
+  if (isLocalUseNat64 && (hextets[4] >> 8) === 0) {
+    const low = ((hextets[4] & 0xff) << 8) | (hextets[5] >> 8);
+    return ipv4FromHextets(hextets[3], low);
+  }
+
+  if (hextets[0] === 0x2002) {
+    return ipv4FromHextets(hextets[1], hextets[2]);
+  }
+
+  return null;
+}
+
 function isPrivateOrReservedIPv6(ip: string): boolean {
   const hextets = expandIpv6Hextets(ip);
   if (!hextets) return true;
 
-  const [first, second] = hextets;
-  const allButLastZero = hextets.slice(0, 7).every((part) => part === 0);
-  if (hextets.every((part) => part === 0) || (allButLastZero && hextets[7] === 1)) return true;
-  if ((first & 0xfe00) === 0xfc00) return true;
-  if ((first & 0xffc0) === 0xfe80) return true;
-  if ((first & 0xff00) === 0xff00) return true;
-  if (first === 0x2001 && second === 0x0db8) return true;
+  const specialPurpose = classifySpecialPurposeIpv6(hextets);
+  if (specialPurpose !== null) return specialPurpose;
 
-  const isIpv4Compatible = hextets.slice(0, 6).every((part) => part === 0);
-  const isIpv4Mapped = hextets.slice(0, 5).every((part) => part === 0) && hextets[5] === 0xffff;
-  if (isIpv4Compatible || isIpv4Mapped) {
-    return isPrivateOrReservedIPv4(ipv4FromHextets(hextets[6], hextets[7]));
-  }
+  const embeddedIpv4 = extractEmbeddedIpv4(hextets);
+  if (embeddedIpv4) return isPrivateOrReservedIPv4(embeddedIpv4);
 
-  return false;
+  // IANA currently assigns globally routable IPv6 unicast space from
+  // 2000::/3. Other unicast blocks are reserved and must not be SSRF targets.
+  return !ipv6InCidr(hextets, "2000::", 3);
 }
 
 export function isPrivateOrReservedIp(hostname: string): boolean {

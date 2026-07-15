@@ -8,6 +8,7 @@ import {
   normalizeSubscriptionUrlList,
   serializeSubscriptionDetailData,
   serializeSubscriptionSummaryData,
+  validateSubscriptionNodeList,
 } from "./crud";
 
 describe("subscription CRUD shared helpers", () => {
@@ -27,6 +28,33 @@ describe("subscription CRUD shared helpers", () => {
     });
     expect(areSubscriptionUrlListsEquivalent(["b", "a"], ["a", "b"])).toBe(true);
     expect(areSubscriptionUrlListsEquivalent(["a"], ["a", "b"])).toBe(false);
+  });
+
+  it("strictly validates persisted node lists without blocking unknown forward-compatible types", () => {
+    expect(
+      validateSubscriptionNodeList([
+        { name: "Future", type: "future-protocol", server: "future.example.com", port: 443, "dialer-proxy": "x" },
+        { name: "Direct", type: "direct" },
+        { name: "DNS", type: "dns" },
+        { name: "Relay", type: "relay", proxies: ["Future"] },
+      ])
+    ).toEqual([
+      { name: "Future", type: "future-protocol", server: "future.example.com", port: 443 },
+      { name: "Direct", type: "direct" },
+      { name: "DNS", type: "dns" },
+      { name: "Relay", type: "relay", proxies: ["Future"] },
+    ]);
+
+    for (const [value, message] of [
+      ["bad", "节点列表必须是数组"],
+      [[null], "节点 #1 必须是对象"],
+      [[{ name: "", type: "ss", server: "x", port: 1 }], "节点 #1 缺少有效名称"],
+      [[{ name: "A", type: "ss", server: "", port: 1 }], "节点 #1 缺少有效服务器地址"],
+      [[{ name: "A", type: "ss", server: "x", port: 0 }], "节点 #1 的端口"],
+      [[{ name: "A", type: "relay", proxies: [""] }], "relay proxies"],
+    ] as const) {
+      expect(() => validateSubscriptionNodeList(value)).toThrow(message);
+    }
   });
 
   it("normalizes config, sources, and smart node matching state", () => {

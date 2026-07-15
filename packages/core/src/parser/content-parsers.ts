@@ -80,11 +80,7 @@ function looksLikeInlineFlowProxyList(content: string): boolean {
 }
 
 export function isClashYamlContent(content: string): boolean {
-  if (
-    content.includes("proxies:") ||
-    content.includes("proxy-groups:") ||
-    content.includes("proxy-providers:")
-  ) {
+  if (/^(?:[ \t]*)(?:proxies|proxy-groups|proxy-providers)[ \t]*:/m.test(content)) {
     return true;
   }
 
@@ -188,7 +184,8 @@ export function parseSubscriptionContentByRegistry(content: string): ParseResult
       if (parser.name === "link-lines") {
         return buildParseResult(result.nodes, [...accumulatedErrors, ...result.errors]);
       }
-      return result;
+      if (result.nodes.length > 0) return result;
+      accumulatedErrors.push(...result.errors);
     } catch (error) {
       if (parser.name === "clash-yaml") {
         accumulatedErrors.push(`Clash YAML 解析失败: ${error instanceof Error ? error.message : "未知错误"}`);
@@ -200,5 +197,4 @@ export function parseSubscriptionContentByRegistry(content: string): ParseResult
 
   return buildParseResult([], accumulatedErrors);
 }
-
 

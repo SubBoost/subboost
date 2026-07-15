@@ -33,6 +33,7 @@ import {
   withUniqueNodeNames,
 } from "./definitions";
 import type { GetState, SetAndGenerateConfig, SetState, StoreState } from "./store-types";
+import { SourceImportOperationGuard, type SingleSourceImportOperation } from "./source-import-operation";
 
 type SourceActions = Pick<
   ConfigActions,
@@ -75,6 +76,18 @@ function filterDialerProxyGroupsByAvailableNames(
 }
 
 export function createSourceActions(set: SetState, get: GetState, setAndGenerateConfig: SetAndGenerateConfig): SourceActions {
+  const importOperations = new SourceImportOperationGuard();
+  const discardStaleSingle = (operation: SingleSourceImportOperation): boolean => {
+    if (importOperations.isSingleCurrent(get().sources, operation)) return false;
+    if (importOperations.ownsSingle(operation)) {
+      set((state) => ({
+        sources: state.sources.map((source) => source.id === operation.sourceId ? { ...source, parsing: false } : source),
+      }));
+    }
+    importOperations.finishSingle(operation);
+    return true;
+  };
+
   return {
     // 设置订阅源
     setSources: (sources: SubscriptionSource[]) => {
@@ -116,7 +129,11 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
 
     // 解析订阅内容
     parseContent: (content: string) => {
-      set({ isLoading: true });
+      importOperations.cancelAll();
+      set((state) => ({
+        isLoading: true,
+        sources: state.sources.map((source) => (source.parsing ? { ...source, parsing: false } : source)),
+      }));
 
       try {
         const result: ParseResult = parseSubscription(content);
@@ -165,6 +182,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
       const { sources } = get();
       const source = sources.find((s) => s.id === sourceId);
       if (!source || !source.content.trim()) return;
+      const operation = importOperations.startSingle(source);
 
       const currentSourceContent =
         source.type === "url"
@@ -181,11 +199,12 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
       const lastNameTemplate = typeof source.lastParsedNameTemplate === "string" ? source.lastParsedNameTemplate.trim() : "";
 
       // 标记为解析中
-      set({
-        sources: sources.map((s) =>
+      set((state) => ({
+        isLoading: false,
+        sources: state.sources.map((s) =>
           s.id === sourceId ? { ...s, parsing: true, error: undefined, errorInfo: undefined } : s
         ),
-      });
+      }));
 
       try {
         let contentToParse = source.content;
@@ -203,6 +222,8 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           if (!["http:", "https:"].includes(parsed.protocol)) {
             throw new Error("只支持 HTTP/HTTPS url");
           }
+
+          if (discardStaleSingle(operation)) return;
 
           setAndGenerateConfig((state) => {
             const baseNodes = detachSourceNodesFromState(state.nodes, sourceId).nodes;
@@ -240,6 +261,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
               parseErrors: [],
             };
           });
+          importOperations.finishSingle(operation);
           return;
         }
 
@@ -278,6 +300,8 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           currentTag,
           currentNameTemplate,
         });
+
+        if (discardStaleSingle(operation)) return;
 
         // 刷新此订阅源解析出的节点：尽量保留用户顺序/手动改名，仅更新节点内容与来源归属。
         setAndGenerateConfig((state) => {
@@ -354,7 +378,9 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
             parseErrors: result.errors.map(sanitizePublicErrorText).filter((e) => e !== ""),
           };
         });
+        importOperations.finishSingle(operation);
       } catch (error) {
+        if (discardStaleSingle(operation)) return;
         const baseInfo = toSubscriptionImportErrorInfo(error);
         const shouldHintProxyProviders =
           source.type === "url" &&
@@ -383,12 +409,18 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
               : s
           ),
         }));
+        importOperations.finishSingle(operation);
       }
     },
 
     // 解析多个订阅源
     parseMultipleSources: async (sources: SubscriptionSource[]) => {
-      set({ isLoading: true, parseErrors: [] });
+      const operation = importOperations.startBatch(sources);
+      set((state) => ({
+        isLoading: true,
+        parseErrors: [],
+        sources: state.sources.map((source) => (source.parsing ? { ...source, parsing: false } : source)),
+      }));
 
       const allNodes: ParsedNode[] = [];
       const allErrors: string[] = [];
@@ -574,6 +606,12 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
       // 确保 name 全局唯一（Clash 要求 proxies.name 唯一）
       const uniqueNamedNodes = withUniqueNodeNames(uniqueNodes, new Set<string>());
 
+      if (!importOperations.isBatchCurrent(get().sources, operation)) {
+        if (importOperations.ownsBatch(operation)) set({ isLoading: false });
+        importOperations.finishBatch(operation);
+        return;
+      }
+
       setAndGenerateConfig((state) => {
         const deleted = new Set(state.deletedNodeNames);
         const normalizedCandidates = uniqueNamedNodes.map((node) => {
@@ -652,6 +690,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           }),
         };
       });
+      importOperations.finishBatch(operation);
     },
   };
 }
