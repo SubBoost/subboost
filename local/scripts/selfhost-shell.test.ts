@@ -20,6 +20,23 @@ function runBash(script: string) {
 }
 
 describe("self-host shell scripts", () => {
+  it("preserves an explicit Docker config when Docker requires sudo", () => {
+    const result = runBash(`
+      set -Eeuo pipefail
+      export SUBBOOST_SCRIPT_SOURCE_ONLY=1
+      source local/scripts/install.sh
+      export DOCKER_CONFIG=/tmp/subboost-isolated-docker-config
+      DOCKER_RUNNER="sudo docker"
+      sudo() { printf 'sudo-call=%s\\n' "$*"; }
+      docker_cmd info
+    `);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      "sudo-call=env DOCKER_CONFIG=/tmp/subboost-isolated-docker-config docker info",
+    );
+  });
+
   it("uses prompt defaults without /dev/tty errors in non-interactive mode", () => {
     const result = runBash(`
       set -Eeuo pipefail

@@ -407,7 +407,11 @@ docker_runner() {
 
 docker_cmd() {
   if [ "$DOCKER_RUNNER" = "sudo docker" ]; then
-    sudo docker "$@"
+    if [ -n "${DOCKER_CONFIG:-}" ]; then
+      sudo env "DOCKER_CONFIG=$DOCKER_CONFIG" docker "$@"
+    else
+      sudo docker "$@"
+    fi
   else
     docker "$@"
   fi
