@@ -51,17 +51,22 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("react/jsx-runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react/jsx-runtime")>();
-  const capture = (type: any, props: any, key?: any) => {
+  const capture = (type: any, props: any) => {
     if (type === "button") {
       mocks.captures.rawButtons ||= [];
       mocks.captures.rawButtons.push(props || {});
     }
-    return actual.jsx(type, props, key);
   };
   return {
     ...actual,
-    jsx: capture,
-    jsxs: capture,
+    jsx: (type: any, props: any, key?: any) => {
+      capture(type, props);
+      return actual.jsx(type, props, key);
+    },
+    jsxs: (type: any, props: any, key?: any) => {
+      capture(type, props);
+      return actual.jsxs(type, props, key);
+    },
   };
 });
 
