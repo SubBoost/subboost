@@ -27,6 +27,13 @@ sudo_do() {
   if is_root; then "$@"; else sudo "$@"; fi
 }
 
+prepare_private_directory() {
+  local directory="$1"
+  sudo_do mkdir -p "$directory"
+  sudo_do chmod 700 "$directory"
+  if ! is_root; then sudo_do chown "$(id -u):$(id -g)" "$directory"; fi
+}
+
 install_secret_file() {
   local source="$1"
   local destination="$2"
@@ -211,7 +218,8 @@ create_verified_dump() {
   local output="$1"
   local partial="${output}.partial"
   local -a dump_status verify_status
-  sudo_do mkdir -p "$(dirname "$output")"
+  prepare_private_directory "$(dirname "$output")"
+  sudo_do install -m 600 /dev/null "$partial"
   set +e
   compose exec -T db pg_dump -Fc -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}" | sudo_do tee "$partial" >/dev/null
   dump_status=("${PIPESTATUS[@]}")
@@ -532,7 +540,7 @@ logs_cmd() {
 
 backup_cmd() {
   load_env
-  sudo_do mkdir -p "$BACKUP_DIR"
+  prepare_private_directory "$BACKUP_DIR"
   local stamp db_out env_out
   local -a sql_backups env_backups
   local i backup_retention_count
@@ -550,6 +558,9 @@ backup_cmd() {
   sql_backups=("$BACKUP_DIR"/subboost-*.dump)
   env_backups=("$BACKUP_DIR"/subboost-*.env)
   shopt -u nullglob
+
+  if ((${#sql_backups[@]} > 0)); then sudo_do chmod 600 "${sql_backups[@]}"; fi
+  if ((${#env_backups[@]} > 0)); then sudo_do chmod 600 "${env_backups[@]}"; fi
 
   for ((i = 0; i < ${#sql_backups[@]} - backup_retention_count; i++)); do
     sudo_do rm -f -- "${sql_backups[$i]}"

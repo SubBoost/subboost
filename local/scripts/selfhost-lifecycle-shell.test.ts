@@ -132,6 +132,8 @@ describe("self-host update rollback lifecycle", () => {
   it("persists a setup token and prints only the fragment bootstrap link", () => {
     const installer = readFileSync(path.join(publicRoot, "local/scripts/install.sh"), "utf8");
     expect(installer).toContain('ensure_env_value LOCAL_SETUP_TOKEN "$(random_hex 32)"');
+    expect(installer).toContain('prepare_private_directory "$SUBBOOST_HOME"');
+    expect(installer).toContain('prepare_private_directory "$SUBBOOST_HOME/backups"');
     expect(installer).toContain("/login#setup-token=$(env_value LOCAL_SETUP_TOKEN)");
     expect(installer).not.toContain("?setup-token=");
   });

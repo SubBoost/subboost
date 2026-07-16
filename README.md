@@ -42,6 +42,7 @@
 ### First-Run Setup and Updates
 
 - After a fresh installation succeeds, the installer prints a first-run URL such as `/login#setup-token=...`. This token creates the first administrator, so protect it like a password. The page sends it in a request header and removes the fragment after setup succeeds.
+- The installer keeps its home and backup directories private (`700`) and writes database/environment backups as owner-only files (`600`). Running `subboost backup` also repairs permissions on retained backups created by an older manager.
 - `subboost update` validates the candidate configuration and pulls its image before pausing the old instance. It then creates and verifies a PostgreSQL backup, and activates formal files only after candidate health passes. Candidate failures restore the old files, image, and database.
 - If database restoration itself fails, the application and scheduled jobs remain stopped and the backup is preserved. Do not force a restart; follow the recovery path printed by the command. Run `subboost doctor` and `subboost logs` first to collect status.
 

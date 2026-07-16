@@ -551,9 +551,13 @@ ENV
       backup_cmd >/dev/null
       sql_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.dump' | wc -l | tr -d '[:space:]')"
       env_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.env' | wc -l | tr -d '[:space:]')"
-      printf 'sql=%s env=%s\\n' "$sql_count" "$env_count"
+      unsafe_files="$(find "$BACKUP_DIR" -maxdepth 1 -type f ! -perm 600 | wc -l | tr -d '[:space:]')"
+      unsafe_dirs="$(find "$BACKUP_DIR" -maxdepth 0 -type d ! -perm 700 | wc -l | tr -d '[:space:]')"
+      printf 'sql=%s env=%s unsafe_files=%s unsafe_dirs=%s\\n' "$sql_count" "$env_count" "$unsafe_files" "$unsafe_dirs"
       [ "$sql_count" = "10" ]
       [ "$env_count" = "10" ]
+      [ "$unsafe_files" = "0" ]
+      [ "$unsafe_dirs" = "0" ]
       [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.dump" ]
       [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.env" ]
     `;
@@ -562,5 +566,6 @@ ENV
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("sql=10 env=10");
+    expect(result.stdout).toContain("unsafe_files=0 unsafe_dirs=0");
   });
 });

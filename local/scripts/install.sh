@@ -57,6 +57,13 @@ run_root() {
   sudo_do "$@"
 }
 
+prepare_private_directory() {
+  local directory="$1"
+  run_root mkdir -p "$directory"
+  run_root chmod 700 "$directory"
+  if ! is_root; then run_root chown "$(id -u):$(id -g)" "$directory"; fi
+}
+
 install_secret_file() {
   local source="$1"
   local destination="$2"
@@ -586,7 +593,9 @@ main() {
 
   ensure_docker
   docker_login_if_needed
-  run_root mkdir -p "$SUBBOOST_HOME" "$SUBBOOST_HOME/backups" "$(dirname "$SUBBOOST_BIN")"
+  prepare_private_directory "$SUBBOOST_HOME"
+  prepare_private_directory "$SUBBOOST_HOME/backups"
+  run_root mkdir -p "$(dirname "$SUBBOOST_BIN")"
   ENV_FILE="$TMP_DIR/candidate.env"
   COMPOSE_FILE="$TMP_DIR/candidate-compose.yml"
   local candidate_manager="$TMP_DIR/candidate-manager"
