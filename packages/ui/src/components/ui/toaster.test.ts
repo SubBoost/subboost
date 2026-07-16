@@ -16,10 +16,13 @@ vi.mock("@radix-ui/react-toast", async () => {
   const createPrimitive = (
     tag: keyof React.JSX.IntrinsicElements,
     displayName: string,
-    capture?: (props: React.HTMLAttributes<HTMLElement>) => void,
+    capture?: (props: React.HTMLAttributes<HTMLElement> & { altText?: string }) => void,
   ) => {
-    const Component = React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>(
-      ({ children, ...props }, ref) => {
+    const Component = React.forwardRef<
+      HTMLElement,
+      React.HTMLAttributes<HTMLElement> & { altText?: string }
+    >(
+      ({ children, altText: _altText, ...props }, ref) => {
         capture?.(props);
         return React.createElement(tag, { ...props, ref }, children);
       }

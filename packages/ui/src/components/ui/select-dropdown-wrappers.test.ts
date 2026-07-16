@@ -3,8 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 function mockPrimitive(tag: keyof React.JSX.IntrinsicElements, displayName: string) {
-  const Component = React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>(
-    ({ children, ...props }, ref) => React.createElement(tag, { ...props, ref }, children)
+  const Component = React.forwardRef<
+    HTMLElement,
+    React.HTMLAttributes<HTMLElement> & { sideOffset?: number }
+  >(
+    ({ children, sideOffset: _sideOffset, ...props }, ref) => React.createElement(tag, { ...props, ref }, children)
   );
   Component.displayName = displayName;
   return Component;

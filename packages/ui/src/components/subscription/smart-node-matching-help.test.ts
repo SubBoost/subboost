@@ -6,7 +6,7 @@ vi.mock("@radix-ui/react-popover", () => ({
   Root: (props: any) => React.createElement("div", null, props.children),
   Trigger: (props: any) => React.createElement("span", null, props.children),
   Portal: (props: any) => React.createElement("div", null, props.children),
-  Content: (props: any) => React.createElement("div", props, props.children),
+  Content: ({ children, sideOffset: _sideOffset, ...props }: any) => React.createElement("div", props, children),
   Arrow: (props: any) => React.createElement("span", props),
 }));
 

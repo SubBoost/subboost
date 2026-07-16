@@ -26,7 +26,8 @@ vi.mock("@subboost/ui/components/ui/dropdown-menu", () => ({
   DropdownMenu: (props: any) => React.createElement("div", null, props.children),
   DropdownMenuContent: (props: any) => {
     captures.contents.push(props);
-    return React.createElement("div", props, props.children);
+    const { children, sideOffset: _sideOffset, ...domProps } = props;
+    return React.createElement("div", domProps, children);
   },
   DropdownMenuItem: (props: any) => {
     captures.items.push(props);
@@ -35,7 +36,8 @@ vi.mock("@subboost/ui/components/ui/dropdown-menu", () => ({
   DropdownMenuSub: (props: any) => React.createElement("div", null, props.children),
   DropdownMenuSubContent: (props: any) => {
     captures.subContents.push(props);
-    return React.createElement("div", props, props.children);
+    const { children, sideOffset: _sideOffset, ...domProps } = props;
+    return React.createElement("div", domProps, children);
   },
   DropdownMenuSubTrigger: (props: any) => {
     captures.subTriggers.push(props);

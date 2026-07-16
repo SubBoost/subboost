@@ -248,6 +248,7 @@ describe("SubscriptionDashboardSurface", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -271,6 +272,7 @@ describe("SubscriptionDashboardSurface", () => {
   });
 
   it("runs mount effects, handles fetch failures, and shows disabled auto-update notices", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const adapter = createAdapter({ fetchSubscriptions: vi.fn(async () => [subscription]) });
     const mounted = renderSurface(adapter, {}, { runEffects: true });
     await flushPromises();
@@ -282,6 +284,7 @@ describe("SubscriptionDashboardSurface", () => {
     const failed = renderSurface(failingAdapter, {}, { runEffects: true });
     await flushPromises();
     expect(failed.setters[0]).toHaveBeenCalledWith([]);
+    expect(errorSpy).toHaveBeenCalledWith("Failed to fetch subscriptions:", expect.objectContaining({ message: "offline" }));
 
     renderSurface(adapter, { 0: [disabledSubscription], 1: false }, { runEffects: true });
     await flushPromises();
@@ -374,6 +377,7 @@ describe("SubscriptionDashboardSurface", () => {
   });
 
   it("reports download failures without opening the subscription URL", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const dom = stubDocumentActions();
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("cors");
@@ -388,6 +392,10 @@ describe("SubscriptionDashboardSurface", () => {
       title: "下载失败",
       variant: "destructive",
     }));
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Failed to fetch subscription YAML for download:",
+      expect.objectContaining({ message: "cors" })
+    );
   });
 
   it("uses the adapter download URL resolver before fetching subscription YAML", async () => {
@@ -420,6 +428,7 @@ describe("SubscriptionDashboardSurface", () => {
   });
 
   it("guards cancelled delete and in-flight refresh failures", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const adapter = createAdapter({ refreshSubscription: vi.fn(async () => { throw new Error("refresh failed"); }) });
     renderSurface(adapter, { 0: [subscription], 1: false, 2: null, 3: "sub-1" });
     mocks.captures.buttons.find((props: any) => props.title === "重新生成配置并刷新缓存").onClick();
@@ -447,9 +456,19 @@ describe("SubscriptionDashboardSurface", () => {
     mocks.captures.buttons.find((props: any) => props.className?.includes("text-red-400")).onClick();
     await flushPromises();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "删除失败，请稍后重试", variant: "destructive" }));
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Failed to refresh subscription:",
+      expect.objectContaining({ message: "refresh failed" })
+    );
+    expect(errorSpy).toHaveBeenCalledWith("Failed to refresh subscription:", "bad");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Failed to delete subscription:",
+      expect.objectContaining({ message: "delete failed" })
+    );
   });
 
   it("validates and saves subscription settings", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const adapter = createAdapter();
     renderSurface(adapter, { 0: [subscription], 1: false, 4: true, 5: subscription, 6: "  ", 7: true, 8: true, 9: 24, 10: false });
     await mocks.captures.settingsDialog.onSave();
@@ -496,5 +515,9 @@ describe("SubscriptionDashboardSurface", () => {
     renderSurface(failingAdapter, { 0: [subscription], 1: false, 4: true, 5: subscription, 6: "Renamed", 7: true, 8: false, 9: 24, 10: false });
     await mocks.captures.settingsDialog.onSave();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "save failed", variant: "destructive" }));
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Failed to save subscription settings:",
+      expect.objectContaining({ message: "save failed" })
+    );
   });
 });

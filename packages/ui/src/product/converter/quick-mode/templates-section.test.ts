@@ -1,6 +1,6 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   captures: {} as Record<string, any>,
@@ -200,6 +200,10 @@ describe("quick mode TemplatesSection", () => {
     };
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("selects built-in templates and opens the catalog", () => {
     const { setters } = renderSection();
 
@@ -278,11 +282,13 @@ describe("quick mode TemplatesSection", () => {
   });
 
   it("reports runtime failures and hides optional catalog features when disabled", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.productApi.templates.loadTemplateDetail.mockRejectedValue(new Error("network"));
     renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
     mocks.captures.buttons[0].onClick();
     await flushPromises();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "应用模板失败，请稍后重试", variant: "destructive" }));
+    expect(errorSpy).toHaveBeenCalledWith(expect.objectContaining({ message: "network" }));
 
     mocks.productApi.templates.catalogEnabled = false;
     mocks.productApi.templates.builtinEngagementEnabled = false;
