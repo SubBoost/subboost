@@ -39,6 +39,12 @@
 - Deployment docs: [Advanced deployment - compiles from source, slower with higher requirements](https://docs.subboost.org/deploy/advanced)
 - Configuration guide: [Clash configuration simple enough for a paramecium: configure precise routing and chained proxies from the UI in one click](https://ryanvan.com/t/topic/59?u=ryan)
 
+### First-Run Setup and Updates
+
+- After a fresh installation succeeds, the installer prints a first-run URL such as `/login#setup-token=...`. This token creates the first administrator, so protect it like a password. The page sends it in a request header and removes the fragment after setup succeeds.
+- `subboost update` validates the candidate configuration and pulls its image before pausing the old instance. It then creates and verifies a PostgreSQL backup, and activates formal files only after candidate health passes. Candidate failures restore the old files, image, and database.
+- If database restoration itself fails, the application and scheduled jobs remain stopped and the backup is preserved. Do not force a restart; follow the recovery path printed by the command. Run `subboost doctor` and `subboost logs` first to collect status.
+
 ## Development Notes
 
 Developers can start a local development environment from source:
