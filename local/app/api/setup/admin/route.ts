@@ -1,22 +1,35 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { getLocalAdminSetupCredentialError, LOCAL_ADMIN_CREDENTIAL_MESSAGES } from "@local/lib/admin-credentials";
-import { apiError, getStringField, readJsonBody } from "@local/lib/http";
+import { apiError, getStringField, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import { prisma } from "@local/lib/prisma";
 import { sessionCookieOptions, signSession, SESSION_COOKIE } from "@local/lib/session";
-import { consumeLocalRateLimit, localRateLimitResponse } from "@local/lib/rate-limit";
+import { consumeLocalRateLimit, getTrustedClientRateLimitKey, localRateLimitResponse } from "@local/lib/rate-limit";
+import { validateLocalSetupToken } from "@local/lib/setup-token";
 
 export async function POST(request: Request) {
-  const setupLimit = consumeLocalRateLimit("admin-setup", "all", {
-    limit: 5,
-    windowMs: 15 * 60 * 1000,
-  });
-  if (!setupLimit.allowed) {
-    return localRateLimitResponse("Too many setup attempts. Try again later.", setupLimit.retryAfterSeconds);
+  const clientKey = getTrustedClientRateLimitKey(request);
+  if (clientKey) {
+    const setupLimit = consumeLocalRateLimit("admin-setup-client", clientKey, {
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!setupLimit.allowed) {
+      return localRateLimitResponse("Too many setup attempts. Try again later.", setupLimit.retryAfterSeconds);
+    }
   }
 
-  const body = await readJsonBody(request);
-  if (!body) return apiError(LOCAL_ADMIN_CREDENTIAL_MESSAGES.invalidJson, "BAD_REQUEST", 400);
+  const setupToken = validateLocalSetupToken(request);
+  if (setupToken === "missing_config") {
+    return apiError("LOCAL_SETUP_TOKEN is not configured.", "CONFIGURATION_ERROR", 503);
+  }
+  if (setupToken === "invalid") {
+    return apiError("Invalid setup token.", "FORBIDDEN", 403);
+  }
+
+  const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.small);
+  if (!parsedBody.ok) return jsonBodyError(parsedBody, LOCAL_ADMIN_CREDENTIAL_MESSAGES.invalidJson);
+  const body = parsedBody.value;
 
   const existingCount = await prisma.localAdmin.count();
   if (existingCount > 0) {

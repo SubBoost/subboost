@@ -125,6 +125,20 @@ describe("local subscription routes", () => {
     expect(createSubscription).toHaveBeenCalledWith("admin-1", fullConfigPayload);
   });
 
+  it("rejects subscription bodies above 16 MiB", async () => {
+    const response = await pluralCollectionRoute.POST(new Request("http://local.test/api/subscriptions", {
+      method: "POST",
+      headers: { "content-length": String(16 * 1024 * 1024 + 1) },
+      body: "{}",
+    }));
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "Request body is too large.",
+      code: "PAYLOAD_TOO_LARGE",
+    });
+    expect(createSubscription).not.toHaveBeenCalled();
+  });
+
   it("uses plural item and refresh routes with path ids", async () => {
     const params = { params: Promise.resolve({ id: "sub-1" }) };
 

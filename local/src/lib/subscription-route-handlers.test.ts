@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   deleteSubscription: vi.fn(),
   getSubscription: vi.fn(),
   json: vi.fn(),
+  jsonBodyError: vi.fn(),
   listSubscriptions: vi.fn(),
   readJsonBody: vi.fn(),
   refreshSubscription: vi.fn(),
@@ -26,6 +27,8 @@ vi.mock("@local/lib/api-auth", () => ({ withCurrentAdmin: mocks.withCurrentAdmin
 vi.mock("@local/lib/http", () => ({
   apiError: mocks.apiError,
   json: mocks.json,
+  jsonBodyError: mocks.jsonBodyError,
+  LOCAL_JSON_BODY_LIMITS: { subscription: 16 * 1024 * 1024 },
   readJsonBody: mocks.readJsonBody,
 }));
 vi.mock("@local/lib/subscription-service", () => ({
@@ -47,6 +50,7 @@ describe("local subscription route handlers", () => {
     );
     mocks.json.mockImplementation((body: unknown, status = 200) => ({ body, status }));
     mocks.apiError.mockImplementation((message: string, code: string, status: number) => ({ message, code, status }));
+    mocks.jsonBodyError.mockImplementation(() => ({ message: "Invalid JSON body.", code: "BAD_REQUEST", status: 400 }));
   });
 
   it("extracts subscription ids from query strings", () => {
@@ -71,14 +75,14 @@ describe("local subscription route handlers", () => {
   });
 
   it("creates subscriptions and reports bad input", async () => {
-    mocks.readJsonBody.mockResolvedValueOnce(null);
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: false, reason: "invalid_json" });
     await expect(createSubscriptionResponse(request)).resolves.toEqual({
       message: "Invalid JSON body.",
       code: "BAD_REQUEST",
       status: 400,
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ name: "A" });
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: { name: "A" } });
     mocks.createSubscription.mockResolvedValueOnce({ id: "sub-1" });
     await expect(createSubscriptionResponse(request)).resolves.toEqual({
       body: { subscription: { id: "sub-1" } },
@@ -86,7 +90,7 @@ describe("local subscription route handlers", () => {
     });
     expect(mocks.createSubscription).toHaveBeenCalledWith("admin-1", { name: "A" });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ name: "" });
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: { name: "" } });
     mocks.createSubscription.mockRejectedValueOnce(new Error("Name required"));
     await expect(createSubscriptionResponse(request)).resolves.toEqual({
       message: "Name required",
@@ -94,7 +98,7 @@ describe("local subscription route handlers", () => {
       status: 400,
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ name: "" });
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: { name: "" } });
     mocks.createSubscription.mockRejectedValueOnce("bad");
     await expect(createSubscriptionResponse(request)).resolves.toEqual({
       message: "Unable to create subscription.",
@@ -104,21 +108,21 @@ describe("local subscription route handlers", () => {
   });
 
   it("updates subscriptions and validates JSON body shape", async () => {
-    mocks.readJsonBody.mockResolvedValueOnce([]);
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: [] });
     await expect(updateSubscriptionResponse(request, "sub-1")).resolves.toEqual({
       message: "Invalid JSON body.",
       code: "BAD_REQUEST",
       status: 400,
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ name: "B" });
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: { name: "B" } });
     mocks.updateSubscription.mockResolvedValueOnce({ id: "sub-1", name: "B" });
     await expect(updateSubscriptionResponse(request, "sub-1")).resolves.toEqual({
       body: { subscription: { id: "sub-1", name: "B" } },
       status: 200,
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ name: "B" });
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: { name: "B" } });
     mocks.updateSubscription.mockResolvedValueOnce(null);
     await expect(updateSubscriptionResponse(request, "missing")).resolves.toEqual({
       message: "Subscription not found.",
@@ -126,7 +130,7 @@ describe("local subscription route handlers", () => {
       status: 404,
     });
 
-    mocks.readJsonBody.mockResolvedValueOnce({ name: "" });
+    mocks.readJsonBody.mockResolvedValueOnce({ ok: true, value: { name: "" } });
     mocks.updateSubscription.mockRejectedValueOnce("bad");
     await expect(updateSubscriptionResponse(request, "sub-1")).resolves.toEqual({
       message: "Unable to update subscription.",

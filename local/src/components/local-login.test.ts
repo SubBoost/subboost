@@ -93,12 +93,19 @@ function response(body: unknown, ok = true) {
   } as unknown as Response;
 }
 
-function installWindow() {
+function installWindow(hash = "") {
+  const replaceState = vi.fn();
   Object.defineProperty(globalThis, "window", {
-    value: { location: { href: "" } },
+    value: {
+      location: { href: "", hash, pathname: "/login", search: "" },
+      history: { replaceState },
+    },
     configurable: true,
   });
-  return (globalThis as any).window as { location: { href: string } };
+  return (globalThis as any).window as {
+    location: { href: string; hash: string; pathname: string; search: string };
+    history: { replaceState: ReturnType<typeof vi.fn> };
+  };
 }
 
 function renderLogin(overrides: Record<number, unknown> = {}, runEffects = false) {
@@ -233,6 +240,7 @@ describe("local login component", () => {
       2: "long-secret",
       3: "long-secret",
       4: true,
+      7: "setup-secret",
     });
 
     expect(mocks.inputs.find((input) => input.placeholder === "密码").type).toBe("text");
@@ -244,6 +252,10 @@ describe("local login component", () => {
       "/api/setup/admin",
       expect.objectContaining({
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-SubBoost-Setup-Token": "setup-secret",
+        },
         body: JSON.stringify({ username: "admin", password: "long-secret", passwordConfirm: "long-secret" }),
       }),
     );
@@ -256,5 +268,35 @@ describe("local login component", () => {
     const load = renderLogin({}, true);
     await flushPromises();
     expect(load.setters[6]).toHaveBeenCalledWith("加载失败");
+  });
+
+  it("requires the installer fragment and clears it after successful setup", async () => {
+    const missingWindow = installWindow();
+    (globalThis as any).fetch = vi.fn();
+    const missing = renderLogin({
+      0: { setupRequired: true, authenticated: false },
+      1: "admin",
+      2: "long-secret",
+      3: "long-secret",
+    });
+    expect(missing.html).toContain("安装器输出的初始化链接");
+    await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });
+    expect(missing.setters[6]).toHaveBeenCalledWith("缺少初始化令牌，请使用安装器输出的初始化链接");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    const win = installWindow("#setup-token=setup-secret");
+    (globalThis as any).fetch = vi.fn(async () => response({ success: true }));
+    const setup = renderLogin({
+      0: { setupRequired: true, authenticated: false },
+      1: "admin",
+      2: "long-secret",
+      3: "long-secret",
+      7: "setup-secret",
+    });
+    await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });
+
+    expect(win.history.replaceState).toHaveBeenCalledWith(null, "", "/login");
+    expect(win.location.href).toBe("/dashboard");
+    expect(missingWindow.history.replaceState).not.toHaveBeenCalled();
   });
 });

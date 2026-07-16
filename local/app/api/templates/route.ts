@@ -1,5 +1,5 @@
 import { getOptionalCurrentAdmin, localAdminRequiredResponse, withCurrentAdmin } from "@local/lib/api-auth";
-import { apiError, json, readJsonBody } from "@local/lib/http";
+import { apiError, json, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import {
   createTemplate,
   deleteTemplate,
@@ -51,11 +51,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withCurrentAdmin(async (admin) => {
-    const body = await readJsonBody(request);
-    if (!body) return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+    const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.template);
+    if (!parsedBody.ok) return jsonBodyError(parsedBody);
+    if (!parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
+      return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+    }
 
     try {
-      const template = await createTemplate(admin.id, body);
+      const template = await createTemplate(admin.id, parsedBody.value);
       return json({ template }, 201);
     } catch (error) {
       return apiError(error instanceof Error ? error.message : "Unable to create template.", "BAD_REQUEST", 400);

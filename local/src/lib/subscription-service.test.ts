@@ -33,8 +33,10 @@ const mocks = vi.hoisted(() => ({
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
+    subscriptionAutoUpdateState: { upsert: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -164,13 +166,16 @@ describe("local subscription service", () => {
     mocks.prisma.subscription.findFirst.mockResolvedValue(row());
     mocks.prisma.subscription.findUnique.mockResolvedValue(row());
     mocks.prisma.subscription.update.mockResolvedValue(row({ name: "Updated" }));
+    mocks.prisma.subscription.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.subscriptionAutoUpdateState.upsert.mockResolvedValue({});
     mocks.prisma.subscription.delete.mockResolvedValue(row());
-    mocks.prisma.$transaction.mockImplementation(async (callback) =>
-      callback({
-        subscription: { update: vi.fn() },
-        subscriptionAutoUpdateState: { upsert: vi.fn() },
-      })
-    );
+    mocks.prisma.$transaction.mockImplementation(async (callback) => callback({
+      subscription: {
+        update: mocks.prisma.subscription.update,
+        updateMany: mocks.prisma.subscription.updateMany,
+      },
+      subscriptionAutoUpdateState: { upsert: mocks.prisma.subscriptionAutoUpdateState.upsert },
+    }));
     mocks.importSourceUrlDirect.mockResolvedValue({
       ok: true,
       parsedNodes: [node("Imported")],
@@ -336,6 +341,13 @@ describe("local subscription service", () => {
         autoUpdateInterval: 359,
       })
     ).rejects.toThrow("自动更新最小间隔为 0.1 小时");
+
+    await expect(createSubscription("owner-1", { name: "Bad", nodes: [null] })).rejects.toThrow(
+      "节点 #1 必须是对象"
+    );
+    await expect(
+      createSubscription("owner-1", { name: "Too many", nodes: Array.from({ length: 10_001 }, () => null) })
+    ).rejects.toThrow("Node count cannot exceed 10000");
   });
 
   it("updates subscriptions and preserves existing values when fields are omitted", async () => {
@@ -387,6 +399,22 @@ describe("local subscription service", () => {
         autoUpdateInterval: 7200,
       }),
       include: { autoUpdateState: true },
+    });
+
+    mocks.prisma.subscription.findFirst.mockResolvedValueOnce(row({ autoUpdateInterval: null }));
+    await updateSubscription("owner-1", "sub-1", { autoUpdateInterval: 7200 });
+    expect(mocks.prisma.subscriptionAutoUpdateState.upsert).toHaveBeenCalledWith({
+      where: { subscriptionId: "sub-1" },
+      create: { subscriptionId: "sub-1" },
+      update: {
+        externalFailureCount: 0,
+        failureSourceState: null,
+        lastFailedAt: null,
+        lastAttemptedAt: null,
+        disabledAt: null,
+        disabledReason: null,
+        disabledPreviousInterval: null,
+      },
     });
   });
 
@@ -477,6 +505,18 @@ describe("local subscription service", () => {
       body: { ok: true, nodeCount: 1 },
     });
     expect(mocks.prisma.$transaction).toHaveBeenCalled();
+
+    mocks.prisma.subscription.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(refreshSubscription("owner-1", "sub-1")).resolves.toEqual({
+      ok: false,
+      response: {
+        body: {
+          error: "Subscription changed while refresh was in progress.",
+          code: "SUBSCRIPTION_CHANGED",
+        },
+        status: 409,
+      },
+    });
 
     mocks.prepareRefreshCacheResult.mockReturnValueOnce({ ok: false, reason: "too_many_nodes" });
     await expect(refreshSubscription("owner-1", "sub-1")).resolves.toEqual({

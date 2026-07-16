@@ -1,5 +1,5 @@
 import { withCurrentAdmin } from "@local/lib/api-auth";
-import { apiError, json, readJsonBody } from "@local/lib/http";
+import { apiError, json, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import {
   createSubscription,
   deleteSubscription,
@@ -19,11 +19,11 @@ export async function listSubscriptionsResponse() {
 
 export async function createSubscriptionResponse(request: Request) {
   return withCurrentAdmin(async (admin) => {
-    const body = await readJsonBody(request);
-    if (!body) return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+    const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.subscription);
+    if (!parsedBody.ok) return jsonBodyError(parsedBody);
 
     try {
-      const subscription = await createSubscription(admin.id, body);
+      const subscription = await createSubscription(admin.id, parsedBody.value);
       return json({ subscription }, 201);
     } catch (error) {
       return apiError(error instanceof Error ? error.message : "Unable to create subscription.", "BAD_REQUEST", 400);
@@ -41,7 +41,9 @@ export async function getSubscriptionResponse(id: string) {
 
 export async function updateSubscriptionResponse(request: Request, id: string) {
   return withCurrentAdmin(async (admin) => {
-    const body = await readJsonBody(request);
+    const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.subscription);
+    if (!parsedBody.ok) return jsonBodyError(parsedBody);
+    const body = parsedBody.value;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
     }

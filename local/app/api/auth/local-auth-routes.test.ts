@@ -103,6 +103,15 @@ describe("local auth and health routes", () => {
       status: 401,
       body: { error: "Invalid username or password.", code: "UNAUTHORIZED" },
     });
+
+    await expect(readJson(await POST(new Request("https://local.test/api/auth/login", {
+      method: "POST",
+      headers: { "content-length": String(64 * 1024 + 1) },
+      body: "{}",
+    })))).resolves.toEqual({
+      status: 413,
+      body: { error: "Request body is too large.", code: "PAYLOAD_TOO_LARGE" },
+    });
   });
 
   it("logs out by clearing the session cookie", async () => {

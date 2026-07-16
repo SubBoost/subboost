@@ -102,4 +102,16 @@ describe("local source import settings route", () => {
     });
     expect(mocks.prisma.localAdmin.update).not.toHaveBeenCalled();
   });
+
+  it("rejects settings bodies above 64 KiB", async () => {
+    const response = await PATCH(new Request("https://local.test/api/settings/source-import", {
+      method: "PATCH",
+      headers: { "content-length": String(64 * 1024 + 1) },
+      body: "{}",
+    }));
+    expect(await readJson(response)).toEqual({
+      status: 413,
+      body: { error: "Request body is too large.", code: "PAYLOAD_TOO_LARGE" },
+    });
+  });
 });

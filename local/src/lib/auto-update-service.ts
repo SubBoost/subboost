@@ -28,6 +28,7 @@ import {
   type SubscriptionRow,
 } from "./subscription-service";
 import { LOCAL_AUTO_UPDATE_MIN_SECONDS } from "./auto-update-policy";
+import { JobLeaseLostError } from "./job-lease";
 
 type AutoUpdateSubscriptionRow = SubscriptionRow & {
   owner: {
@@ -56,20 +57,29 @@ function toCompletionTarget(subscription: AutoUpdateSubscriptionRow): AutomaticR
 
 async function writeAutoUpdateState(
   subscriptionId: string,
+  expectedUpdatedAt: Date,
   state: SubscriptionAutoUpdateStateFields,
-  extraSubscriptionData: Record<string, unknown> = {}
-) {
-  await prisma.$transaction([
-    prisma.subscription.update({
-      where: { id: subscriptionId },
-      data: extraSubscriptionData,
-    }),
-    prisma.subscriptionAutoUpdateState.upsert({
+  extraSubscriptionData: Record<string, unknown> = {},
+  assertLease?: () => Promise<void>
+): Promise<boolean> {
+  await assertLease?.();
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.subscription.updateMany({
+      where: { id: subscriptionId, updatedAt: expectedUpdatedAt },
+      data: { ...extraSubscriptionData, updatedAt: new Date() },
+    });
+    if (updated.count !== 1) return false;
+    await tx.subscriptionAutoUpdateState.upsert({
       where: { subscriptionId },
       create: { subscriptionId, ...state },
       update: state,
-    }),
-  ]);
+    });
+    return true;
+  });
+}
+
+function staleOutcome(requestedHosts: string[]): CronUpdateOutcome {
+  return { status: "skipped", requestedHosts, recordHosts: false };
 }
 
 async function prepareLocalRefresh(
@@ -110,10 +120,16 @@ async function completeAllSourcesFailed(params: {
   subscription: AutoUpdateSubscriptionRow;
   prepared: PreparedLocalRefresh;
   decision: Extract<ReturnType<typeof resolveAutomaticRefreshCompletionDecision>, { kind: "all_sources_failed" }>;
+  assertLease?: () => Promise<void>;
 }): Promise<CronUpdateOutcome> {
-  await writeAutoUpdateState(params.subscription.id, params.decision.nextAutoUpdateState.state, {
-    ...(params.decision.nextAutoUpdateState.shouldDisableAutoUpdate ? { autoUpdateInterval: null } : {}),
-  });
+  const persisted = await writeAutoUpdateState(
+    params.subscription.id,
+    params.subscription.updatedAt,
+    params.decision.nextAutoUpdateState.state,
+    { ...(params.decision.nextAutoUpdateState.shouldDisableAutoUpdate ? { autoUpdateInterval: null } : {}) },
+    params.assertLease
+  );
+  if (!persisted) return staleOutcome(params.prepared.requestedHosts);
 
   if (params.decision.nextAutoUpdateState.shouldDisableAutoUpdate) {
     console.warn("[local-subscription-cron] auto update disabled", {
@@ -130,6 +146,7 @@ async function completeSuccess(params: {
   prepared: PreparedLocalRefresh;
   attemptedAt: Date;
   intervalSeconds: number;
+  assertLease?: () => Promise<void>;
 }): Promise<CronUpdateOutcome> {
   const refreshResult = params.prepared.refreshResult;
   if (!refreshResult.ok) throw new Error(`Unexpected refresh failure reason: ${refreshResult.reason}`);
@@ -146,14 +163,21 @@ async function completeSuccess(params: {
   if (decision.kind !== "success") throw new Error(`Unexpected refresh completion decision: ${decision.kind}`);
   const config = { ...params.prepared.config, sources: params.prepared.snapshot.savedSources };
 
-  await writeAutoUpdateState(params.subscription.id, decision.nextAutoUpdateState.state, {
-    encryptedNodes: encryptJson(refreshResult.cacheEntry.nodes),
-    encryptedConfig: encryptJson(config),
-    encryptedSubscriptionInfo: encryptJson(refreshResult.cacheEntry.subscriptionInfo),
-    lastUpdatedAt: cachedAt,
-    cacheExpiresAt: buildSubscriptionCacheExpiry(cachedAt),
-    ...(decision.nextAutoUpdateState.shouldDisableAutoUpdate ? { autoUpdateInterval: null } : {}),
-  });
+  const persisted = await writeAutoUpdateState(
+    params.subscription.id,
+    params.subscription.updatedAt,
+    decision.nextAutoUpdateState.state,
+    {
+      encryptedNodes: encryptJson(refreshResult.cacheEntry.nodes),
+      encryptedConfig: encryptJson(config),
+      encryptedSubscriptionInfo: encryptJson(refreshResult.cacheEntry.subscriptionInfo),
+      lastUpdatedAt: cachedAt,
+      cacheExpiresAt: buildSubscriptionCacheExpiry(cachedAt),
+      ...(decision.nextAutoUpdateState.shouldDisableAutoUpdate ? { autoUpdateInterval: null } : {}),
+    },
+    params.assertLease
+  );
+  if (!persisted) return staleOutcome(params.prepared.requestedHosts);
 
   console.info("[local-subscription-cron] updated", {
     subscriptionId: params.subscription.id,
@@ -172,6 +196,7 @@ async function completeLocalRefresh(params: {
   prepared: PreparedLocalRefresh;
   attemptedAt: Date;
   intervalSeconds: number;
+  assertLease?: () => Promise<void>;
 }): Promise<CronUpdateOutcome> {
   const refreshResult = params.prepared.refreshResult;
 
@@ -189,7 +214,14 @@ async function completeLocalRefresh(params: {
     }
     if (decision.kind === "success") throw new Error("Unexpected successful completion decision");
 
-    await writeAutoUpdateState(params.subscription.id, decision.attemptedState);
+    const persisted = await writeAutoUpdateState(
+      params.subscription.id,
+      params.subscription.updatedAt,
+      decision.attemptedState,
+      {},
+      params.assertLease
+    );
+    if (!persisted) return staleOutcome(params.prepared.requestedHosts);
     return decision.outcome;
   }
 
@@ -201,6 +233,7 @@ async function recordUnexpectedFailure(params: {
   requestedHosts: string[];
   error: unknown;
   attemptStartedAt: Date | null;
+  assertLease?: () => Promise<void>;
 }): Promise<CronUpdateOutcome> {
   const completion = resolveAutomaticRefreshUnexpectedFailureCompletion({
     target: toCompletionTarget(params.subscription),
@@ -209,7 +242,17 @@ async function recordUnexpectedFailure(params: {
     attemptStartedAt: params.attemptStartedAt,
   });
   if (completion.attemptedState) {
-    await writeAutoUpdateState(params.subscription.id, completion.attemptedState).catch(() => undefined);
+    const persisted = await writeAutoUpdateState(
+      params.subscription.id,
+      params.subscription.updatedAt,
+      completion.attemptedState,
+      {},
+      params.assertLease
+    ).catch((error) => {
+      if (error instanceof JobLeaseLostError) throw error;
+      return null;
+    });
+    if (persisted === false) return staleOutcome(params.requestedHosts);
   }
 
   console.error("[local-subscription-cron] failed", {
@@ -220,7 +263,11 @@ async function recordUnexpectedFailure(params: {
   return completion.outcome;
 }
 
-export async function runLocalSubscriptionAutoUpdateCron(now = new Date()): Promise<FinalCronUpdateSummary> {
+export async function runLocalSubscriptionAutoUpdateCron(
+  now = new Date(),
+  options: { assertLease?: () => Promise<void> } = {}
+): Promise<FinalCronUpdateSummary> {
+  await options.assertLease?.();
   const subscriptions = (await prisma.subscription.findMany({
     where: { autoUpdateInterval: { not: null } },
     include: { owner: { select: { username: true } }, autoUpdateState: true },
@@ -228,6 +275,7 @@ export async function runLocalSubscriptionAutoUpdateCron(now = new Date()): Prom
 
   const accumulator = createCronUpdateAccumulator(subscriptions.length);
   for (const subscription of subscriptions) {
+    await options.assertLease?.();
     let requestedHosts: string[] = [];
     let attemptStartedAt: Date | null = null;
     try {
@@ -258,15 +306,24 @@ export async function runLocalSubscriptionAutoUpdateCron(now = new Date()): Prom
         prepared,
         attemptedAt: attemptStartedAt,
         intervalSeconds,
+        assertLease: options.assertLease,
       });
       applyCronUpdateOutcome(accumulator, outcome);
     } catch (error) {
+      if (error instanceof JobLeaseLostError) throw error;
       applyCronUpdateOutcome(
         accumulator,
-        await recordUnexpectedFailure({ subscription, requestedHosts, error, attemptStartedAt })
+        await recordUnexpectedFailure({
+          subscription,
+          requestedHosts,
+          error,
+          attemptStartedAt,
+          assertLease: options.assertLease,
+        })
       );
     }
   }
 
+  await options.assertLease?.();
   return finalizeCronUpdateSummary(accumulator, { maxTopHosts: 50, maxTopUsers: 50 });
 }

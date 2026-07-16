@@ -73,3 +73,12 @@ model SubscriptionAutoUpdateState {
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 }
+
+model JobLeaseLock {
+  name       String   @id
+  ownerToken String
+  expiresAt  DateTime
+  updatedAt  DateTime @updatedAt
+
+  @@index([expiresAt])
+}

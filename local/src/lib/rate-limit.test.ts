@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearLocalRateLimitsForTests,
   consumeLocalRateLimit,
+  getTrustedClientRateLimitKey,
   hashLocalRateLimitKey,
   localRateLimitResponse,
   resetLocalRateLimit,
@@ -35,5 +36,28 @@ describe("local rate limits", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("7");
     await expect(response.json()).resolves.toEqual({ error: "slow down", code: "RATE_LIMITED" });
+  });
+
+  it("uses only runtime or explicitly trusted proxy client addresses", () => {
+    const direct = new Request("https://local.test");
+    expect(getTrustedClientRateLimitKey(direct)).toBeNull();
+
+    const runtime = Object.assign(new Request("https://local.test"), { ip: "203.0.113.10" });
+    expect(getTrustedClientRateLimitKey(runtime)).toBe(hashLocalRateLimitKey("203.0.113.10"));
+
+    process.env.TRUST_PROXY_HEADERS = "true";
+    const proxied = new Request("https://local.test", { headers: { "x-forwarded-for": "198.51.100.2, 10.0.0.1" } });
+    expect(getTrustedClientRateLimitKey(proxied)).toBe(hashLocalRateLimitKey("198.51.100.2"));
+    delete process.env.TRUST_PROXY_HEADERS;
+  });
+
+  it("caps in-memory buckets at 10,000 by evicting the earliest expiry", () => {
+    for (let index = 0; index < 10_000; index += 1) {
+      consumeLocalRateLimit("bounded", String(index), { limit: 1, windowMs: 60_000, now: 1_000 });
+    }
+    consumeLocalRateLimit("bounded", "overflow", { limit: 1, windowMs: 60_000, now: 1_000 });
+
+    expect(consumeLocalRateLimit("bounded", "0", { limit: 1, windowMs: 60_000, now: 1_001 }).allowed).toBe(true);
+    expect(consumeLocalRateLimit("bounded", "9999", { limit: 1, windowMs: 60_000, now: 1_001 }).allowed).toBe(false);
   });
 });

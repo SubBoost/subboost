@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAllowUnsafeSubscriptionSources: vi.fn(),
   lookup: vi.fn(),
   importSubscriptionFromUrl: vi.fn(),
+  requestPinnedText: vi.fn(),
 }));
 
 vi.mock("node:dns/promises", () => ({
@@ -14,6 +15,11 @@ vi.mock("node:dns/promises", () => ({
 vi.mock("@local/lib/source-import-settings", () => ({
   getAllowUnsafeSubscriptionSources: mocks.getAllowUnsafeSubscriptionSources,
 }));
+
+vi.mock("./pinned-http", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./pinned-http")>();
+  return { ...actual, requestPinnedText: mocks.requestPinnedText };
+});
 
 vi.mock("@subboost/server-core/subscription", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@subboost/server-core/subscription")>();
@@ -65,7 +71,8 @@ describe("local source import transport", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(false);
-    mocks.lookup.mockResolvedValue([{ address: "93.184.216.34" }]);
+    mocks.lookup.mockRejectedValue(new Error("dns unavailable"));
+    mocks.requestPinnedText.mockResolvedValue({ status: 200, headers: {}, content: "ss://node" });
     globalThis.fetch = vi.fn();
   });
 
@@ -150,8 +157,7 @@ describe("local source import transport", () => {
     mocks.lookup.mockResolvedValueOnce([{ address: "198.18.3.6" }]);
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(dnsResponse(["93.184.216.34"]))
-      .mockResolvedValueOnce(dnsResponse([]))
-      .mockResolvedValueOnce(response("ss://node", { status: 200 }));
+      .mockResolvedValueOnce(dnsResponse([]));
 
     await expect(runTransport("https://api.dler.io/sub")).resolves.toMatchObject({
       ok: true,
@@ -169,11 +175,54 @@ describe("local source import transport", () => {
         body: expect.any(ArrayBuffer),
       })
     );
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      3,
-      "https://api.dler.io/sub",
-      expect.objectContaining({ method: "GET", redirect: "manual" })
-    );
+    expect(mocks.requestPinnedText).toHaveBeenCalledWith(expect.objectContaining({
+      url: "https://api.dler.io/sub",
+      addresses: ["93.184.216.34"],
+      method: "GET",
+    }));
+  });
+
+  it("pins ordinary successful DNS validation results into the connection", async () => {
+    mocks.lookup.mockResolvedValueOnce([{ address: "93.184.216.34" }]);
+
+    await expect(runTransport("https://example.com/sub")).resolves.toMatchObject({
+      ok: true,
+      content: "ss://node",
+    });
+
+    expect(mocks.requestPinnedText).toHaveBeenCalledWith(expect.objectContaining({
+      url: "https://example.com/sub",
+      addresses: ["93.184.216.34"],
+      maxBytes: 1024,
+    }));
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("revalidates and pins every redirect target independently", async () => {
+    mocks.lookup
+      .mockResolvedValueOnce([{ address: "93.184.216.34" }])
+      .mockResolvedValueOnce([{ address: "1.1.1.1" }]);
+    mocks.requestPinnedText
+      .mockResolvedValueOnce({
+        status: 302,
+        headers: { location: "https://cdn.example.net/sub" },
+        content: "",
+      })
+      .mockResolvedValueOnce({ status: 200, headers: {}, content: "ss://node" });
+
+    await expect(runTransport("https://example.com/sub")).resolves.toMatchObject({
+      ok: true,
+      content: "ss://node",
+    });
+
+    expect(mocks.requestPinnedText).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      url: "https://example.com/sub",
+      addresses: ["93.184.216.34"],
+    }));
+    expect(mocks.requestPinnedText).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      url: "https://cdn.example.net/sub",
+      addresses: ["1.1.1.1"],
+    }));
   });
 
   it("keeps blocking fake-ip DNS answers when DoH confirms an unsafe target", async () => {
@@ -327,7 +376,9 @@ describe("local source import transport", () => {
   });
 
   it("handles redirect loops, missing locations, and thrown fetch errors", async () => {
-    vi.mocked(globalThis.fetch).mockResolvedValue(response("", { status: 302, headers: { location: "/next" } }));
+    vi.mocked(globalThis.fetch).mockImplementation(async () => (
+      response("", { status: 302, headers: { location: "/next" } })
+    ));
     await expect(runTransport("https://example.com/loop")).resolves.toMatchObject({
       ok: false,
       publicReason: "HTTP 310",

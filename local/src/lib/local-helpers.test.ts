@@ -164,9 +164,20 @@ describe("local lib helpers", () => {
       status: 400,
       body: { error: "bad", code: "BAD_REQUEST" },
     });
-    await expect(readJsonBody(new Request("https://local.test", { method: "POST", body: "" }))).resolves.toEqual({});
-    await expect(readJsonBody(new Request("https://local.test", { method: "POST", body: "{bad" }))).resolves.toBeNull();
-    await expect(readJsonBody(new Request("https://local.test", { method: "POST", body: '{"name":" Ry "}' }))).resolves.toEqual({ name: " Ry " });
+    await expect(readJsonBody(new Request("https://local.test", { method: "POST", body: "" }), 1024)).resolves.toEqual({
+      ok: true,
+      value: {},
+    });
+    await expect(readJsonBody(new Request("https://local.test", { method: "POST", body: "{bad" }), 1024)).resolves.toEqual({
+      ok: false,
+      reason: "invalid_json",
+    });
+    await expect(
+      readJsonBody(new Request("https://local.test", { method: "POST", body: '{"name":" Ry "}' }), 1024)
+    ).resolves.toEqual({ ok: true, value: { name: " Ry " } });
+    await expect(
+      readJsonBody(new Request("https://local.test", { method: "POST", body: '{"too":"large"}' }), 4)
+    ).resolves.toEqual({ ok: false, reason: "too_large" });
     expect(getStringField({ name: " Ry " }, "name")).toBe("Ry");
     expect(getStringField({ name: 1 }, "name")).toBe("");
     expect(getStringField(null, "name")).toBe("");

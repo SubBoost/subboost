@@ -3,6 +3,13 @@ import { refreshNodeSnapshot } from "@subboost/server-core/subscription";
 import { prisma } from "@local/lib/prisma";
 import { runLocalSubscriptionAutoUpdateCron } from "@local/lib/auto-update-service";
 
+const dbMocks = vi.hoisted(() => ({
+  findMany: vi.fn(),
+  updateMany: vi.fn(async () => ({ count: 1 })),
+  upsert: vi.fn(async (args) => args),
+  transaction: vi.fn(),
+}));
+
 vi.mock("@local/lib/crypto", () => ({
   decryptJson: vi.fn((ciphertext: string | null | undefined, fallback: unknown) =>
     ciphertext ? JSON.parse(ciphertext.replace(/^json:/, "")) : fallback
@@ -16,13 +23,13 @@ vi.mock("@local/lib/crypto", () => ({
 vi.mock("@local/lib/prisma", () => ({
   prisma: {
     subscription: {
-      findMany: vi.fn(),
-      update: vi.fn(async (args) => args),
+      findMany: dbMocks.findMany,
+      updateMany: dbMocks.updateMany,
     },
     subscriptionAutoUpdateState: {
-      upsert: vi.fn(async (args) => args),
+      upsert: dbMocks.upsert,
     },
-    $transaction: vi.fn(async (operations: Array<Promise<unknown>>) => Promise.all(operations)),
+    $transaction: dbMocks.transaction,
   },
 }));
 
@@ -67,9 +74,14 @@ function subscription(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.mocked(prisma.subscription.findMany).mockReset();
-  vi.mocked(prisma.subscription.update).mockClear();
+  vi.mocked(prisma.subscription.updateMany).mockClear();
   vi.mocked(prisma.subscriptionAutoUpdateState.upsert).mockClear();
   vi.mocked(prisma.$transaction).mockClear();
+  dbMocks.updateMany.mockResolvedValue({ count: 1 });
+  dbMocks.transaction.mockImplementation(async (callback) => callback({
+    subscription: { updateMany: dbMocks.updateMany },
+    subscriptionAutoUpdateState: { upsert: dbMocks.upsert },
+  }));
   vi.mocked(refreshNodeSnapshot).mockReset();
 });
 
@@ -82,7 +94,7 @@ describe("local subscription auto-update service", () => {
     const summary = await runLocalSubscriptionAutoUpdateCron(new Date("2026-06-02T00:30:00.000Z"));
     expect(summary.results).toMatchObject({ total: 1, updated: 0, skipped: 1, failed: 0 });
     expect(refreshNodeSnapshot).not.toHaveBeenCalled();
-    expect(prisma.subscription.update).not.toHaveBeenCalled();
+    expect(prisma.subscription.updateMany).not.toHaveBeenCalled();
   });
 
   it("refreshes due subscriptions and persists the refreshed cache", async () => {
@@ -110,9 +122,9 @@ describe("local subscription auto-update service", () => {
         storedNodes: [],
       })
     );
-    expect(prisma.subscription.update).toHaveBeenCalledWith(
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "sub-1" },
+        where: { id: "sub-1", updatedAt: new Date("2026-06-01T00:00:00.000Z") },
         data: expect.objectContaining({
           encryptedNodes: expect.stringContaining("node-a"),
           encryptedConfig: expect.stringContaining("src-1"),
@@ -132,4 +144,3 @@ describe("local subscription auto-update service", () => {
     );
   });
 });
-

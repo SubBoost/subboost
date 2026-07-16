@@ -1,5 +1,5 @@
 import { withCurrentAdmin } from "@local/lib/api-auth";
-import { apiError, json, readJsonBody } from "@local/lib/http";
+import { apiError, json, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import { importSourceUrlDirect } from "@local/lib/source-import";
 import { buildSourceImportParseResult } from "@subboost/server-core/subscription";
 
@@ -11,8 +11,12 @@ function getStringField(body: unknown, key: string): string {
 
 export async function POST(request: Request) {
   return withCurrentAdmin(async () => {
-    const body = await readJsonBody(request);
-    if (!body) return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+    const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.small);
+    if (!parsedBody.ok) return jsonBodyError(parsedBody);
+    const body = parsedBody.value;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+    }
 
     const result = await importSourceUrlDirect({
       url: getStringField(body, "url"),

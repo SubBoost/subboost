@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
     $transaction: vi.fn(),
     subscription: {
       findMany: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
     subscriptionAutoUpdateState: {
       upsert: vi.fn(),
@@ -63,6 +63,7 @@ const subscription = {
   createdAt: new Date("2026-06-05T00:00:00.000Z"),
   lastUpdatedAt: null,
   autoUpdateState: null,
+  updatedAt: new Date("2026-06-05T00:00:00.000Z"),
 };
 
 function accumulator(total: number) {
@@ -85,9 +86,12 @@ describe("local subscription auto update service", () => {
     });
     mocks.finalizeCronUpdateSummary.mockImplementation((acc, options) => ({ ...acc, options }));
     mocks.prisma.subscription.findMany.mockResolvedValue([subscription]);
-    mocks.prisma.subscription.update.mockReturnValue({ update: true });
-    mocks.prisma.subscriptionAutoUpdateState.upsert.mockReturnValue({ upsert: true });
-    mocks.prisma.$transaction.mockResolvedValue([]);
+    mocks.prisma.subscription.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.subscriptionAutoUpdateState.upsert.mockResolvedValue({ upsert: true });
+    mocks.prisma.$transaction.mockImplementation(async (callback) => callback({
+      subscription: { updateMany: mocks.prisma.subscription.updateMany },
+      subscriptionAutoUpdateState: { upsert: mocks.prisma.subscriptionAutoUpdateState.upsert },
+    }));
     mocks.resolveSubscriptionAutoUpdateState.mockReturnValue({ lastAttemptedAt: null, externalFailureCount: 0 });
     mocks.resolveAutoUpdateScheduleState.mockReturnValue({ due: true });
     mocks.readSubscriptionSecrets.mockReturnValue({ config: { rules: [] }, urls: ["https://airport.example/sub"], nodes: [] });
@@ -150,9 +154,9 @@ describe("local subscription auto update service", () => {
         storedNodes: [],
       })
     );
-    expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
+    expect(mocks.prisma.subscription.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "sub-1" },
+        where: { id: "sub-1", updatedAt: subscription.updatedAt },
         data: expect.objectContaining({
           encryptedNodes: { encrypted: [{ name: "A" }] },
           encryptedConfig: { encrypted: { rules: [], sources: [{ url: "https://airport.example/sub" }] } },
@@ -180,7 +184,7 @@ describe("local subscription auto update service", () => {
       expect.objectContaining({ outcomes: [{ kind: "disabled", subscriptionId: "sub-1" }] })
     );
 
-    expect(mocks.prisma.subscription.update).toHaveBeenCalledWith(
+    expect(mocks.prisma.subscription.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ autoUpdateInterval: null }),
       })
@@ -234,5 +238,19 @@ describe("local subscription auto update service", () => {
       "[local-subscription-cron] failed",
       expect.objectContaining({ subscriptionId: "sub-1", message: "unexpected" })
     );
+  });
+
+  it("treats a CAS miss as a stale skip without publishing success", async () => {
+    mocks.prisma.subscription.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await runLocalSubscriptionAutoUpdateCron(now);
+
+    expect(mocks.prisma.subscriptionAutoUpdateState.upsert).not.toHaveBeenCalled();
+    expect(mocks.applyCronUpdateOutcome).toHaveBeenCalledWith(expect.anything(), {
+      status: "skipped",
+      requestedHosts: ["airport.example"],
+      recordHosts: false,
+    });
+    expect(console.info).not.toHaveBeenCalled();
   });
 });

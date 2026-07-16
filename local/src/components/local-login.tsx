@@ -29,9 +29,12 @@ export function LocalLogin() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [setupToken, setSetupToken] = React.useState("");
 
   React.useEffect(() => {
     let cancelled = false;
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    setSetupToken(fragment.get("setup-token")?.trim() || "");
     void fetch("/api/auth/me", { cache: "no-store" })
       .then((response) => readJson<AuthState>(response))
       .then((nextAuth) => {
@@ -60,16 +63,26 @@ export function LocalLogin() {
       setError(credentialError);
       return;
     }
+    if (setupRequired && !setupToken) {
+      setError("缺少初始化令牌，请使用安装器输出的初始化链接");
+      return;
+    }
 
     setLoading(true);
     try {
       const response = await fetch(setupRequired ? "/api/setup/admin" : "/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(setupRequired ? { "X-SubBoost-Setup-Token": setupToken } : {}),
+        },
         body: JSON.stringify({ username, password, passwordConfirm }),
       });
       const data = await readJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(data.error || "登录失败");
+      if (setupRequired) {
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      }
       window.location.href = getPostLoginHref();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "登录失败，请重试");
@@ -121,6 +134,11 @@ export function LocalLogin() {
               {setupRequired ? (
                 <p id="local-admin-password-help" className="-mt-1 text-xs text-white/45">
                   至少 {LOCAL_ADMIN_PASSWORD_MIN_LENGTH} 个字符
+                </p>
+              ) : null}
+              {setupRequired && !setupToken ? (
+                <p className="text-amber-300/80 text-xs">
+                  请从安装器输出的初始化链接进入本页面。
                 </p>
               ) : null}
               {setupRequired ? (

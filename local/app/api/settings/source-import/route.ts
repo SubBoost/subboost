@@ -1,5 +1,5 @@
 import { withCurrentAdmin } from "@local/lib/api-auth";
-import { apiError, json, readJsonBody } from "@local/lib/http";
+import { apiError, json, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import { prisma } from "@local/lib/prisma";
 
 export async function GET() {
@@ -16,8 +16,9 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   return withCurrentAdmin(async (admin) => {
-    const body = await readJsonBody(request);
-    if (!body) return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+    const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.small);
+    if (!parsedBody.ok) return jsonBodyError(parsedBody);
+    const body = parsedBody.value;
 
     const allowUnsafeSubscriptionSources =
       typeof body === "object" && !Array.isArray(body)

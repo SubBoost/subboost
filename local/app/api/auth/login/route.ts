@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { apiError, getStringField, readJsonBody } from "@local/lib/http";
+import { apiError, getStringField, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import { prisma } from "@local/lib/prisma";
 import { sessionCookieOptions, signSession, SESSION_COOKIE } from "@local/lib/session";
 import {
   consumeLocalRateLimit,
+  getTrustedClientRateLimitKey,
   hashLocalRateLimitKey,
   localRateLimitResponse,
   resetLocalRateLimit,
@@ -13,16 +14,20 @@ import {
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(request: Request) {
-  const globalLimit = consumeLocalRateLimit("auth-login-global", "all", {
-    limit: 30,
-    windowMs: LOGIN_WINDOW_MS,
-  });
-  if (!globalLimit.allowed) {
-    return localRateLimitResponse("Too many login attempts. Try again later.", globalLimit.retryAfterSeconds);
+  const clientKey = getTrustedClientRateLimitKey(request);
+  if (clientKey) {
+    const clientLimit = consumeLocalRateLimit("auth-login-client", clientKey, {
+      limit: 30,
+      windowMs: LOGIN_WINDOW_MS,
+    });
+    if (!clientLimit.allowed) {
+      return localRateLimitResponse("Too many login attempts. Try again later.", clientLimit.retryAfterSeconds);
+    }
   }
 
-  const body = await readJsonBody(request);
-  if (!body) return apiError("Invalid JSON body.", "BAD_REQUEST", 400);
+  const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.small);
+  if (!parsedBody.ok) return jsonBodyError(parsedBody);
+  const body = parsedBody.value;
 
   const username = getStringField(body, "username");
   const password = getStringField(body, "password");

@@ -94,6 +94,19 @@ describe("local template routes", () => {
     expect(deleteTemplate).toHaveBeenCalledWith("admin-1", "tpl-1");
   });
 
+  it("rejects template bodies above 4 MiB", async () => {
+    const response = await collectionRoute.POST(new Request("http://local.test/api/templates", {
+      method: "POST",
+      headers: { "content-length": String(4 * 1024 * 1024 + 1) },
+      body: "{}",
+    }));
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "Request body is too large.",
+      code: "PAYLOAD_TOO_LARGE",
+    });
+  });
+
   it("reports local template collection errors", async () => {
     vi.mocked(listTemplates).mockRejectedValueOnce(new Error("Bad filters"));
     let response = await collectionRoute.GET(new Request("http://local.test/api/templates?type=default"));
