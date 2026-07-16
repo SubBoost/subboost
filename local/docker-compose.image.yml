@@ -27,6 +27,8 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
+      LOCAL_SETUP_TOKEN: ${LOCAL_SETUP_TOKEN:?set LOCAL_SETUP_TOKEN}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
       APP_URL: ${APP_URL:-http://localhost:3000}
 
   cron:
@@ -41,7 +43,7 @@ services:
       [
         "sh",
         "-c",
-        "i=0; while true; do if [ $$i -le 0 ]; then echo \"[local-cron] $(date -Iseconds) POST /api/cron/update-rule-index\"; curl -fsS -X POST -H \"Authorization: Bearer $${CRON_SECRET}\" http://app:3000/api/cron/update-rule-index || true; i=10; fi; echo \"[local-cron] $(date -Iseconds) POST /api/cron/update-subscriptions\"; curl -fsS -X POST -H \"Authorization: Bearer $${CRON_SECRET}\" http://app:3000/api/cron/update-subscriptions || true; i=$$((i - 1)); sleep 360; done"
+        "i=0; while true; do failed=0; if [ $$i -le 0 ]; then echo \"[local-cron] $(date -Iseconds) POST /api/cron/update-rule-index\"; curl -fsS -X POST -H \"Authorization: Bearer $${CRON_SECRET}\" http://app:3000/api/cron/update-rule-index || failed=1; i=10; fi; echo \"[local-cron] $(date -Iseconds) POST /api/cron/update-subscriptions\"; curl -fsS -X POST -H \"Authorization: Bearer $${CRON_SECRET}\" http://app:3000/api/cron/update-subscriptions || failed=1; i=$$((i - 1)); if [ $$failed -ne 0 ]; then echo \"[local-cron] one or more endpoints failed; restarting after delay\" >&2; sleep 30; exit 1; fi; sleep 360; done"
       ]
 
 volumes:

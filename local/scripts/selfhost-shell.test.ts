@@ -238,13 +238,17 @@ ENV
       export SUBBOOST_DOCTOR_HEALTH_ATTEMPTS=3
       export SUBBOOST_DOCTOR_HEALTH_INTERVAL_SECONDS=0
       source local/scripts/subboost.sh
+      sudo_do() { "$@"; }
       docker() {
         if [ "$1" = "info" ]; then return 0; fi
         if [ "$1" = "compose" ]; then
           case "$*" in
             "compose version"*) return 0 ;;
+            *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull") return 0 ;;
+            *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
+            *"pg_restore --list"*) cat >/dev/null; return 0 ;;
             *" up -d --remove-orphans") return 0 ;;
             *" up -d --no-deps --force-recreate app") return 0 ;;
             *" ps -q app") printf 'app-id\\n'; return 0 ;;
@@ -254,6 +258,7 @@ ENV
         fi
         if [ "$1" = "inspect" ]; then
           case "$*" in
+            *"{{.Image}}"*) printf 'sha256:old-image\\n'; return 0 ;;
             *".State.Status"*) printf 'running\\n'; return 0 ;;
             *".State.Health"*) printf 'healthy\\n'; return 0 ;;
           esac
@@ -324,15 +329,19 @@ ENV
       docker_log="$home/docker-log"
       : > "$docker_log"
       docker() {
+        printf 'command=%s\n' "$*" >> "$docker_log"
         if [ "$1" = "info" ]; then return 0; fi
         if [ "$1" = "compose" ]; then
           case "$*" in
             "compose version"*) return 0 ;;
+            *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull")
               printf 'pull_image=%s\\n' "\${SUBBOOST_IMAGE:-}" >> "$docker_log"
               return 0
               ;;
+            *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
+            *"pg_restore --list"*) cat >/dev/null; return 0 ;;
             *" up -d --remove-orphans") return 0 ;;
             *" up -d --no-deps --force-recreate app") return 0 ;;
             *" ps -q app") printf 'app-id\\n'; return 0 ;;
@@ -342,6 +351,7 @@ ENV
         fi
         if [ "$1" = "inspect" ]; then
           case "$*" in
+            *"{{.Image}}"*) printf 'sha256:old-image\\n'; return 0 ;;
             *".State.Status"*) printf 'running\\n'; return 0 ;;
             *".State.Health"*) printf 'healthy\\n'; return 0 ;;
           esac
@@ -361,6 +371,14 @@ ENV
     expect(result.stdout).toContain("SUBBOOST_IMAGE=new-image");
     expect(result.stdout).toContain("SUBBOOST_COMPOSE_URL=file://");
     expect(result.stdout).toContain("SUBBOOST_MANAGER_URL=file://");
+    const pullIndex = result.stdout.search(/^command=compose.* pull$/m);
+    const pauseIndex = result.stdout.indexOf(" stop cron app");
+    const dumpIndex = result.stdout.indexOf("pg_dump -Fc");
+    const candidateStartIndex = result.stdout.indexOf("candidate-compose.yml", dumpIndex);
+    expect(pullIndex).toBeGreaterThanOrEqual(0);
+    expect(pauseIndex).toBeGreaterThan(pullIndex);
+    expect(dumpIndex).toBeGreaterThan(pauseIndex);
+    expect(candidateStartIndex).toBeGreaterThan(dumpIndex);
   }, 10_000);
 
   it("migrates old fixed official update sources to stable latest", () => {
@@ -414,11 +432,14 @@ JSON
         if [ "$1" = "compose" ]; then
           case "$*" in
             "compose version"*) return 0 ;;
+            *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull")
               printf 'pull_image=%s\\n' "\${SUBBOOST_IMAGE:-}" >> "$docker_log"
               return 0
               ;;
+            *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
+            *"pg_restore --list"*) cat >/dev/null; return 0 ;;
             *" up -d --remove-orphans") return 0 ;;
             *" up -d --no-deps --force-recreate app") return 0 ;;
             *" ps -q app") printf 'app-id\\n'; return 0 ;;
@@ -428,6 +449,7 @@ JSON
         fi
         if [ "$1" = "inspect" ]; then
           case "$*" in
+            *"{{.Image}}"*) printf 'sha256:old-image\\n'; return 0 ;;
             *".State.Status"*) printf 'running\\n'; return 0 ;;
             *".State.Health"*) printf 'healthy\\n'; return 0 ;;
           esac
@@ -495,22 +517,27 @@ ENV
       source local/scripts/subboost.sh
       sudo_do() { "$@"; }
       load_env() { :; }
-      compose() { printf 'dump'; }
+      compose() {
+        case "$*" in
+          *"pg_dump -Fc"*) printf 'custom-dump' ;;
+          *"pg_restore --list"*) cat >/dev/null ;;
+        esac
+      }
       cat > "$ENV_FILE" <<'ENV'
 POSTGRES_DB=subboost
 POSTGRES_USER=subboost
 ENV
       for i in $(seq -w 1 12); do
-        : > "$BACKUP_DIR/subboost-20240101T0000\${i}Z.sql.gz"
+        : > "$BACKUP_DIR/subboost-20240101T0000\${i}Z.dump"
         : > "$BACKUP_DIR/subboost-20240101T0000\${i}Z.env"
       done
       backup_cmd >/dev/null
-      sql_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.sql.gz' | wc -l | tr -d '[:space:]')"
+      sql_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.dump' | wc -l | tr -d '[:space:]')"
       env_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.env' | wc -l | tr -d '[:space:]')"
       printf 'sql=%s env=%s\\n' "$sql_count" "$env_count"
       [ "$sql_count" = "10" ]
       [ "$env_count" = "10" ]
-      [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.sql.gz" ]
+      [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.dump" ]
       [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.env" ]
     `;
 

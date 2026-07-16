@@ -120,15 +120,6 @@ download_to_temp() {
   esac
 }
 
-install_file_from_url() {
-  local url="$1"
-  local destination="$2"
-  local mode="$3"
-  local tmp="$TMP_DIR/download"
-  download_to_temp "$url" "$tmp"
-  run_root install -m "$mode" "$tmp" "$destination"
-}
-
 json_get() {
   local key="$1"
   local file="$2"
@@ -445,7 +436,7 @@ docker_login_if_needed() {
 }
 
 compose() {
-  (cd "$SUBBOOST_HOME" && docker_cmd compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@")
+  (cd "$SUBBOOST_HOME" && docker_cmd compose --project-directory "$SUBBOOST_HOME" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@")
 }
 
 subboost_app_container_id() {
@@ -507,20 +498,6 @@ prompt_for_port() {
   done
 }
 
-select_existing_or_random_port() {
-  local current_port selected_port
-  current_port="$(port_number "${1:-}")"
-  if port_can_be_used "$current_port"; then
-    printf '%s\n' "$current_port"
-    return 0
-  fi
-  selected_port="$(random_free_port)"
-  if [ -n "$current_port" ]; then
-    warn "已有配置端口 $current_port 被其它服务占用，已自动改用随机空闲端口 $selected_port。"
-  fi
-  printf '%s\n' "$selected_port"
-}
-
 wait_for_health() {
   local port="$1"
   local base="http://127.0.0.1:$(port_number "$port")"
@@ -541,9 +518,42 @@ wait_for_health() {
   return 1
 }
 
+cleanup_failed_install() {
+  local volumes_before="$1"
+  local project_name
+  project_name="$(basename "$SUBBOOST_HOME")"
+  compose down --remove-orphans >/dev/null 2>&1 || true
+  while IFS= read -r volume; do
+    [ -n "$volume" ] || continue
+    if ! grep -Fxq "$volume" "$volumes_before"; then
+      docker_cmd volume rm "$volume" >/dev/null 2>&1 || true
+    fi
+  done < <(docker_cmd volume ls -q --filter "label=com.docker.compose.project=$project_name" 2>/dev/null || true)
+}
+
+commit_candidate_install() {
+  local candidate_env="$1" candidate_compose="$2" candidate_manager="$3"
+  local live_env="$4" live_compose="$5"
+  local staged_env="${live_env}.candidate.$$"
+  local staged_compose="${live_compose}.candidate.$$"
+  local staged_manager="${SUBBOOST_BIN}.candidate.$$"
+  run_root install -m 600 "$candidate_env" "$staged_env" || return 1
+  if ! is_root; then run_root chown "$(id -u):$(id -g)" "$staged_env" || return 1; fi
+  run_root install -m 644 "$candidate_compose" "$staged_compose" || return 1
+  run_root install -m 755 "$candidate_manager" "$staged_manager" || return 1
+  run_root mv -f "$staged_env" "$live_env" || return 1
+  run_root mv -f "$staged_compose" "$live_compose" || return 1
+  run_root mv -f "$staged_manager" "$SUBBOOST_BIN" || return 1
+}
+
 main() {
   require_linux
   require_curl
+  local live_env="$ENV_FILE"
+  local live_compose="$COMPOSE_FILE"
+  if [ -e "$live_env" ] || [ -e "$live_compose" ]; then
+    die "Existing installation metadata was found. Use 'subboost update' or inspect the incomplete installation before retrying."
+  fi
   fetch_release_manifest
 
   local manifest_image manifest_compose manifest_manager manifest_version
@@ -556,6 +566,7 @@ main() {
   image="${SUBBOOST_IMAGE:-${manifest_image:-$DEFAULT_IMAGE}}"
   compose_url="${SUBBOOST_COMPOSE_URL:-$(resolve_url "$SUBBOOST_RELEASE_URL" "${manifest_compose:-$DEFAULT_COMPOSE_URL}")}"
   manager_url="${SUBBOOST_MANAGER_URL:-$(resolve_url "$SUBBOOST_RELEASE_URL" "${manifest_manager:-$DEFAULT_MANAGER_URL}")}"
+  [ -n "$image" ] && [ -n "$compose_url" ] && [ -n "$manager_url" ] || die "Release metadata is missing image, composeUrl, or managerUrl."
 
   say "Installing SubBoost."
   say "Install directory: $SUBBOOST_HOME"
@@ -572,11 +583,16 @@ main() {
   ensure_docker
   docker_login_if_needed
   run_root mkdir -p "$SUBBOOST_HOME" "$SUBBOOST_HOME/backups" "$(dirname "$SUBBOOST_BIN")"
-  install_file_from_url "$compose_url" "$COMPOSE_FILE" 644
-  install_file_from_url "$manager_url" "$SUBBOOST_BIN" 755
-
-  local existing_env="0"
-  if [ -f "$ENV_FILE" ]; then existing_env="1"; fi
+  ENV_FILE="$TMP_DIR/candidate.env"
+  COMPOSE_FILE="$TMP_DIR/candidate-compose.yml"
+  local candidate_manager="$TMP_DIR/candidate-manager"
+  local volumes_before="$TMP_DIR/volumes.before"
+  umask 077
+  : > "$ENV_FILE"
+  download_to_temp "$compose_url" "$COMPOSE_FILE"
+  download_to_temp "$manager_url" "$candidate_manager"
+  [ -s "$COMPOSE_FILE" ] || die "Candidate Compose file is empty."
+  [ -s "$candidate_manager" ] && bash -n "$candidate_manager" || die "Candidate manager is invalid."
 
   set_env_value SUBBOOST_IMAGE "$image"
   set_env_value SUBBOOST_RELEASE_URL "$SUBBOOST_UPDATE_RELEASE_URL"
@@ -588,6 +604,7 @@ main() {
   ensure_env_value ENCRYPTION_KEY "$(random_hex 32)"
   ensure_env_value JWT_SECRET "$(random_hex 32)"
   ensure_env_value CRON_SECRET "$(random_hex 32)"
+  ensure_env_value LOCAL_SETUP_TOKEN "$(random_hex 32)"
 
   local db_name db_user db_pass database_url current_url current_port default_host default_url input_url selected_port final_url recommended_port
   db_name="$(env_value POSTGRES_DB)"
@@ -599,37 +616,46 @@ main() {
   current_port="${SUBBOOST_PORT:-$(env_value SUBBOOST_PORT || true)}"
   current_url="${APP_URL:-$(env_value APP_URL || true)}"
 
-  if [ "$existing_env" = "0" ] || [ -z "$current_url" ]; then
-    default_host="$(detect_public_host)"
-    if [ -n "$current_url" ]; then
-      default_url="$(url_without_port "$current_url")"
-    else
-      default_url="http://$default_host"
-    fi
-    recommended_port="$(recommended_port_from "$current_port")"
-    input_url="$(prompt "请输入 SubBoost 访问地址，直接回车会自动填入服务器 ip [$default_url]: " "$default_url")"
-    selected_port="$(prompt_for_port "$recommended_port")"
-    final_url="$(normalize_app_url "$(url_without_port "$input_url")" "$selected_port")"
-    set_env_value SUBBOOST_PORT "$selected_port"
-    set_env_value APP_URL "$final_url"
+  default_host="$(detect_public_host)"
+  if [ -n "$current_url" ]; then
+    default_url="$(url_without_port "$current_url")"
   else
-    selected_port="$(select_existing_or_random_port "$current_port")"
-    final_url="$(normalize_app_url "$(url_without_port "$current_url")" "$selected_port")"
-    set_env_value SUBBOOST_PORT "$selected_port"
-    set_env_value APP_URL "$final_url"
+    default_url="http://$default_host"
   fi
+  recommended_port="$(recommended_port_from "$current_port")"
+  input_url="$(prompt "请输入 SubBoost 访问地址，直接回车会自动填入服务器 ip [$default_url]: " "$default_url")"
+  selected_port="$(prompt_for_port "$recommended_port")"
+  final_url="$(normalize_app_url "$(url_without_port "$input_url")" "$selected_port")"
+  set_env_value SUBBOOST_PORT "$selected_port"
+  set_env_value APP_URL "$final_url"
 
-  say "Pulling SubBoost image..."
+  compose config >/dev/null
+  local services
+  services="$(compose config --services)"
+  for service in app db cron; do
+    printf '%s\n' "$services" | grep -Fxq "$service" || die "Candidate Compose is missing service: $service"
+  done
+  docker_cmd volume ls -q > "$volumes_before"
+  say "Pulling SubBoost image before creating containers..."
   compose pull
   say "Starting SubBoost..."
-  compose up -d --remove-orphans
-  compose up -d --no-deps --force-recreate app
-  wait_for_health "$(env_value SUBBOOST_PORT)"
+  if ! compose up -d db app || ! wait_for_health "$(env_value SUBBOOST_PORT)" || ! compose up -d cron; then
+    cleanup_failed_install "$volumes_before"
+    die "New installation failed; only resources created by this run were cleaned up."
+  fi
+  if ! commit_candidate_install "$ENV_FILE" "$COMPOSE_FILE" "$candidate_manager" "$live_env" "$live_compose"; then
+    cleanup_failed_install "$volumes_before"
+    run_root rm -f "$live_env" "$live_compose" "${live_env}.candidate.$$" "${live_compose}.candidate.$$" "${SUBBOOST_BIN}.candidate.$$"
+    die "Failed to atomically install candidate metadata."
+  fi
+  ENV_FILE="$live_env"
+  COMPOSE_FILE="$live_compose"
 
   say ""
   say "SubBoost 已启动。"
   say "访问地址: $(env_value APP_URL)"
-  say "第一次打开网页时，请创建管理员账号。"
+  say "首次初始化链接: $(env_value APP_URL)/login#setup-token=$(env_value LOCAL_SETUP_TOKEN)"
+  say "请通过上面的链接创建第一个管理员；初始化成功后页面会清除令牌片段。"
   say "管理命令: subboost"
   say "重要提醒: 请把 $ENV_FILE 和数据库备份一起保存好。"
 }

@@ -60,9 +60,16 @@ docker_cmd() {
 }
 
 compose() {
-  [ -f "$COMPOSE_FILE" ] || die "Missing $COMPOSE_FILE"
-  [ -f "$ENV_FILE" ] || die "Missing $ENV_FILE"
-  (cd "$SUBBOOST_HOME" && docker_cmd compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@")
+  compose_files "$ENV_FILE" "$COMPOSE_FILE" "$@"
+}
+
+compose_files() {
+  local env_file="$1"
+  local compose_file="$2"
+  shift 2
+  [ -f "$compose_file" ] || die "Missing $compose_file"
+  [ -f "$env_file" ] || die "Missing $env_file"
+  (cd "$SUBBOOST_HOME" && docker_cmd compose --project-directory "$SUBBOOST_HOME" --env-file "$env_file" -f "$compose_file" "$@")
 }
 
 load_env() {
@@ -147,11 +154,47 @@ is_official_fixed_release_url() {
   esac
 }
 
-migrate_update_release_url() {
-  local release_url="$1"
-  is_official_fixed_release_url "$release_url" || return 1
-  say "Detected old fixed release update source; switching updates to stable latest."
-  write_runtime_env_value SUBBOOST_RELEASE_URL "$DEFAULT_STABLE_RELEASE_URL"
+random_hex() {
+  local bytes="$1"
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex "$bytes"
+  else
+    dd if=/dev/urandom bs="$bytes" count=1 2>/dev/null | od -An -tx1 | tr -d ' \n'
+  fi
+}
+
+set_file_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp="$TMP_DIR/env.$key"
+  awk -F= -v key="$key" '$1 != key { print }' "$file" > "$tmp"
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  mv "$tmp" "$file"
+}
+
+atomic_install_file() {
+  local source="$1"
+  local destination="$2"
+  local mode="$3"
+  stage_install_file "$source" "$destination" "$mode"
+  activate_staged_file "$destination"
+}
+
+stage_install_file() {
+  local source="$1"
+  local destination="$2"
+  local mode="$3"
+  local staged="${destination}.candidate.$$"
+  sudo_do install -m "$mode" "$source" "$staged" || return 1
+  if [ "$mode" = "600" ] && ! is_root; then
+    sudo_do chown "$(id -u):$(id -g)" "$staged" || return 1
+  fi
+}
+
+activate_staged_file() {
+  local destination="$1"
+  sudo_do mv -f "${destination}.candidate.$$" "$destination"
 }
 
 install_file_from_url() {
@@ -162,6 +205,32 @@ install_file_from_url() {
   mkdir -p "$TMP_DIR"
   download_to_temp "$url" "$tmp"
   sudo_do install -m "$mode" "$tmp" "$destination"
+}
+
+create_verified_dump() {
+  local output="$1"
+  local partial="${output}.partial"
+  local -a dump_status verify_status
+  sudo_do mkdir -p "$(dirname "$output")"
+  set +e
+  compose exec -T db pg_dump -Fc -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}" | sudo_do tee "$partial" >/dev/null
+  dump_status=("${PIPESTATUS[@]}")
+  set -e
+  if (( dump_status[0] != 0 || dump_status[1] != 0 )) || [ ! -s "$partial" ]; then
+    sudo_do rm -f -- "$partial"
+    say "Backup failed: pg_dump=${dump_status[0]} write=${dump_status[1]}"
+    return 1
+  fi
+  set +e
+  sudo_do cat "$partial" | compose exec -T db pg_restore --list >/dev/null
+  verify_status=("${PIPESTATUS[@]}")
+  set -e
+  if (( verify_status[0] != 0 || verify_status[1] != 0 )); then
+    sudo_do rm -f -- "$partial"
+    say "Backup verification failed: read=${verify_status[0]} pg_restore=${verify_status[1]}"
+    return 1
+  fi
+  sudo_do mv "$partial" "$output"
 }
 
 port_number() {
@@ -304,36 +373,156 @@ update_cmd() {
   load_env
   local release_url="${SUBBOOST_RELEASE_URL:-}"
   local release_file="$TMP_DIR/release.json"
-  local image compose_url manager_url
+  local candidate_env="$TMP_DIR/candidate.env"
+  local candidate_compose="$TMP_DIR/candidate-compose.yml"
+  local candidate_manager="$TMP_DIR/candidate-manager"
+  local old_env="$TMP_DIR/old.env"
+  local old_compose="$TMP_DIR/old-compose.yml"
+  local old_manager="$TMP_DIR/old-manager"
+  local rollback_dump="$BACKUP_DIR/update-rollback-$(date -u +%Y%m%dT%H%M%SZ).dump"
+  local image="${SUBBOOST_IMAGE:-}" compose_url="" manager_url="" services=""
+  local app_id old_image_id rollback_tag old_image_ref update_error restore_error db_ready
+  local manager_present=0 old_manager_present=0
+  local -a restore_status
   mkdir -p "$TMP_DIR"
-  if migrate_update_release_url "$release_url"; then
+  if is_official_fixed_release_url "$release_url"; then
+    say "Detected old fixed release update source; switching updates to stable latest."
     release_url="$DEFAULT_STABLE_RELEASE_URL"
   fi
   if [ -n "$release_url" ] && download_to_temp "$release_url" "$release_file" 2>/dev/null; then
     image="$(json_get image "$release_file" || true)"
     compose_url="$(resolve_url "$release_url" "$(json_get composeUrl "$release_file" || true)")"
     manager_url="$(resolve_url "$release_url" "$(json_get managerUrl "$release_file" || true)")"
-    if [ -n "$image" ]; then write_runtime_env_value SUBBOOST_IMAGE "$image"; fi
-    if [ -n "$compose_url" ]; then
-      install_file_from_url "$compose_url" "$COMPOSE_FILE" 644
-      write_runtime_env_value SUBBOOST_COMPOSE_URL "$compose_url"
-    fi
-    if [ -n "$manager_url" ]; then
-      install_file_from_url "$manager_url" "${SUBBOOST_BIN:-/usr/local/bin/subboost}" 755
-      write_runtime_env_value SUBBOOST_MANAGER_URL "$manager_url"
-    fi
+    [ -n "$image" ] && [ -n "$compose_url" ] && [ -n "$manager_url" ] || die "Release manifest is missing image, composeUrl, or managerUrl."
+    download_to_temp "$compose_url" "$candidate_compose"
+    download_to_temp "$manager_url" "$candidate_manager"
+    [ -s "$candidate_manager" ] && bash -n "$candidate_manager" || die "Candidate manager is invalid."
   else
     say "Release manifest unavailable; updating current image and compose only."
+    cp "$COMPOSE_FILE" "$candidate_compose"
+    if [ -f "${SUBBOOST_BIN:-/usr/local/bin/subboost}" ]; then
+      sudo_do cp "${SUBBOOST_BIN:-/usr/local/bin/subboost}" "$candidate_manager"
+      manager_present=1
+    fi
   fi
-  compose pull
-  compose up -d --remove-orphans
-  compose up -d --no-deps --force-recreate app
-  if ! wait_for_health; then
-    local health_status
-    health_status="$(health_status_code)"
-    status_cmd
-    die "$(doctor_health_failure_message "$health_status")"
+  [ -n "$manager_url" ] && manager_present=1
+  [ -n "$image" ] || die "SUBBOOST_IMAGE is missing."
+  read_env_file > "$candidate_env"
+  cp "$candidate_env" "$old_env"
+  cp "$COMPOSE_FILE" "$old_compose"
+  if [ -f "${SUBBOOST_BIN:-/usr/local/bin/subboost}" ]; then
+    sudo_do cp "${SUBBOOST_BIN:-/usr/local/bin/subboost}" "$old_manager"
+    old_manager_present=1
   fi
+  set_file_env_value "$candidate_env" SUBBOOST_IMAGE "$image"
+  set_file_env_value "$candidate_env" SUBBOOST_RELEASE_URL "$release_url"
+  [ -n "$compose_url" ] && set_file_env_value "$candidate_env" SUBBOOST_COMPOSE_URL "$compose_url"
+  [ -n "$manager_url" ] && set_file_env_value "$candidate_env" SUBBOOST_MANAGER_URL "$manager_url"
+  if ! grep -q '^LOCAL_SETUP_TOKEN=.' "$candidate_env"; then
+    set_file_env_value "$candidate_env" LOCAL_SETUP_TOKEN "$(random_hex 32)"
+  fi
+  compose_files "$candidate_env" "$candidate_compose" config >/dev/null
+  services="$(compose_files "$candidate_env" "$candidate_compose" config --services)"
+  for service in app db cron; do
+    printf '%s\n' "$services" | grep -Fxq "$service" || die "Candidate Compose is missing service: $service"
+  done
+  say "Pulling candidate image before the maintenance window..."
+  SUBBOOST_IMAGE="$image" compose_files "$candidate_env" "$candidate_compose" pull
+
+  app_id="$(service_container_id app)"
+  [ -n "$app_id" ] || die "Cannot identify the current app container for rollback."
+  old_image_id="$(docker_cmd inspect -f '{{.Image}}' "$app_id" 2>/dev/null || true)"
+  [ -n "$old_image_id" ] || die "Cannot identify the current app image for rollback."
+  old_image_ref="${SUBBOOST_IMAGE:-}"
+  rollback_tag="subboost-rollback:update-$$"
+  if ! stage_install_file "$candidate_env" "$ENV_FILE" 600 \
+    || ! stage_install_file "$candidate_compose" "$COMPOSE_FILE" 644 \
+    || { [ "$manager_present" = "1" ] && ! stage_install_file "$candidate_manager" "${SUBBOOST_BIN:-/usr/local/bin/subboost}" 755; }; then
+    sudo_do rm -f "${ENV_FILE}.candidate.$$" "${COMPOSE_FILE}.candidate.$$" "${SUBBOOST_BIN:-/usr/local/bin/subboost}.candidate.$$"
+    die "Candidate metadata could not be staged safely."
+  fi
+  if ! docker_cmd tag "$old_image_id" "$rollback_tag"; then
+    sudo_do rm -f "${ENV_FILE}.candidate.$$" "${COMPOSE_FILE}.candidate.$$" "${SUBBOOST_BIN:-/usr/local/bin/subboost}.candidate.$$"
+    die "Could not create the rollback image tag."
+  fi
+
+  say "Pausing app and cron for a stable database snapshot..."
+  if ! compose stop cron app; then
+    sudo_do rm -f "${ENV_FILE}.candidate.$$" "${COMPOSE_FILE}.candidate.$$" "${SUBBOOST_BIN:-/usr/local/bin/subboost}.candidate.$$"
+    docker_cmd image rm "$rollback_tag" >/dev/null 2>&1 || true
+    die "Update aborted because app and cron could not be paused safely."
+  fi
+  if ! create_verified_dump "$rollback_dump"; then
+    compose up -d app cron || true
+    wait_for_health || true
+    sudo_do rm -f "${ENV_FILE}.candidate.$$" "${COMPOSE_FILE}.candidate.$$" "${SUBBOOST_BIN:-/usr/local/bin/subboost}.candidate.$$"
+    docker_cmd image rm "$rollback_tag" >/dev/null 2>&1 || true
+    die "Update aborted because a verified rollback dump could not be created."
+  fi
+
+  update_error=""
+  compose_files "$candidate_env" "$candidate_compose" up -d db || update_error="candidate database startup failed"
+  if [ -z "$update_error" ]; then
+    compose_files "$candidate_env" "$candidate_compose" up -d --no-deps app || update_error="candidate app startup or migration failed"
+  fi
+  if [ -z "$update_error" ] && ! wait_for_health; then
+    update_error="candidate health check failed"
+  fi
+  if [ -z "$update_error" ]; then
+    activate_staged_file "$ENV_FILE" || update_error="candidate environment activation failed"
+  fi
+  if [ -z "$update_error" ]; then
+    activate_staged_file "$COMPOSE_FILE" || update_error="candidate Compose activation failed"
+  fi
+  if [ -z "$update_error" ] && [ "$manager_present" = "1" ]; then
+    activate_staged_file "${SUBBOOST_BIN:-/usr/local/bin/subboost}" || update_error="candidate manager activation failed"
+  fi
+  if [ -z "$update_error" ]; then
+    compose_files "$candidate_env" "$candidate_compose" up -d cron || update_error="candidate cron startup failed"
+  fi
+
+  if [ -n "$update_error" ]; then
+    say "Candidate update failed: $update_error"
+    compose_files "$candidate_env" "$candidate_compose" stop cron app >/dev/null 2>&1 || true
+    docker_cmd tag "$rollback_tag" "$old_image_ref" || true
+    sudo_do rm -f "${ENV_FILE}.candidate.$$" "${COMPOSE_FILE}.candidate.$$" "${SUBBOOST_BIN:-/usr/local/bin/subboost}.candidate.$$"
+    restore_error=""
+    atomic_install_file "$old_env" "$ENV_FILE" 600 || restore_error="old environment metadata restore failed"
+    atomic_install_file "$old_compose" "$COMPOSE_FILE" 644 || restore_error="old Compose metadata restore failed"
+    if [ "$old_manager_present" = "1" ]; then
+      atomic_install_file "$old_manager" "${SUBBOOST_BIN:-/usr/local/bin/subboost}" 755 || restore_error="old manager metadata restore failed"
+    fi
+    db_ready=1
+    compose_files "$old_env" "$old_compose" up -d db || { restore_error="old database container did not start"; db_ready=0; }
+    if [ "$db_ready" = "1" ]; then
+      set +e
+      sudo_do cat "$rollback_dump" | compose_files "$old_env" "$old_compose" exec -T db pg_restore --clean --if-exists --exit-on-error --no-owner --no-privileges -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}"
+      restore_status=("${PIPESTATUS[@]}")
+      set -e
+      if (( restore_status[0] != 0 || restore_status[1] != 0 )); then restore_error="database restore failed"; fi
+    fi
+    if [ -n "$restore_error" ]; then
+      compose_files "$old_env" "$old_compose" stop cron app >/dev/null 2>&1 || true
+      say "Automatic rollback stopped: $restore_error"
+      say "Rollback dump preserved at: $rollback_dump"
+      say "Keep app and cron stopped. Restore manually with pg_restore before restarting them."
+      return 1
+    fi
+    compose_files "$old_env" "$old_compose" up -d app
+    if ! wait_for_health; then
+      compose_files "$old_env" "$old_compose" stop cron app >/dev/null 2>&1 || true
+      say "Database and old image were restored, but the old app did not become healthy."
+      say "Rollback dump preserved at: $rollback_dump"
+      return 1
+    fi
+    compose_files "$old_env" "$old_compose" up -d cron
+    docker_cmd image rm "$rollback_tag" >/dev/null 2>&1 || true
+    say "Previous version restored successfully."
+    return 1
+  fi
+
+  docker_cmd image rm "$rollback_tag" >/dev/null 2>&1 || true
+  load_env
   status_cmd
 }
 
@@ -344,32 +533,21 @@ logs_cmd() {
 backup_cmd() {
   load_env
   sudo_do mkdir -p "$BACKUP_DIR"
-  local stamp db_tmp db_out env_out
+  local stamp db_out env_out
   local -a sql_backups env_backups
-  local -a backup_status
   local i backup_retention_count
   backup_retention_count="${SUBBOOST_BACKUP_RETENTION_COUNT:-$DEFAULT_BACKUP_RETENTION_COUNT}"
   if ! [[ "$backup_retention_count" =~ ^[0-9]+$ ]] || (( backup_retention_count < 1 )); then
     die "SUBBOOST_BACKUP_RETENTION_COUNT must be a positive integer"
   fi
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  db_tmp="$BACKUP_DIR/subboost-$stamp.sql.gz.partial"
-  db_out="$BACKUP_DIR/subboost-$stamp.sql.gz"
+  db_out="$BACKUP_DIR/subboost-$stamp.dump"
   env_out="$BACKUP_DIR/subboost-$stamp.env"
-  set +e
-  compose exec -T db pg_dump -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}" | gzip -c | sudo_do tee "$db_tmp" >/dev/null
-  backup_status=("${PIPESTATUS[@]}")
-  set -e
-  if (( backup_status[0] != 0 || backup_status[1] != 0 || backup_status[2] != 0 )); then
-    sudo_do rm -f -- "$db_tmp"
-    say "Backup failed: pg_dump=${backup_status[0]} gzip=${backup_status[1]} write=${backup_status[2]}"
-    return 1
-  fi
-  sudo_do mv "$db_tmp" "$db_out"
+  create_verified_dump "$db_out"
   sudo_do install -m 600 "$ENV_FILE" "$env_out"
 
   shopt -s nullglob
-  sql_backups=("$BACKUP_DIR"/subboost-*.sql.gz)
+  sql_backups=("$BACKUP_DIR"/subboost-*.dump)
   env_backups=("$BACKUP_DIR"/subboost-*.env)
   shopt -u nullglob
 
