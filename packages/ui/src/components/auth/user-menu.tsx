@@ -71,6 +71,10 @@ export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountM
   return (
     <div className="relative" ref={menuRef}>
       <button
+        type="button"
+        aria-label="用户菜单"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
       >

@@ -177,6 +177,14 @@ describe("UserMenu", () => {
     expect(html).toContain("我的订阅");
     expect(html).toContain("账户设置");
     expect(html).toContain("退出登录");
+    const toggle = findIntrinsic(
+      "button",
+      (props) => typeof props.className === "string" && props.className.includes("px-2 py-1.5")
+    );
+    expect(toggle.type).toBe("button");
+    expect(toggle["aria-label"]).toBe("用户菜单");
+    expect(toggle["aria-haspopup"]).toBe("menu");
+    expect(toggle["aria-expanded"]).toBe(true);
   });
 
   it("closes the menu from document, toggle, overlay, links, and logout actions", async () => {

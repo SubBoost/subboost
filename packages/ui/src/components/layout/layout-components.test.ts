@@ -80,6 +80,9 @@ describe("shared layout components", () => {
     expect(html).toContain("FAQ");
     expect(html).not.toContain("我的订阅");
     expect(html).toContain("UserMenu:none");
+    expect(html).toContain('aria-label="打开导航菜单"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-controls="subboost-mobile-navigation"');
   });
 
   it("renders local mode header links and privileged menu item", () => {
