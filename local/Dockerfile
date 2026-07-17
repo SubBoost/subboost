@@ -9,7 +9,19 @@ COPY packages/ui packages/ui
 COPY packages/config packages/config
 COPY local/package.json local/package.json
 
-RUN npm ci
+RUN set -eu; \
+    attempt=1; \
+    max_attempts=3; \
+    until npm ci; do \
+      if [ "$attempt" -ge "$max_attempts" ]; then \
+        echo "npm ci failed after ${max_attempts} attempts" >&2; \
+        exit 1; \
+      fi; \
+      delay=$((attempt * 10)); \
+      echo "npm ci attempt ${attempt} failed; retrying in ${delay}s" >&2; \
+      sleep "$delay"; \
+      attempt=$((attempt + 1)); \
+    done
 
 FROM node:22-alpine AS builder
 WORKDIR /package
