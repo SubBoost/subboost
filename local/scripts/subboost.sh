@@ -134,7 +134,7 @@ resolve_url() {
 }
 
 read_env_file() {
-  if is_root; then cat "$ENV_FILE"; else sudo cat "$ENV_FILE"; fi
+  sudo_do cat "$ENV_FILE"
 }
 
 write_env_value() {

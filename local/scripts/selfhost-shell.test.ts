@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const publicRoot = path.resolve(__dirname, "../..");
 const BASH_NON_INTERACTIVE_COMMAND = "exec \"$BASH\" -s";
+const POSIX_BACKUP_MODE_ASSERTIONS = process.platform === "win32"
+  ? ": # NTFS permissions are verified by Windows ACL checks, not POSIX mode bits"
+  : `
+      [ "$unsafe_files" = "0" ]
+      [ "$unsafe_dirs" = "0" ]`;
 
 function runBash(script: string) {
   return spawnSync("bash", ["-lc", BASH_NON_INTERACTIVE_COMMAND], {
@@ -556,8 +561,7 @@ ENV
       printf 'sql=%s env=%s unsafe_files=%s unsafe_dirs=%s\\n' "$sql_count" "$env_count" "$unsafe_files" "$unsafe_dirs"
       [ "$sql_count" = "10" ]
       [ "$env_count" = "10" ]
-      [ "$unsafe_files" = "0" ]
-      [ "$unsafe_dirs" = "0" ]
+      ${POSIX_BACKUP_MODE_ASSERTIONS}
       [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.dump" ]
       [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.env" ]
     `;
@@ -566,6 +570,8 @@ ENV
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("sql=10 env=10");
-    expect(result.stdout).toContain("unsafe_files=0 unsafe_dirs=0");
+    if (process.platform !== "win32") {
+      expect(result.stdout).toContain("unsafe_files=0 unsafe_dirs=0");
+    }
   });
 });

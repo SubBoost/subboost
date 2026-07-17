@@ -25,6 +25,7 @@ export default defineConfig({
   plugins: [tsxTransformPlugin()],
   test: {
     environment: "node",
+    setupFiles: ["./test/setup-runtime.ts"],
     include: [
       "packages/core/src/**/*.test.ts",
       "packages/server-core/src/**/*.test.ts",
