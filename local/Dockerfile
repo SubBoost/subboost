@@ -9,7 +9,8 @@ COPY packages/ui packages/ui
 COPY packages/config packages/config
 COPY local/package.json local/package.json
 
-RUN set -eu; \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    set -eu; \
     attempt=1; \
     max_attempts=3; \
     until npm ci; do \
