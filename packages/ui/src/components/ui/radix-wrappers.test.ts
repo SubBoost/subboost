@@ -77,6 +77,7 @@ describe("Radix UI wrappers", () => {
     expect(html).toContain("avatar-extra");
     expect(html).toContain("fallback-extra");
     expect(html).toContain("dialog-extra");
+    expect(html).toContain("关闭");
     expect(html).toContain("header-extra");
     expect(html).toContain("footer-extra");
     expect(html).toContain("switch-extra");
