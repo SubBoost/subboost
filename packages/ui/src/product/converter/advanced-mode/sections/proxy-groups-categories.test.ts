@@ -265,11 +265,11 @@ describe("ProxyGroupsCategories", () => {
     expect(mocks.captures.inputs).toHaveLength(0);
     const html = renderCategories({ 0: new Set(["core"]) }).html;
     expect(html).toContain("https://rules.example/base/");
-    expect(html).toContain("grid-cols-[minmax(0,1fr)_128px]");
-    expect(html).not.toContain("md:grid-cols-[minmax(0,1fr)_128px]");
+    expect(html).toContain("grid-cols-[minmax(0,1fr)_96px]");
+    expect(html).not.toContain("md:grid-cols-[minmax(0,1fr)_96px]");
     expect(html).toContain("min-w-0 space-y-1");
-    expect(html).toContain("高级模式");
-    expect(html).toContain("aria-labelledby=\"switch-field-");
+    expect(html).toContain("text-xs text-amber-300");
+    expect(html).toContain('aria-label="高级模式"');
     expect(mocks.store.setRuleProviderBaseUrl).not.toHaveBeenCalled();
 
     expect(mocks.captures.moduleCards).toHaveLength(1);

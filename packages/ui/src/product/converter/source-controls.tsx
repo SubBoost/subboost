@@ -49,7 +49,12 @@ export function SourceTypeChoices({
                 <span className="sr-only">{info.label}</span>
               </>
             }
-            className="min-h-0 rounded p-1"
+            className={cn(
+              "min-h-0 rounded border-0 p-1",
+              value === type
+                ? "bg-indigo-500/20 text-indigo-400"
+                : "bg-transparent text-white/30 hover:bg-white/5 hover:text-white/50"
+            )}
           />
         );
       })}
