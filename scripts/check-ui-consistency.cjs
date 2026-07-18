@@ -108,6 +108,10 @@ function checkFile(filePath) {
         }
       }
 
+      if (name === "IconButton" && !findAttribute(opening, "label")) {
+        report(sourceFile, opening, "IconButton 必须提供 label");
+      }
+
       if (name === "Switch" && !isSwitchFieldWrapper) {
         const hasAccessibleName = Boolean(
           findAttribute(opening, "aria-label") || findAttribute(opening, "aria-labelledby")
