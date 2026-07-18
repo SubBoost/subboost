@@ -156,6 +156,8 @@ describe("ProxyGroupsModuleCard", () => {
     expect(html).toContain("Gemini 分流说明");
     expect(html).toContain("rules-panel");
     expect(mocks.panels[0]).toEqual(expect.objectContaining({ module: baseModule, cnIpNoResolve: true }));
+    expect(html).toContain('aria-label="收起 Gemini Display"');
+    expect(html).toContain('aria-expanded="true"');
 
     capturesClick(html);
     mocks.buttons.find((button) => button.title === "改名").onClick({ stopPropagation: vi.fn() });
@@ -264,6 +266,17 @@ describe("ProxyGroupsModuleCard", () => {
     expect(html).toContain("Scholar description");
     expect(mocks.buttons.some((button) => button.title === "改名")).toBe(false);
     expect(mocks.panels).toHaveLength(0);
+  });
+
+  it("keeps the full module header as the disclosure control", () => {
+    const collapsedHandlers = props({ isRulesExpanded: false });
+    const collapsedHtml = renderToStaticMarkup(
+      React.createElement(ProxyGroupsModuleCard, collapsedHandlers),
+    );
+
+    expect(collapsedHtml).toContain('class="absolute inset-0');
+    expect(collapsedHtml).toContain('aria-label="展开 Gemini Display"');
+    expect(collapsedHtml).toContain('aria-expanded="false"');
   });
 
   it("renders module summary with the requested description and rule colors", () => {

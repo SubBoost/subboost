@@ -245,22 +245,26 @@ export function DialerProxyGroupsSection({
               <div key={group.id} className="bg-white/5 rounded-lg border border-white/10">
               {/* 组标题 */}
               <div
-                className="flex items-center gap-2 px-3 py-2 hover:bg-white/[0.03]"
+                className={cn(
+                  "relative flex items-center gap-2 px-3 py-2",
+                  !isEditing && "cursor-pointer",
+                )}
               >
-                <IconButton
-                  label={expandedDialerGroups.has(group.id) ? `收起 ${group.name}` : `展开 ${group.name}`}
-                  variant="ghost"
-                  className="h-6 w-6 rounded-md text-white/50"
-                  aria-expanded={expandedDialerGroups.has(group.id)}
-                  disabled={isEditing}
-                  onClick={() => toggleDialerGroupExpand(group.id)}
-                >
-                  {expandedDialerGroups.has(group.id) ? (
-                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </IconButton>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    className="absolute inset-0 z-0 cursor-pointer rounded-none transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/60"
+                    aria-label={expandedDialerGroups.has(group.id) ? `收起 ${group.name}` : `展开 ${group.name}`}
+                    aria-expanded={expandedDialerGroups.has(group.id)}
+                    onClick={() => toggleDialerGroupExpand(group.id)}
+                    title={expandedDialerGroups.has(group.id) ? "收起" : "展开"}
+                  />
+                )}
+                {expandedDialerGroups.has(group.id) ? (
+                  <ChevronDown className="pointer-events-none relative z-10 h-4 w-4 text-white/50" aria-hidden="true" />
+                ) : (
+                  <ChevronRight className="pointer-events-none relative z-10 h-4 w-4 text-white/50" aria-hidden="true" />
+                )}
 
                 {isEditing ? (
                   <ProxyGroupNameEditor
@@ -273,14 +277,14 @@ export function DialerProxyGroupsSection({
                     }}
                   />
                 ) : (
-                  <div className="flex items-center gap-1 min-w-0">
+                  <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-1">
                     <span className="text-sm font-medium text-white truncate" title={group.name}>
                       {group.name}
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2"
+                      className="pointer-events-auto h-7 px-2"
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingDialerGroupId(group.id);
@@ -305,7 +309,7 @@ export function DialerProxyGroupsSection({
                 ) : (
                   <>
                     <ProxyGroupSummary
-                      className="ml-auto flex"
+                      className="pointer-events-none relative z-10 ml-auto flex"
                       disabled={!isEnabled}
                       items={[
                         { label: `${group.relayNodes.length} 中转`, tone: "accent" },
@@ -315,6 +319,7 @@ export function DialerProxyGroupsSection({
                     <Switch
                       aria-label={`启用 ${group.name} 中转组`}
                       checked={isEnabled}
+                      className="pointer-events-auto relative z-10"
                       onCheckedChange={(checked) => {
                         const nextEnabled = Boolean(checked);
                         if (!nextEnabled) {
@@ -385,7 +390,7 @@ export function DialerProxyGroupsSection({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-7 shrink-0 px-2 text-white/35 hover:text-indigo-200"
+                          className="pointer-events-auto relative z-10 h-7 shrink-0 px-2 text-white/35 hover:text-indigo-200"
                           title={`类型：${dialerTypeLabel}`}
                           aria-label={`修改 ${group.name} 类型`}
                           onClick={(event) => event.stopPropagation()}
@@ -401,7 +406,7 @@ export function DialerProxyGroupsSection({
                         e.stopPropagation();
                         removeDialerProxyGroup(group.id);
                       }}
-                      className="h-7 w-7 p-1 text-white/30 hover:text-red-400"
+                      className="pointer-events-auto relative z-10 h-7 w-7 p-1 text-white/30 hover:text-red-400"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </IconButton>

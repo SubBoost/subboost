@@ -446,11 +446,11 @@ describe("DialerProxyGroupsSection", () => {
 
   it("toggles expansion and relay or target membership from native rows", () => {
     let result = renderSection();
-    mocks.captures.iconButtons.find((props: any) => props.label === "展开 Group A").onClick();
+    findIntrinsic("button", (props) => props["aria-label"] === "展开 Group A").onClick();
     expect((result.setters[0] as any).lastValue).toEqual(new Set(["g-a"]));
 
     result = renderSection({ 0: new Set(["g-a"]) });
-    mocks.captures.iconButtons.find((props: any) => props.label === "收起 Group A").onClick();
+    findIntrinsic("button", (props) => props["aria-label"] === "收起 Group A").onClick();
     expect((result.setters[0] as any).lastValue).toEqual(new Set());
 
     renderSection({ 0: new Set(["g-a"]) });
