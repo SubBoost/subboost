@@ -5,7 +5,7 @@ import { LogOut, Network, ServerCog, ShieldCheck } from "lucide-react";
 
 import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
-import { Switch } from "@subboost/ui/components/ui/switch";
+import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { useUserStore } from "@subboost/ui/store/user-store";
 
 export default function SettingsPage() {
@@ -122,22 +122,15 @@ export default function SettingsPage() {
             </div>
             <CardTitle className="text-base">订阅源安全</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">允许本机和局域网订阅</p>
-                <p className="mt-1 text-xs leading-relaxed text-white/50">
-                  开启后，本机、局域网及其他保留地址都可作为订阅源。仅在信任来源时开启。
-                </p>
-                {sourceImportError && <p className="mt-2 text-xs text-red-300">{sourceImportError}</p>}
-              </div>
-              <Switch
-                aria-label="允许本机和局域网订阅"
-                checked={allowUnsafeSubscriptionSources}
-                disabled={!user || sourceImportLoading || sourceImportSaving}
-                onCheckedChange={(checked) => void handleUnsafeSourceToggle(checked)}
-              />
-            </div>
+          <CardContent className="space-y-2">
+            <SwitchField
+              label="允许本机和局域网订阅"
+              description="开启后，本机、局域网及其他保留地址都可作为订阅源。仅在信任来源时开启。"
+              checked={allowUnsafeSubscriptionSources}
+              disabled={!user || sourceImportLoading || sourceImportSaving}
+              onCheckedChange={(checked) => void handleUnsafeSourceToggle(checked)}
+            />
+            {sourceImportError && <p className="text-xs text-red-300">{sourceImportError}</p>}
           </CardContent>
         </Card>
 

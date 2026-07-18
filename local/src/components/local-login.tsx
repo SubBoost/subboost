@@ -3,8 +3,12 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { getLocalAdminSetupCredentialError, LOCAL_ADMIN_PASSWORD_MIN_LENGTH } from "@local/lib/admin-credentials";
+import { Button } from "@subboost/ui/components/ui/button";
+import { FormField } from "@subboost/ui/components/ui/form-field";
+import { Input } from "@subboost/ui/components/ui/input";
+import { PasswordField } from "@subboost/ui/components/ui/password-field";
 import { hasAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
 
 type AuthState = {
@@ -26,7 +30,6 @@ export function LocalLogin() {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [passwordConfirm, setPasswordConfirm] = React.useState("");
-  const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [setupToken, setSetupToken] = React.useState("");
@@ -105,50 +108,37 @@ export function LocalLogin() {
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 space-y-4">
           {auth ? (
             <form onSubmit={handleSubmit} className="space-y-3">
-              <input
-                type="text"
+              <FormField label="管理员账号">
+                <Input
                 autoComplete="username"
                 placeholder="管理员账号"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 transition-colors"
-              />
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  autoComplete={setupRequired ? "new-password" : "current-password"}
-                  aria-describedby={setupRequired ? "local-admin-password-help" : undefined}
-                  placeholder="密码"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 transition-colors pr-12"
+                className="h-12"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {setupRequired ? (
-                <p id="local-admin-password-help" className="-mt-1 text-xs text-white/45">
-                  至少 {LOCAL_ADMIN_PASSWORD_MIN_LENGTH} 个字符
-                </p>
-              ) : null}
+              </FormField>
+              <PasswordField
+                label="密码"
+                autoComplete={setupRequired ? "new-password" : "current-password"}
+                description={setupRequired ? `至少 ${LOCAL_ADMIN_PASSWORD_MIN_LENGTH} 个字符` : undefined}
+                placeholder="密码"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-12"
+              />
               {setupRequired && !setupToken ? (
                 <p className="text-amber-300/80 text-xs">
                   请从安装器输出的初始化链接进入本页面。
                 </p>
               ) : null}
               {setupRequired ? (
-                <input
-                  type={showPassword ? "text" : "password"}
+                <PasswordField
+                  label="确认密码"
                   autoComplete="new-password"
                   placeholder="确认密码"
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                  className="h-12"
                 />
               ) : null}
 
@@ -158,14 +148,14 @@ export function LocalLogin() {
                 </p>
               ) : null}
 
-              <button
+              <Button
                 type="submit"
                 disabled={loading || !username || !password || (setupRequired && !passwordConfirm)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 btn-primary"
+                className="h-12 w-full"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {setupRequired ? "创建管理员" : "登录"}
-              </button>
+              </Button>
             </form>
           ) : (
             <div className="h-36 animate-pulse rounded-xl bg-white/5" />

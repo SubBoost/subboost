@@ -77,8 +77,17 @@ vi.mock("@subboost/ui/components/ui/button", () => ({
     return null;
   },
 }));
+vi.mock("@subboost/ui/components/ui/icon-button", () => ({
+  IconButton: (props: any) => {
+    mocks.captures.iconButtons.push(props);
+    return null;
+  },
+}));
 vi.mock("@subboost/ui/components/ui/dropdown-menu", () => ({
-  DropdownMenu: (props: any) => props.children,
+  DropdownMenu: (props: any) => {
+    mocks.captures.dropdownRoots.push(props);
+    return props.children;
+  },
   DropdownMenuTrigger: (props: any) => props.children,
   DropdownMenuContent: (props: any) => {
     mocks.captures.dropdownContents.push(props);
@@ -94,6 +103,8 @@ vi.mock("@subboost/ui/components/ui/dropdown-menu", () => ({
     mocks.captures.menuItems.push(props);
     return props.children;
   },
+  DropdownMenuLabel: (props: any) => props.children,
+  DropdownMenuSeparator: () => null,
 }));
 vi.mock("@subboost/ui/components/ui/input", () => ({
   Input: (props: any) => {
@@ -170,9 +181,11 @@ function renderSection(overrides: Record<number, unknown> = {}, props = { isExpa
   stateMock.setters = [];
   mocks.captures.buttons = [];
   mocks.captures.inputs = [];
+  mocks.captures.iconButtons = [];
   mocks.captures.switches = [];
   mocks.captures.menuItems = [];
   mocks.captures.dropdownContents = [];
+  mocks.captures.dropdownRoots = [];
   mocks.captures.intrinsics = [];
   try {
     const html = renderToStaticMarkup(React.createElement(DialerProxyGroupsSection, props));
@@ -204,7 +217,7 @@ function findIntrinsics(type: string, predicate: (props: any) => boolean) {
 describe("DialerProxyGroupsSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.captures = { buttons: [], dropdownContents: [], inputs: [], menuItems: [], switches: [], intrinsics: [] };
+    mocks.captures = { buttons: [], dropdownContents: [], dropdownRoots: [], iconButtons: [], inputs: [], menuItems: [], switches: [], intrinsics: [] };
     mocks.store = {
       nodes,
       dialerProxyGroups: [groupA, groupB],
@@ -227,7 +240,7 @@ describe("DialerProxyGroupsSection", () => {
     mocks.store.dialerProxyGroups = [];
     renderSection();
     expect(mocks.captures.header).toEqual(expect.objectContaining({ title: "中转代理组", isExpanded: true }));
-    expect(mocks.captures.buttons.at(-1)).toEqual(expect.objectContaining({ className: expect.stringContaining("border-dashed") }));
+    expect(mocks.captures.buttons.find((props: any) => String(props.className).includes("border-dashed"))).toBeTruthy();
 
     mocks.store.nodes = nodes;
     mocks.store.dialerProxyGroups = [groupA, groupB];
@@ -292,12 +305,11 @@ describe("DialerProxyGroupsSection", () => {
   it("opens the add menu and creates preset dialer groups", () => {
     const { setters } = renderSection();
 
-    const addMenuButton = mocks.captures.buttons.find((props: any) => textOf(props.children).includes("添加中转组"));
-    addMenuButton.onClick();
+    mocks.captures.dropdownRoots.find((props: any) => typeof props.onOpenChange === "function").onOpenChange(true);
     expect((setters[1] as any).lastValue).toBe(true);
 
     renderSection({ 1: true });
-    findIntrinsic("button", (props) => textOf(props.children).includes("香港中转")).onClick();
+    mocks.captures.menuItems.find((props: any) => textOf(props.children).includes("香港中转")).onSelect();
     expect(mocks.store.addDialerProxyGroup).toHaveBeenCalledWith({
       name: "香港中转",
       enabled: true,
@@ -373,7 +385,7 @@ describe("DialerProxyGroupsSection", () => {
       })
     );
 
-    findIntrinsic("button", (props) => props.title === "删除").onClick({ stopPropagation: vi.fn() });
+    mocks.captures.iconButtons.find((props: any) => props.label === "删除 Group A 中转组").onClick({ stopPropagation: vi.fn() });
     expect(mocks.store.removeDialerProxyGroup).toHaveBeenCalledWith("g-a");
   });
 
@@ -434,25 +446,25 @@ describe("DialerProxyGroupsSection", () => {
 
   it("toggles expansion and relay or target membership from native rows", () => {
     let result = renderSection();
-    findIntrinsic("div", (props) => typeof props.className === "string" && props.className.includes("cursor-pointer")).onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "展开 Group A").onClick();
     expect((result.setters[0] as any).lastValue).toEqual(new Set(["g-a"]));
 
     result = renderSection({ 0: new Set(["g-a"]) });
-    findIntrinsic("div", (props) => typeof props.className === "string" && props.className.includes("cursor-pointer")).onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "收起 Group A").onClick();
     expect((result.setters[0] as any).lastValue).toEqual(new Set());
 
     renderSection({ 0: new Set(["g-a"]) });
-    findIntrinsic("div", (props) => textOf(props.children).includes("Alpha")).onClick();
+    findIntrinsic("button", (props) => textOf(props.children).includes("Alpha") && props["aria-pressed"] === true).onClick();
     expect(mocks.store.removeNodeFromDialerGroup).toHaveBeenCalledWith("g-a", "Alpha", true);
 
-    findIntrinsic("div", (props) => textOf(props.children).includes("DIRECT（直连）")).onClick();
+    findIntrinsic("button", (props) => textOf(props.children).includes("DIRECT（直连）")).onClick();
     expect(mocks.store.addNodeToDialerGroup).toHaveBeenCalledWith("g-a", "DIRECT", true);
 
-    findIntrinsic("div", (props) => textOf(props.children).includes("Beta")).onClick();
+    findIntrinsic("button", (props) => textOf(props.children).includes("Beta") && props["aria-pressed"] === true).onClick();
     expect(mocks.store.removeNodeFromDialerGroup).toHaveBeenCalledWith("g-a", "Beta", false);
 
     const gammaTargetRow = findIntrinsics(
-      "div",
+      "button",
       (props) => textOf(props.children).includes("Gamma") && typeof props.onClick === "function"
     ).at(-1);
     expect(gammaTargetRow).toBeTruthy();
@@ -466,7 +478,7 @@ describe("DialerProxyGroupsSection", () => {
     mocks.store.addNodeToDialerGroup.mockClear();
     renderSection({ 0: new Set(["g-a"]) });
     const blockedGammaTargetRow = findIntrinsics(
-      "div",
+      "button",
       (props) => textOf(props.children).includes("Gamma") && typeof props.onClick === "function"
     ).at(-1);
     expect(blockedGammaTargetRow).toBeTruthy();

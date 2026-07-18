@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Card, CardContent } from "@subboost/ui/components/ui/card";
 import { cn } from "@subboost/ui/lib/utils";
 import type { Template } from "./types";
@@ -58,15 +59,14 @@ export function TemplateCard({
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {showDelete && onDelete && (
-              <Button
+              <IconButton
+                label="删除模板"
                 variant="outline"
-                size="icon"
                 onClick={onDelete}
-                title="删除"
                 className="h-8 w-8 border-white/10 hover:border-red-500/40 hover:text-red-400"
               >
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </IconButton>
             )}
             <Button size="sm" onClick={onApply} disabled={isApplying} className="gap-1">
               {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
@@ -91,11 +91,14 @@ export function TemplateCard({
           </span>
 
           {showEngagement && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={onEngage}
               disabled={!isLoggedIn}
               className={cn(
-                "inline-flex items-center gap-1 transition-colors",
+                "h-auto gap-1 p-0 transition-colors hover:bg-transparent",
                 template.isEngaged ? "text-red-400" : "hover:text-red-400",
                 !isLoggedIn && "cursor-not-allowed opacity-50"
               )}
@@ -103,7 +106,7 @@ export function TemplateCard({
             >
               <Heart className={cn("h-3.5 w-3.5", template.isEngaged && "fill-current")} />
               {formatNumber(template.engagementCount)}
-            </button>
+            </Button>
           )}
 
           <span className="inline-flex items-center gap-1">

@@ -6,7 +6,7 @@ import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
 import { confirmDialog } from "@subboost/ui/components/ui/confirm-dialog";
 import { Input } from "@subboost/ui/components/ui/input";
-import { Switch } from "@subboost/ui/components/ui/switch";
+import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { DEFAULT_NODE_NAME_TEMPLATE } from "@subboost/core/node-name-template";
 import { useConfigStore, type SubscriptionSource } from "@subboost/ui/store/config-store";
@@ -96,7 +96,6 @@ export function NodeManagementSection({
   const [nameRulesOpen, setNameRulesOpen] = React.useState(false);
   const [nodeSearchKeyword, setNodeSearchKeyword] = React.useState("");
   const [listenerPortEnabled, setListenerPortEnabled] = React.useState(false);
-  const listenerPortSwitchId = React.useId();
   const interactions = useProductInteractionAdapter();
 
   const [listenerPortDrafts, setListenerPortDrafts] = React.useState<Record<string, string>>({});
@@ -440,20 +439,14 @@ export function NodeManagementSection({
                 className="pl-7 text-xs h-7 bg-white/5 border-white/10"
               />
             </div>
-            <div
-              className="flex h-7 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2"
-              title="为节点配置 socks5/http 协议的本地监听端口"
-            >
-              <Switch
-                id={listenerPortSwitchId}
+            <div className="shrink-0" title="为节点配置 socks5/http 协议的本地监听端口">
+              <SwitchField
+                label="监听端口"
                 checked={isListenerPortVisible}
                 onCheckedChange={handleListenerPortChange}
                 disabled={nodes.length === 0 && !hasConfiguredListenerPorts}
-                aria-label="监听端口"
+                density="compact"
               />
-              <label htmlFor={listenerPortSwitchId} className="cursor-pointer select-none text-xs text-white/70">
-                监听端口
-              </label>
             </div>
             <Button
               variant="secondary"

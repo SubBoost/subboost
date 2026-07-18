@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@radix-ui/react-popover", () => ({
+  Anchor: (props: any) => React.createElement("span", null, props.children),
+  Close: (props: any) => React.createElement("button", null, props.children),
   Root: (props: any) => React.createElement("div", null, props.children),
   Trigger: (props: any) => React.createElement("span", null, props.children),
   Portal: (props: any) => React.createElement("div", null, props.children),
@@ -11,6 +13,7 @@ vi.mock("@radix-ui/react-popover", () => ({
 }));
 
 vi.mock("lucide-react", () => ({
+  CircleHelp: () => React.createElement("span", null, "circle-help-icon"),
   HelpCircle: () => React.createElement("span", null, "help-icon"),
 }));
 

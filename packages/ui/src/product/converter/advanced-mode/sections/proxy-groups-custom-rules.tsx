@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ArrowRight, Check, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
 import {
   Select,
@@ -315,6 +316,7 @@ export function ProxyGroupsCustomRules() {
             </Select>
             <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2">
               <Switch
+                aria-label="新规则不解析域名"
                 checked={newRuleNoResolve}
                 onCheckedChange={setNewRuleNoResolve}
               />
@@ -429,6 +431,7 @@ export function ProxyGroupsCustomRules() {
                       </Select>
                       <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2">
                         <Switch
+                          aria-label="编辑规则时不解析域名"
                           checked={Boolean(editingRuleDraft.noResolve)}
                           onCheckedChange={(noResolve) =>
                             setEditingRuleDraft((prev) =>
@@ -513,22 +516,24 @@ export function ProxyGroupsCustomRules() {
                   {ruleTargetName}
                 </span>
                 <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                  <button
+                  <IconButton
+                    label="编辑规则"
+                    variant="ghost"
                     type="button"
                     onClick={() => startEditingRule(rule)}
                     className="inline-flex h-5 w-5 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/10 hover:text-white/80"
-                    title="编辑规则"
                   >
                     <Pencil className="h-3 w-3" />
-                  </button>
-                  <button
+                  </IconButton>
+                  <IconButton
+                    label="删除规则"
+                    variant="ghost"
                     type="button"
                     onClick={() => removeCustomRule(index)}
                     className="inline-flex h-5 w-5 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-red-500/10 hover:text-red-300"
-                    title="删除规则"
                   >
                     <Trash2 className="h-3 w-3" />
-                  </button>
+                  </IconButton>
                 </div>
               </div>
             );

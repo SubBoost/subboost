@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Button } from "@subboost/ui/components/ui/button";
 import { cn } from "@subboost/ui/lib/utils";
 
 /**
@@ -88,21 +89,25 @@ export function YamlHighlight({ content, className }: { content: string; classNa
                 `（${renderStats.lineCount} 行 / ${renderStats.charCount} 字符）`}
             </span>
             {forceHighlight ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setForceHighlight(false)}
-                className="rounded border border-amber-300/40 px-2 py-0.5 text-[10px] text-amber-100 transition-colors hover:bg-amber-300/10"
+                className="h-auto rounded border-amber-300/40 px-2 py-0.5 text-[10px] text-amber-100 hover:bg-amber-300/10"
               >
                 恢复纯文本
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setForceHighlight(true)}
-                className="rounded border border-amber-300/40 px-2 py-0.5 text-[10px] text-amber-100 transition-colors hover:bg-amber-300/10"
+                className="h-auto rounded border-amber-300/40 px-2 py-0.5 text-[10px] text-amber-100 hover:bg-amber-300/10"
               >
                 强制语法高亮
-              </button>
+              </Button>
             )}
           </div>
         </div>

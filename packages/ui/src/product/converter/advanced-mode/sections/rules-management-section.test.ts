@@ -322,8 +322,8 @@ describe("RulesManagementSection", () => {
     stateMock.value = { "custom:one": "1" };
     const tree = renderSection({ ruleOrder: ["module:geo", "custom:one"] });
     const orderInputs = collectElements(tree, (element) => (element.props as any).title === "最终规则行号（1=最前）");
-    const upButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "上移");
-    const downButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "下移");
+    const upButtons = collectElements(tree, (element) => element.props.label === "上移规则");
+    const downButtons = collectElements(tree, (element) => element.props.label === "下移规则");
 
     orderInputs[1].props.onChange({ target: { value: "2" } });
     expect(stateMock.value["custom:one"]).toBe("2");
@@ -349,8 +349,8 @@ describe("RulesManagementSection", () => {
   it("does not turn legacy custom-only ordering into full ordering after a custom move", () => {
     const tree = renderSection({ ruleOrder: ["custom:one"] });
     const orderInputs = collectElements(tree, (element) => (element.props as any).title === "最终规则行号（1=最前）");
-    const upButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "上移");
-    const downButtons = collectElements(tree, (element) => element.type === "button" && element.props.title === "下移");
+    const upButtons = collectElements(tree, (element) => element.props.label === "上移规则");
+    const downButtons = collectElements(tree, (element) => element.props.label === "下移规则");
 
     stateMock.value = { "custom:one": "1" };
     orderInputs[1].props.onKeyDown({ key: "Enter" });

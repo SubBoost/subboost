@@ -45,6 +45,15 @@ vi.mock("@subboost/ui/components/ui/button", () => ({
   Button: (props: any) => React.createElement("button", props, props.children),
 }));
 
+vi.mock("@subboost/ui/components/ui/form-field", () => ({
+  FormField: (props: any) => React.createElement("div", null, props.children),
+}));
+
+vi.mock("@subboost/ui/components/ui/choice-group", () => ({
+  ChoiceGroup: (props: any) => React.createElement("div", null, props.children),
+  ChoiceChip: ({ label, selected, ...props }: any) => React.createElement("button", { ...props, "aria-pressed": selected }, label),
+}));
+
 vi.mock("@subboost/ui/components/ui/input", () => ({
   Input: (props: any) => React.createElement("input", props),
 }));
@@ -163,7 +172,7 @@ describe("ProxyGroupAdvancedPanel interactions", () => {
     const sourceCheckboxes = elements.filter((element) => element.type === "input" && element.props.type === "checkbox");
     const textInputs = elements.filter((element) => element.type === "input" && element.props.type !== "checkbox");
     const regionButtons = elements.filter(
-      (element) => element.type === "button" && String(element.props.className || "").includes("rounded border px-2"),
+      (element) => element.type === "button" && typeof element.props["aria-pressed"] === "boolean",
     );
     const includedRows = elements.filter((element) => element.props.draggable);
     const excludeButton = elements.find((element) => element.type === "button" && element.props.title === "排除");

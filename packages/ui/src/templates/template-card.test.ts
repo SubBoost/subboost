@@ -108,12 +108,12 @@ describe("TemplateCard", () => {
     expect(html).toContain("公开");
     expect(html).toContain("使用");
 
-    mocks.captures.buttons.find((button) => button.title === "删除").onClick();
+    mocks.captures.buttons.find((button) => button.title === "删除模板").onClick();
     expect(props.onDelete).toHaveBeenCalled();
     mocks.captures.buttons.find((button) => button.children?.includes?.("使用")).onClick();
     expect(props.onApply).toHaveBeenCalled();
 
-    const engageButton = mocks.captures.nativeButtons.find((button) => button.title === "取消收藏");
+    const engageButton = mocks.captures.buttons.find((button) => button.title === "取消收藏");
     expect(engageButton.disabled).toBe(false);
     expect(engageButton.className).toContain("text-red-400");
     engageButton.onClick();
@@ -140,10 +140,10 @@ describe("TemplateCard", () => {
     expect(html).toContain("私有");
     expect(html).toContain("应用中");
     expect(html).toContain("loader-icon");
-    expect(mocks.captures.buttons.some((button) => button.title === "删除")).toBe(false);
+    expect(mocks.captures.buttons.some((button) => button.title === "删除模板")).toBe(false);
     expect(mocks.captures.buttons.find((button) => button.children?.includes?.("应用中")).disabled).toBe(true);
 
-    const engageButton = mocks.captures.nativeButtons.find((button) => button.title === "登录后可收藏");
+    const engageButton = mocks.captures.buttons.find((button) => button.title === "登录后可收藏");
     expect(engageButton.disabled).toBe(true);
     expect(engageButton.className).toContain("cursor-not-allowed");
   });
@@ -157,7 +157,7 @@ describe("TemplateCard", () => {
 
     expect(html).not.toContain("公开");
     expect(html).not.toContain("私有");
-    expect(mocks.captures.buttons.some((button) => button.title === "删除")).toBe(false);
-    expect(mocks.captures.nativeButtons).toEqual([]);
+    expect(mocks.captures.buttons.some((button) => button.title === "删除模板")).toBe(false);
+    expect(mocks.captures.buttons.some((button) => button.title === "登录后可收藏")).toBe(false);
   });
 });

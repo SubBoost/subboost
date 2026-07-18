@@ -48,6 +48,8 @@ vi.mock("react", async (importOriginal) => {
 });
 
 vi.mock("@radix-ui/react-popover", () => ({
+  Anchor: (props: any) => React.createElement(React.Fragment, null, props.children),
+  Close: (props: any) => React.createElement(React.Fragment, null, props.children),
   Root: (props: any) => React.createElement(React.Fragment, null, props.children),
   Trigger: (props: any) => React.createElement(React.Fragment, null, props.children),
   Portal: (props: any) => React.createElement(React.Fragment, null, props.children),
@@ -55,6 +57,7 @@ vi.mock("@radix-ui/react-popover", () => ({
   Arrow: () => null,
 }));
 vi.mock("lucide-react", () => ({
+  CircleHelp: () => null,
   HelpCircle: () => null,
   Plus: () => null,
   RotateCcw: () => null,

@@ -3,6 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@subboost/ui/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@subboost/ui/components/ui/dropdown-menu";
 import { SafeImage } from "@subboost/ui/components/ui/safe-image";
 import { captureAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
 import { useConfigStore } from "@subboost/ui/store/config-store";
@@ -25,22 +33,10 @@ export type AccountMenuItem = {
 export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountMenuItem }) {
   const { user, isLoading: userLoading, fetchUser, logout: userLogout } = useUserStore();
   const [isOpen, setIsOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     fetchUser();
   }, [fetchUser]);
-
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const handleLogout = async () => {
     if (user) await userLogout();
@@ -59,57 +55,48 @@ export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountM
   // 未登录
   if (!user) {
     return (
-      <Link href="/login" onClick={() => captureAuthConfigHandoff(useConfigStore.getState())}>
-        <Button size="sm" className="gap-2">
+      <Button asChild size="sm" className="gap-2">
+        <Link href="/login" onClick={() => captureAuthConfigHandoff(useConfigStore.getState())}>
           <LogIn className="h-4 w-4" />
           登录
-        </Button>
-      </Link>
+        </Link>
+      </Button>
     );
   }
 
   return (
-    <div className="relative" ref={menuRef}>
-      <button
-        type="button"
-        aria-label="用户菜单"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
-      >
-        <SafeImage
-          src={user.avatarUrl}
-          alt={user.name || user.username}
-          className="h-8 w-8 rounded-full border border-white/20"
-          fallback={
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <UserIcon className="h-4 w-4 text-white" />
-            </div>
-          }
-        />
-        <span className="text-sm font-medium hidden sm:block">{user.name || user.username}</span>
-        <ChevronDown className={`h-4 w-4 text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          aria-label="用户菜单"
+          className="h-auto gap-2 px-2 py-1.5"
+        >
+          <SafeImage
+            src={user.avatarUrl}
+            alt={user.name || user.username}
+            className="h-8 w-8 rounded-full border border-white/20"
+            fallback={
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600">
+                <UserIcon className="h-4 w-4 text-white" />
+              </span>
+            }
           />
-          <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#1a1a1a] border border-white/10 shadow-xl py-2 z-50">
-            {/* User Info Header */}
-            <div className="px-4 py-3 border-b border-white/10">
+          <span className="hidden text-sm font-medium sm:block">{user.name || user.username}</span>
+          <ChevronDown className={`h-4 w-4 text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 border-white/10 bg-[#1a1a1a] p-0 text-white">
+        <DropdownMenuLabel className="border-b border-white/10 px-4 py-3 font-normal text-white">
               <div className="flex items-center gap-3">
                 <SafeImage
                   src={user.avatarUrl}
                   alt={user.name || user.username}
                   className="h-12 w-12 rounded-full border border-white/20"
                   fallback={
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600">
                       <UserIcon className="h-6 w-6 text-white" />
-                    </div>
+                    </span>
                   }
                 />
                 <div className="flex-1 min-w-0">
@@ -132,51 +119,47 @@ export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountM
                   {user.subscriptionCount}/{user.quota.maxSubscriptions} 订阅
                 </div>
               </div>
-            </div>
-
-            {/* Menu Items */}
-            <div className="py-1">
-              {privilegedMenuItem && user.isAdmin && !user.isBanned && (
+        </DropdownMenuLabel>
+        <div className="py-1">
+          {privilegedMenuItem && user.isAdmin && !user.isBanned && (
+            <DropdownMenuItem asChild className="rounded-none px-4 py-2 text-indigo-400/80 focus:bg-white/5 focus:text-indigo-400">
                 <Link
                   href={privilegedMenuItem.href}
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2 text-sm text-indigo-400/80 hover:bg-white/5 hover:text-indigo-400 transition-colors"
+                  className="flex items-center gap-3 text-sm"
                 >
                   <Settings className="h-4 w-4" />
                   {privilegedMenuItem.label}
                 </Link>
-              )}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem asChild className="rounded-none px-4 py-2 text-white/60 focus:bg-white/5 focus:text-white">
               <Link
                 href="/dashboard"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 px-4 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-colors"
+                className="flex items-center gap-3 text-sm"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 我的订阅
               </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="rounded-none px-4 py-2 text-white/60 focus:bg-white/5 focus:text-white">
               <Link
                 href="/dashboard/settings"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 px-4 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-colors"
+                className="flex items-center gap-3 text-sm"
               >
                 <Settings className="h-4 w-4" />
                 账户设置
               </Link>
-            </div>
-
-            {/* Logout */}
-            <div className="border-t border-white/10 pt-1">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                退出登录
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+          </DropdownMenuItem>
+        </div>
+        <DropdownMenuSeparator className="m-0 bg-white/10" />
+        <DropdownMenuItem
+          onSelect={() => void handleLogout()}
+          className="rounded-none px-4 py-2 text-red-400 focus:bg-white/5 focus:text-red-300"
+        >
+          <LogOut className="h-4 w-4" />
+          退出登录
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

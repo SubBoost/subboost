@@ -71,6 +71,8 @@ vi.mock("react/jsx-runtime", async (importOriginal) => {
 });
 
 vi.mock("@radix-ui/react-popover", () => ({
+  Anchor: (props: any) => props.children,
+  Close: (props: any) => props.children,
   Root: (props: any) => props.children,
   Trigger: (props: any) => props.children,
   Portal: (props: any) => props.children,
@@ -82,16 +84,26 @@ vi.mock("lucide-react", () => ({
   Check: () => null,
   ChevronDown: () => null,
   ChevronUp: () => null,
+  CircleHelp: () => null,
+  FileCode: () => null,
   HelpCircle: () => null,
   Loader2: () => null,
+  Link2: () => null,
   Maximize2: () => null,
   Menu: () => null,
   Plus: () => null,
+  Server: () => null,
   X: () => null,
 }));
 vi.mock("@subboost/ui/components/ui/button", () => ({
   Button: (props: any) => {
     mocks.captures.buttons.push(props);
+    return null;
+  },
+}));
+vi.mock("@subboost/ui/components/ui/icon-button", () => ({
+  IconButton: (props: any) => {
+    mocks.captures.iconButtons.push(props);
     return null;
   },
 }));
@@ -157,6 +169,26 @@ vi.mock("@subboost/ui/product/subscription/source-order", () => ({ moveSubscript
 vi.mock("@subboost/ui/product/converter/source-display-label", () => ({
   buildSourceDisplayLabel: ({ typeLabel, order, total, tag }: any) => `${typeLabel} ${order}/${total}${tag ? ` ${tag}` : ""}`,
 }));
+vi.mock("@subboost/ui/product/converter/source-controls", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@subboost/ui/product/converter/source-controls")>();
+  return {
+    ...actual,
+    AddSourceMenu: (props: any) => {
+      mocks.captures.addSourceMenus.push(props);
+      return null;
+    },
+    SourceTypeChoices: (props: any) => {
+      mocks.captures.sourceTypeChoices.push(props);
+      return null;
+    },
+  };
+});
+vi.mock("@subboost/ui/product/converter/source-editor-dialog", () => ({
+  SourceEditorDialog: (props: any) => {
+    mocks.captures.editor = props;
+    return null;
+  },
+}));
 vi.mock("@subboost/ui/product/interactions", () => ({ useProductInteractionAdapter: () => mocks.interactions }));
 vi.mock("./constants", () => ({
   sourceTypeInfo: {
@@ -209,6 +241,9 @@ function renderSection(overrides: Record<number, unknown> = {}) {
   mocks.captures.inputs = [];
   mocks.captures.textareas = [];
   mocks.captures.switches = [];
+  mocks.captures.iconButtons = [];
+  mocks.captures.addSourceMenus = [];
+  mocks.captures.sourceTypeChoices = [];
   mocks.captures.rawButtons = [];
   try {
     const html = renderToStaticMarkup(React.createElement(SourcesSection));
@@ -221,7 +256,16 @@ function renderSection(overrides: Record<number, unknown> = {}) {
 describe("quick mode SourcesSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.captures = { buttons: [], inputs: [], textareas: [], switches: [], rawButtons: [] };
+    mocks.captures = {
+      addSourceMenus: [],
+      buttons: [],
+      iconButtons: [],
+      inputs: [],
+      rawButtons: [],
+      sourceTypeChoices: [],
+      switches: [],
+      textareas: [],
+    };
     mocks.getSubscriptionUserInfoDisplay.mockReturnValue({ traffic: "1 GB", expire: "2026-01-01" });
     mocks.markSourceAsPendingImport.mockImplementation((source) => ({ ...source, pendingImport: true }));
     mocks.moveSubscriptionSource.mockImplementation((sources) => sources.slice().reverse());
@@ -242,43 +286,34 @@ describe("quick mode SourcesSection", () => {
     renderSection({ 0: true, 1: "s1" });
 
     expect(mocks.captures.errorBadge).toEqual(expect.objectContaining({ errorMessage: "parse failed" }));
-    expect(mocks.captures.dialog).toEqual(expect.objectContaining({ open: true }));
-    expect(mocks.captures.inputs.some((props: any) => props.value === "https://example.com/sub")).toBe(true);
-    expect(mocks.captures.inputs.some((props: any) => props.value === "HK")).toBe(true);
-    expect(mocks.captures.inputs.some((props: any) => props.readOnly)).toBe(true);
-    expect(mocks.captures.textareas.some((props: any) => props.value === "ss://node")).toBe(true);
-    expect(mocks.captures.switches).toEqual([expect.objectContaining({ checked: false })]);
+    expect(mocks.captures.editor).toEqual(expect.objectContaining({ source: urlSource }));
+    expect(mocks.captures.addSourceMenus[0]).toEqual(expect.objectContaining({ open: true }));
+    expect(mocks.captures.sourceTypeChoices).toHaveLength(2);
   });
 
-  it("updates source content and metadata through captured inputs", () => {
+  it("updates source content and metadata through the shared editor contract", () => {
     renderSection({ 1: "s1" });
 
-    const mainUrlInput = mocks.captures.inputs.find((props: any) => props.placeholder === "https://example.com/sub" && props.value === urlSource.content);
-    mainUrlInput.onChange({ target: { value: "https://new.example/sub" } });
+    mocks.captures.editor.onUpdateContent("s1", "https://new.example/sub");
     expect(mocks.store.setSources).toHaveBeenCalledWith(expect.any(Array));
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ content: "https://new.example/sub" }));
 
-    const textArea = mocks.captures.textareas.find((props: any) => props.value === "ss://node");
-    textArea.onChange({ target: { value: "trojan://node" } });
+    mocks.captures.editor.onUpdateContent("s2", "trojan://node");
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ content: "trojan://node" }));
 
-    const tagInput = mocks.captures.inputs.find((props: any) => props.value === "HK");
-    tagInput.onChange({ target: { value: "JP" } });
+    mocks.captures.editor.onUpdateMeta("s1", { tag: "JP" });
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ tag: "JP" }));
 
-    const templateInput = mocks.captures.inputs.find((props: any) => props.value === "[{tag}] {name}");
-    templateInput.onChange({ target: { value: "{tag}-{name}" } });
+    mocks.captures.editor.onUpdateMeta("s1", { nameTemplate: "{tag}-{name}" });
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ nameTemplate: "{tag}-{name}" }));
 
-    mocks.captures.switches[0].onCheckedChange(true);
+    mocks.captures.editor.onUpdateMeta("s1", { useProxyProviders: true });
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ useProxyProviders: true }));
 
-    const userinfoUrlInput = mocks.captures.inputs.find((props: any) => props.value === "https://example.com/userinfo");
-    userinfoUrlInput.onChange({ target: { value: "https://new.example/userinfo" } });
+    mocks.captures.editor.onUpdateMeta("s1", { userinfoUrl: "https://new.example/userinfo" });
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ userinfoUrl: "https://new.example/userinfo" }));
 
-    const userinfoUaInput = mocks.captures.inputs.find((props: any) => props.value === "clash");
-    userinfoUaInput.onChange({ target: { value: "clash.meta/v1.19.16" } });
+    mocks.captures.editor.onUpdateMeta("s1", { userinfoUserAgent: "clash.meta/v1.19.16" });
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ userinfoUserAgent: "clash.meta/v1.19.16" }));
   });
 
@@ -296,7 +331,7 @@ describe("quick mode SourcesSection", () => {
       },
     });
 
-    mocks.captures.dialog.onOpenChange(false);
+    mocks.captures.editor.onClose();
     expect(mocks.store.parseSingleSource).toHaveBeenCalledWith("s1");
     expect(stateMock.setters[1]).toHaveBeenCalledWith(null);
 
@@ -313,7 +348,7 @@ describe("quick mode SourcesSection", () => {
         userinfoUserAgent: "clash",
       },
     });
-    mocks.captures.buttons.at(-1).onClick();
+    mocks.captures.editor.onClose();
     expect(mocks.store.parseSingleSource).not.toHaveBeenCalled();
   });
 
@@ -323,7 +358,7 @@ describe("quick mode SourcesSection", () => {
     mocks.store.parseErrors = [];
     mocks.store.sources = [{ ...urlSource, content: "", parsed: false, nodeCount: undefined }];
     renderSection();
-    expect(mocks.captures.dialog).toEqual(expect.objectContaining({ open: false }));
+    expect(mocks.captures.editor).toEqual(expect.objectContaining({ source: null }));
 
     mocks.store.setSources.mockClear();
     const emptyInput = mocks.captures.inputs.find((props: any) => props.placeholder === "https://example.com/sub");
@@ -334,7 +369,7 @@ describe("quick mode SourcesSection", () => {
   it("imports sources and reports success, runtime, and validation outcomes", async () => {
     renderSection();
 
-    mocks.captures.rawButtons.find((props: any) => props.title === "重新导入").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "重新导入").onClick();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -349,7 +384,7 @@ describe("quick mode SourcesSection", () => {
     });
 
     mocks.interactions.sourceImported.mockClear();
-    mocks.captures.rawButtons.find((props: any) => props.title === "导入此源").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入此源").onClick();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -361,7 +396,7 @@ describe("quick mode SourcesSection", () => {
     mocks.interactions.sourceImported.mockClear();
     mocks.store.sources = [{ ...textSource, error: undefined, errorInfo: undefined, parsed: false }];
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "导入此源").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入此源").onClick();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -374,10 +409,7 @@ describe("quick mode SourcesSection", () => {
     vi.spyOn(Date, "now").mockReturnValue(1700000000000);
 
     renderSection({ 0: true });
-    const addMenuButtons = mocks.captures.rawButtons.filter((props: any) =>
-      String(props.className).includes("w-full flex items-center gap-3")
-    );
-    addMenuButtons[0].onClick();
+    mocks.captures.addSourceMenus[0].onAdd("url");
 
     expect(mocks.store.setSources).toHaveBeenCalledWith([
       urlSource,
@@ -391,16 +423,16 @@ describe("quick mode SourcesSection", () => {
     });
 
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "下移" && !props.disabled).onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "下移" && !props.disabled).onClick();
     expect(mocks.moveSubscriptionSource).toHaveBeenCalledWith(mocks.store.sources, "s1", "down");
     expect(mocks.store.setSources).toHaveBeenCalledWith([...mocks.store.sources].reverse());
 
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "删除").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "删除导入源").onClick();
     expect(mocks.store.setSources).toHaveBeenCalledWith([textSource]);
 
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "Text").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "url").onChange("text");
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "s1",
@@ -417,17 +449,14 @@ describe("quick mode SourcesSection", () => {
     mocks.userStore = { user: { isAdmin: false, quota: { maxImportSourcesPerType: 1 } } };
 
     renderSection({ 0: true });
-    const addMenuButtons = mocks.captures.rawButtons.filter((props: any) =>
-      String(props.className).includes("w-full flex items-center gap-3")
-    );
-    addMenuButtons[0].onClick();
+    mocks.captures.addSourceMenus[0].onAdd("url");
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "每种导入方式最多 1 个",
       variant: "warning",
     });
 
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "Text").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "url").onChange("text");
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "每种导入方式最多 1 个",
       variant: "warning",
@@ -440,10 +469,7 @@ describe("quick mode SourcesSection", () => {
       textSource,
     ];
     renderSection({ 0: true });
-    const anonymousAddMenuButtons = mocks.captures.rawButtons.filter((props: any) =>
-      String(props.className).includes("w-full flex items-center gap-3")
-    );
-    anonymousAddMenuButtons[0].onClick();
+    mocks.captures.addSourceMenus[0].onAdd("url");
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "未登录用户每种导入方式最多 2 个（登录后可提升）",
       variant: "warning",
@@ -453,12 +479,8 @@ describe("quick mode SourcesSection", () => {
   it("renders and edits non-url expanded sources", () => {
     renderSection({ 1: "s2" });
 
-    const expandedTextarea = mocks.captures.textareas.find((props: any) =>
-      String(props.className).includes("min-h-[60vh]")
-    );
-    expect(expandedTextarea).toMatchObject({ value: "ss://node" });
-
-    expandedTextarea.onChange({ target: { value: "vmess://node" } });
+    expect(mocks.captures.editor.source).toEqual(textSource);
+    mocks.captures.editor.onUpdateContent("s2", "vmess://node");
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ content: "vmess://node" }));
   });
 
@@ -472,10 +494,7 @@ describe("quick mode SourcesSection", () => {
     ];
 
     renderSection({ 0: true });
-    const addMenuButtons = mocks.captures.rawButtons.filter((props: any) =>
-      String(props.className).includes("w-full flex items-center gap-3")
-    );
-    addMenuButtons[0].onClick();
+    mocks.captures.addSourceMenus[0].onAdd("url");
 
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(mocks.store.setSources).toHaveBeenCalledWith([
@@ -486,7 +505,7 @@ describe("quick mode SourcesSection", () => {
     mocks.store.setSources.mockClear();
     mocks.store.sources = [textSource];
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "URL").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "text").onChange("url");
 
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -503,30 +522,29 @@ describe("quick mode SourcesSection", () => {
   it("keeps no-op source actions from writing back", async () => {
     mocks.store.setSources.mockClear();
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "URL").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "url").onChange("url");
     expect(mocks.store.setSources).not.toHaveBeenCalled();
 
     mocks.moveSubscriptionSource.mockReturnValueOnce(mocks.store.sources);
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "下移" && !props.disabled).onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "下移" && !props.disabled).onClick();
     expect(mocks.store.setSources).not.toHaveBeenCalled();
 
     renderSection({ 1: "s1" });
     mocks.markSourceAsPendingImport.mockClear();
-    const tagInput = mocks.captures.inputs.find((props: any) => props.value === "HK");
-    tagInput.onChange({ target: { value: "HK" } });
+    mocks.captures.editor.onUpdateMeta("s1", { tag: "HK" });
     expect(mocks.markSourceAsPendingImport).not.toHaveBeenCalled();
 
     mocks.store.parseSingleSource.mockClear();
     mocks.store.sources = [{ ...urlSource, content: "", parsed: false, nodeCount: undefined }];
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "导入此源").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入此源").onClick();
     await Promise.resolve();
     expect(mocks.store.parseSingleSource).not.toHaveBeenCalled();
 
     mocks.store.sources = [{ ...urlSource, parsing: true }];
     renderSection();
-    mocks.captures.rawButtons.find((props: any) => props.title === "导入中...").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入中").onClick();
     await Promise.resolve();
     expect(mocks.store.parseSingleSource).not.toHaveBeenCalled();
   });
@@ -560,7 +578,7 @@ describe("quick mode SourcesSection", () => {
       },
     });
 
-    mocks.captures.dialog.onOpenChange(false);
+    mocks.captures.editor.onClose();
     expect(mocks.store.parseSingleSource).not.toHaveBeenCalled();
     expect(stateMock.setters[1]).toHaveBeenCalledWith(null);
   });

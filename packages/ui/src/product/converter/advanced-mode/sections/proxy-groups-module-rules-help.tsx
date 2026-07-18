@@ -1,28 +1,16 @@
 "use client";
 
-import * as Popover from "@radix-ui/react-popover";
 import { AlertCircle, HelpCircle } from "lucide-react";
+import { HelpPopover } from "@subboost/ui/components/ui/popover";
 
 export function ExperimentalCnRuleHelpButton() {
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          aria-label="国内服务实验性选项说明"
-          title="国内服务实验性选项说明"
-        >
-          <HelpCircle className="h-3.5 w-3.5" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="bottom"
-          align="end"
-          sideOffset={8}
-          className="z-50 w-[420px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-md shadow-2xl p-3"
-        >
+    <HelpPopover
+      label="国内服务实验性选项说明"
+      side="bottom"
+      align="end"
+      contentClassName="w-[420px] bg-black/90 p-3"
+    >
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2">
               <HelpCircle className="h-4 w-4 text-amber-300" />
@@ -37,33 +25,19 @@ export function ExperimentalCnRuleHelpButton() {
               预期结果：不会发生DNS泄露的同时正确分流绝大多数国内站点；但也可能导致意料之外的分流错误。
             </div>
           </div>
-          <Popover.Arrow className="fill-white/10" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    </HelpPopover>
   );
 }
 
 export function CnIpNoResolveHelpButton() {
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          aria-label="国内服务 no-resolve 说明"
-          title="国内服务 no-resolve 说明"
-        >
-          <AlertCircle className="h-3.5 w-3.5" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="bottom"
-          align="end"
-          sideOffset={8}
-          className="z-50 w-[360px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-md shadow-2xl p-3"
-        >
+    <HelpPopover
+      label="国内服务 no-resolve 说明"
+      side="bottom"
+      align="end"
+      contentClassName="w-[360px] bg-black/90 p-3"
+      className="text-amber-300/70"
+    >
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-amber-300" />
@@ -80,9 +54,6 @@ export function CnIpNoResolveHelpButton() {
               该开关仅影响“国内服务”的 GeoIP（cn-ip）规则，不影响其它代理组。
             </div>
           </div>
-          <Popover.Arrow className="fill-white/10" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    </HelpPopover>
   );
 }

@@ -2,8 +2,26 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
+const accessibilityRules = {
+  "jsx-a11y/click-events-have-key-events": "error",
+  "jsx-a11y/label-has-associated-control": "error",
+  "jsx-a11y/no-static-element-interactions": "error",
+};
+
+const nextVitalsWithAccessibility = nextVitals.map((config) =>
+  config.name === "next"
+    ? {
+        ...config,
+        rules: {
+          ...config.rules,
+          ...accessibilityRules,
+        },
+      }
+    : config
+);
+
 export default defineConfig([
-  ...nextVitals,
+  ...nextVitalsWithAccessibility,
   ...nextTypescript,
   {
     linterOptions: {

@@ -10,8 +10,9 @@ import {
   DialogTitle,
 } from "@subboost/ui/components/ui/dialog";
 import { Input } from "@subboost/ui/components/ui/input";
-import { Label } from "@subboost/ui/components/ui/label";
+import { FormField } from "@subboost/ui/components/ui/form-field";
 import { Switch } from "@subboost/ui/components/ui/switch";
+import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { SmartNodeMatchingHelp } from "@subboost/ui/components/subscription/smart-node-matching-help";
 import {
   getAutoUpdateIntervalPolicyMinLabel,
@@ -67,15 +68,14 @@ export function SubscriptionSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>订阅名称</Label>
+          <FormField label="订阅名称">
             <Input
               value={settingsName}
               onChange={(e) => setSettingsName(e.target.value)}
               maxLength={100}
               placeholder="例如：我的配置"
             />
-          </div>
+          </FormField>
 
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -84,16 +84,19 @@ export function SubscriptionSettingsDialog({
                 <SmartNodeMatchingHelp enabled={smartNodeMatchingEnabled} />
               </div>
             </div>
-            <Switch checked={smartNodeMatchingEnabled} onCheckedChange={setSmartNodeMatchingEnabled} />
+            <Switch
+              checked={smartNodeMatchingEnabled}
+              onCheckedChange={setSmartNodeMatchingEnabled}
+              aria-label="更新时智能匹配节点"
+            />
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm text-white/70">启用自动更新</p>
-              <p className="text-xs text-white/40 mt-1">开启后服务器会按间隔刷新缓存</p>
-            </div>
-            <Switch checked={autoUpdateEnabled} onCheckedChange={setAutoUpdateEnabled} />
-          </div>
+          <SwitchField
+            label="启用自动更新"
+            description="开启后服务器会按间隔刷新缓存"
+            checked={autoUpdateEnabled}
+            onCheckedChange={setAutoUpdateEnabled}
+          />
 
           {!autoUpdateEnabled && subscription?.autoUpdateState.disabledAt && subscription.autoUpdateState.disabledReason && (
             <div className="rounded-md border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
@@ -102,8 +105,7 @@ export function SubscriptionSettingsDialog({
           )}
 
           {autoUpdateEnabled && (
-            <div className="space-y-2">
-              <Label>自动更新间隔（小时）</Label>
+            <FormField label="自动更新间隔（小时）">
               <Input
                 type="number"
                 min={policy.minHours}
@@ -111,7 +113,7 @@ export function SubscriptionSettingsDialog({
                 value={autoUpdateHours}
                 onChange={(e) => setAutoUpdateHours(Number(e.target.value))}
               />
-            </div>
+            </FormField>
           )}
         </div>
 

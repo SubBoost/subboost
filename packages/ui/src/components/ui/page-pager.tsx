@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@subboost/ui/components/ui/button";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
 import { cn } from "@subboost/ui/lib/utils";
 
@@ -26,16 +26,15 @@ export function PagePager({ page, totalPages, onPageChange, className, disabled 
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Button
+      <IconButton
+        label="上一页"
         variant="outline"
-        size="icon"
         className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10"
         onClick={() => goToPage(page - 1)}
         disabled={disabled || page <= 1 || isSinglePage}
-        aria-label="上一页"
       >
         <ChevronLeft className="h-4 w-4" />
-      </Button>
+      </IconButton>
 
       <div className="flex items-center gap-1">
         <Input
@@ -58,16 +57,15 @@ export function PagePager({ page, totalPages, onPageChange, className, disabled 
         <span className="text-sm text-white/60 whitespace-nowrap">/ {safeTotalPages}</span>
       </div>
 
-      <Button
+      <IconButton
+        label="下一页"
         variant="outline"
-        size="icon"
         className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10"
         onClick={() => goToPage(page + 1)}
         disabled={disabled || page >= safeTotalPages || isSinglePage}
-        aria-label="下一页"
       >
         <ChevronRight className="h-4 w-4" />
-      </Button>
+      </IconButton>
     </div>
   );
 }

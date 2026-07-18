@@ -4,6 +4,15 @@ import * as React from "react";
 import { Check, ChevronDown, ChevronRight, Link as LinkIcon, Pencil, Plus, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@subboost/ui/components/ui/dropdown-menu";
 import { Input } from "@subboost/ui/components/ui/input";
 import { Switch } from "@subboost/ui/components/ui/switch";
 import { toast } from "@subboost/ui/components/ui/toaster";
@@ -236,17 +245,22 @@ export function DialerProxyGroupsSection({
               <div key={group.id} className="bg-white/5 rounded-lg border border-white/10">
               {/* 组标题 */}
               <div
-                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-white/5"
-                onClick={() => {
-                  if (isEditing) return;
-                  toggleDialerGroupExpand(group.id);
-                }}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-white/[0.03]"
               >
-                {expandedDialerGroups.has(group.id) ? (
-                  <ChevronDown className="h-4 w-4 text-white/50" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-white/50" />
-                )}
+                <IconButton
+                  label={expandedDialerGroups.has(group.id) ? `收起 ${group.name}` : `展开 ${group.name}`}
+                  variant="ghost"
+                  className="h-6 w-6 rounded-md text-white/50"
+                  aria-expanded={expandedDialerGroups.has(group.id)}
+                  disabled={isEditing}
+                  onClick={() => toggleDialerGroupExpand(group.id)}
+                >
+                  {expandedDialerGroups.has(group.id) ? (
+                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </IconButton>
 
                 {isEditing ? (
                   <ProxyGroupNameEditor
@@ -280,7 +294,7 @@ export function DialerProxyGroupsSection({
                 )}
 
                 {isEditing ? (
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" className="h-7 px-2" onClick={commitRename} title="保存">
                       <Check className="h-3.5 w-3.5" />
                     </Button>
@@ -299,6 +313,7 @@ export function DialerProxyGroupsSection({
                       ]}
                     />
                     <Switch
+                      aria-label={`启用 ${group.name} 中转组`}
                       checked={isEnabled}
                       onCheckedChange={(checked) => {
                         const nextEnabled = Boolean(checked);
@@ -379,16 +394,17 @@ export function DialerProxyGroupsSection({
                         </Button>
                       }
                     />
-                    <button
+                    <IconButton
+                      label={`删除 ${group.name} 中转组`}
+                      variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeDialerProxyGroup(group.id);
                       }}
-                      className="p-1 text-white/30 hover:text-red-400"
-                      title="删除"
+                      className="h-7 w-7 p-1 text-white/30 hover:text-red-400"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </IconButton>
                   </>
                 )}
               </div>
@@ -399,7 +415,7 @@ export function DialerProxyGroupsSection({
                   {/* 中转节点选择 */}
                   <div className="mt-3">
                     <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <label className="text-xs text-white/50">中转节点（流量入口）</label>
+                      <p className="text-xs text-white/50">中转节点（流量入口）</p>
                       <div className="relative w-full sm:max-w-[220px]">
                         <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
                         <Input
@@ -419,7 +435,9 @@ export function DialerProxyGroupsSection({
                         const isSelected = group.relayNodes.includes(node.name);
                         const displayName = node.name === "DIRECT" ? "DIRECT（直连）" : node.name;
                         return (
-                          <div
+                          <button
+                            type="button"
+                            aria-pressed={isSelected}
                             key={node.name}
                             className={cn(
                               "flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors",
@@ -447,7 +465,7 @@ export function DialerProxyGroupsSection({
                               {node.type}
                             </Badge>
                             <span className="truncate">{displayName}</span>
-                          </div>
+                          </button>
                         );
                       })}
                       {availableRelayNodes.length === 0 ? (
@@ -461,7 +479,7 @@ export function DialerProxyGroupsSection({
                   {/* 目标节点选择 */}
                   <div>
                     <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <label className="text-xs text-white/50">落地节点（流量出口）</label>
+                      <p className="text-xs text-white/50">落地节点（流量出口）</p>
                       <div className="relative w-full sm:max-w-[220px]">
                         <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
                         <Input
@@ -484,8 +502,11 @@ export function DialerProxyGroupsSection({
                             (g) => g.id !== group.id && g.enabled !== false && g.targetNodes.includes(node.name)
                           );
                           return (
-                            <div
+                            <button
+                              type="button"
+                              aria-pressed={isSelected}
                               key={node.name}
+                              disabled={usedByOther}
                               className={cn(
                                 "flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors",
                                 usedByOther ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
@@ -519,7 +540,7 @@ export function DialerProxyGroupsSection({
                               {usedByOther && (
                                 <span className="text-[10px] text-white/30 ml-auto">已被其他组使用</span>
                               )}
-                            </div>
+                            </button>
                           );
                         })}
                       {availableTargetNodes.length === 0 ? (
@@ -540,31 +561,29 @@ export function DialerProxyGroupsSection({
           )}
 
           {/* 添加中转组按钮 */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-7 text-xs border-dashed border-white/20 text-white/50 hover:text-white/70 hover:border-white/30"
-              onClick={() => setShowDialerMenu(!showDialerMenu)}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              添加中转组
-            </Button>
-
-            {showDialerMenu && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-10 overflow-hidden">
-                {/* 预设地区选项 */}
-                {PRESET_RELAY_NAMES.map((name) => (
-                  <button
-                    key={name}
-                    onClick={() => handleAddDialerGroup(name)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors text-sm text-white/70 hover:text-white"
-                  >
-                    <span>{name}</span>
-                  </button>
-                ))}
-                {/* 自定义选项 */}
-                <div className="border-t border-white/10 p-2">
+          <DropdownMenu open={showDialerMenu} onOpenChange={setShowDialerMenu}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-full border-dashed border-white/20 text-xs text-white/50 hover:border-white/30 hover:text-white/70"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                添加中转组
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] border-white/10 bg-[#1a1a1a] text-white">
+              {PRESET_RELAY_NAMES.map((name) => (
+                <DropdownMenuItem
+                  key={name}
+                  onSelect={() => handleAddDialerGroup(name)}
+                  className="text-white/70 focus:bg-white/5 focus:text-white"
+                >
+                  {name}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuLabel className="p-2 font-normal text-white">
                   <div className="flex gap-2">
                     <ProxyGroupNameEditor
                       value={customDialerDraft}
@@ -587,10 +606,9 @@ export function DialerProxyGroupsSection({
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
+              </DropdownMenuLabel>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
     </div>

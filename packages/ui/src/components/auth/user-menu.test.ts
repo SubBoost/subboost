@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   captureAuthConfigHandoff: vi.fn(),
   documentHandlers: {} as Record<string, (event: any) => void>,
+  dropdownRoots: [] as any[],
+  dropdownItems: [] as any[],
   fetchUser: vi.fn(),
   intrinsics: [] as any[],
   links: [] as any[],
@@ -71,7 +73,24 @@ vi.mock("lucide-react", () => ({
 }));
 
 vi.mock("@subboost/ui/components/ui/button", () => ({
-  Button: (props: any) => React.createElement("button", props, props.children),
+  Button: ({ asChild: _asChild, ...props }: any) => React.createElement("button", props, props.children),
+}));
+
+vi.mock("@subboost/ui/components/ui/dropdown-menu", () => ({
+  DropdownMenu: (props: any) => {
+    mocks.dropdownRoots.push(props);
+    return React.createElement("div", null, props.children);
+  },
+  DropdownMenuContent: (props: any) => React.createElement("div", props, props.children),
+  DropdownMenuItem: ({ asChild, children, onSelect, ...props }: any) => {
+    mocks.dropdownItems.push({ asChild, children, onSelect, ...props });
+    return asChild
+      ? React.createElement(React.Fragment, null, children)
+      : React.createElement("button", { ...props, onClick: () => onSelect?.() }, children);
+  },
+  DropdownMenuLabel: (props: any) => React.createElement("div", props, props.children),
+  DropdownMenuSeparator: (props: any) => React.createElement("hr", props),
+  DropdownMenuTrigger: (props: any) => React.createElement(React.Fragment, null, props.children),
 }));
 
 vi.mock("@subboost/ui/components/ui/safe-image", () => ({
@@ -109,6 +128,8 @@ describe("UserMenu", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.documentHandlers = {};
+    mocks.dropdownRoots = [];
+    mocks.dropdownItems = [];
     mocks.intrinsics = [];
     mocks.refContains.mockReturnValue(false);
     vi.stubGlobal("document", {
@@ -177,17 +198,11 @@ describe("UserMenu", () => {
     expect(html).toContain("我的订阅");
     expect(html).toContain("账户设置");
     expect(html).toContain("退出登录");
-    const toggle = findIntrinsic(
-      "button",
-      (props) => typeof props.className === "string" && props.className.includes("px-2 py-1.5")
-    );
-    expect(toggle.type).toBe("button");
-    expect(toggle["aria-label"]).toBe("用户菜单");
-    expect(toggle["aria-haspopup"]).toBe("menu");
-    expect(toggle["aria-expanded"]).toBe(true);
+    expect(html).toContain('aria-label="用户菜单"');
+    expect(mocks.dropdownRoots[0].open).toBe(true);
   });
 
-  it("closes the menu from document, toggle, overlay, links, and logout actions", async () => {
+  it("delegates close behavior to DropdownMenu and logs out", async () => {
     mocks.stateOverride = true;
     mocks.userState = {
       fetchUser: mocks.fetchUser,
@@ -207,26 +222,12 @@ describe("UserMenu", () => {
 
     renderToStaticMarkup(React.createElement(UserMenu, { privilegedMenuItem: { href: "/ops", label: "Privileged" } }));
 
-    mocks.documentHandlers.mousedown({ target: {} });
+    mocks.dropdownRoots[0].onOpenChange(false);
     expect(mocks.stateSetter).toHaveBeenCalledWith(false);
 
-    mocks.stateSetter.mockClear();
-    mocks.refContains.mockReturnValueOnce(true);
-    mocks.documentHandlers.mousedown({ target: {} });
-    expect(mocks.stateSetter).not.toHaveBeenCalled();
-
-    findIntrinsic("button", (props) => typeof props.className === "string" && props.className.includes("px-2 py-1.5")).onClick();
-    expect(mocks.stateSetter).toHaveBeenCalledWith(false);
-
-    findIntrinsic("div", (props) => typeof props.className === "string" && props.className.includes("fixed inset-0")).onClick();
-    expect(mocks.stateSetter).toHaveBeenCalledWith(false);
-
-    for (const link of mocks.links) {
-      link.onClick?.();
-    }
-    expect(mocks.stateSetter).toHaveBeenCalledWith(false);
-
-    await findIntrinsic("button", (props) => textOf(props.children).includes("退出登录")).onClick();
+    const logoutItem = mocks.dropdownItems.find((item) => textOf(item.children).includes("退出登录"));
+    expect(logoutItem).toBeTruthy();
+    await logoutItem.onSelect();
     expect(mocks.logout).toHaveBeenCalled();
     expect(mocks.stateSetter).toHaveBeenCalledWith(false);
     expect(window.location.href).toBe("/");

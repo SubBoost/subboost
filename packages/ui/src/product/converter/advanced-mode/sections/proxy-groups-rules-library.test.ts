@@ -417,13 +417,13 @@ describe("ProxyGroupsRulesLibrary", () => {
     expect(stateMock.setters[1]).not.toHaveBeenCalledWith("");
 
     renderLibrary();
-    const firstRuleDiv = mocks.captures.nativeDivs.find((props) => String(props.className).includes("cursor-pointer"));
-    firstRuleDiv.onClick();
+    const firstRuleButton = mocks.captures.nativeButtons.find((props) => String(props.className).includes("w-full"));
+    firstRuleButton.onClick();
     expect(stateMock.setters[0]).toHaveBeenCalledWith([telegramRule]);
 
     renderLibrary({ 0: [telegramRule] });
-    const selectedRuleDiv = mocks.captures.nativeDivs.find((props) => String(props.className).includes("cursor-pointer"));
-    selectedRuleDiv.onClick();
+    const selectedRuleButton = mocks.captures.nativeButtons.find((props) => String(props.className).includes("w-full"));
+    selectedRuleButton.onClick();
     expect(stateMock.setters[0]).toHaveBeenCalledWith([]);
   });
 
@@ -439,7 +439,7 @@ describe("ProxyGroupsRulesLibrary", () => {
     const { html } = renderLibrary({ 0: selectedRules, 1: "custom:custom-1" });
     expect(html).toContain("+1");
 
-    mocks.captures.nativeButtons.find((props) => props.children === "清空").onClick();
+    mocks.captures.buttons.find((props) => props.children === "清空").onClick();
     expect(stateMock.setters[0]).toHaveBeenCalledWith([]);
 
     mocks.captures.badges.find((props) => typeof props.onClick === "function").onClick();
@@ -565,7 +565,7 @@ describe("ProxyGroupsRulesLibrary", () => {
     mocks.search.searchResults = [netflixRule];
     mocks.store.builtinRuleEdits = { "module:auto:netflix": { enabled: false } };
     renderLibrary();
-    expect(mocks.captures.nativeDivs.some((props) => String(props.className).includes("cursor-pointer"))).toBe(true);
+    expect(mocks.captures.nativeButtons.some((props) => String(props.className).includes("w-full"))).toBe(true);
 
     mocks.store.builtinRuleEdits = {};
     mocks.store.customRuleSets = [{ id: "netflix", name: "Netflix", behavior: "domain", path: "geosite/netflix.mrs", target: "Custom" }];

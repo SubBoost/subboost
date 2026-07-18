@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   buttons: [] as any[],
+  choiceChips: [] as any[],
   dialogs: [] as any[],
   inputs: [] as any[],
   rawButtons: [] as any[],
+  switchFields: [] as any[],
   textareas: [] as any[],
 }));
 
@@ -40,6 +42,19 @@ vi.mock("@subboost/ui/components/ui/button", () => ({
     return React.createElement("button", props, props.children);
   },
 }));
+vi.mock("@subboost/ui/components/ui/choice-group", () => ({
+  ChoiceGroup: (props: any) => React.createElement("div", null, props.children),
+  ChoiceChip: (props: any) => {
+    mocks.choiceChips.push(props);
+    return React.createElement("button", { onClick: props.onClick, disabled: props.disabled }, props.label);
+  },
+}));
+vi.mock("@subboost/ui/components/ui/switch-field", () => ({
+  SwitchField: (props: any) => {
+    mocks.switchFields.push(props);
+    return React.createElement("div", null, props.label, props.description);
+  },
+}));
 vi.mock("@subboost/ui/components/ui/dialog", () => ({
   Dialog: (props: any) => {
     mocks.dialogs.push(props);
@@ -69,9 +84,11 @@ import { TemplateUploadDialog } from "./template-upload-dialog";
 
 function renderDialog(overrides: Partial<React.ComponentProps<typeof TemplateUploadDialog>> = {}) {
   mocks.buttons = [];
+  mocks.choiceChips = [];
   mocks.dialogs = [];
   mocks.inputs = [];
   mocks.rawButtons = [];
+  mocks.switchFields = [];
   mocks.textareas = [];
   const props = {
     open: true,
@@ -113,10 +130,10 @@ describe("TemplateUploadDialog", () => {
 
     mocks.inputs[0].onChange({ target: { value: "New template" } });
     mocks.textareas[0].onChange({ target: { value: "New description" } });
-    mocks.buttons.find((button) => button.children === "配置模板").onClick();
-    mocks.buttons.find((button) => button.children === "YAML（开发中）").onClick();
-    mocks.rawButtons[0].onClick();
-    mocks.rawButtons[1].onClick();
+    mocks.choiceChips.find((chip) => chip.label === "配置模板").onClick();
+    mocks.choiceChips.find((chip) => chip.label === "YAML（开发中）").onClick();
+    mocks.switchFields[0].onCheckedChange(true);
+    mocks.switchFields[1].onCheckedChange(true);
     mocks.buttons.at(-2).onClick();
     mocks.buttons.at(-1).onClick();
 
@@ -167,8 +184,8 @@ describe("TemplateUploadDialog", () => {
     expect(html).toContain("公开模板");
     expect(html).toContain("其他用户可以搜索和使用此模板");
     expect(html).toContain("globe-icon");
-    expect(mocks.rawButtons).toHaveLength(1);
-    mocks.rawButtons[0].onClick();
+    expect(mocks.switchFields).toHaveLength(1);
+    mocks.switchFields[0].onCheckedChange(false);
     expect(props.onPublicChange).toHaveBeenCalledWith(false);
   });
 
@@ -180,7 +197,7 @@ describe("TemplateUploadDialog", () => {
 
     expect(html).toContain("默认模板");
     expect(html).toContain("将展示在默认模板中");
-    mocks.rawButtons[1].onClick();
+    expect(mocks.switchFields[1]).toEqual(expect.objectContaining({ disabled: true }));
     expect(props.onPublicChange).not.toHaveBeenCalled();
   });
 });

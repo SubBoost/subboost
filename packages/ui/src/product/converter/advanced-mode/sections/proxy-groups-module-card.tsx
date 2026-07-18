@@ -1,10 +1,16 @@
 "use client";
 
 import * as React from "react";
-import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, ChevronRight, HelpCircle, Pencil, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
+import {
+  Popover,
+  PopoverArrow,
+  PopoverContent,
+  PopoverTrigger,
+} from "@subboost/ui/components/ui/popover";
 import { Switch } from "@subboost/ui/components/ui/switch";
 import {
   getEffectiveModuleRuleItems,
@@ -38,20 +44,18 @@ function ModuleHintPopover({ moduleId }: { moduleId: string }) {
   const label = isGemini ? "Gemini 分流说明" : "谷歌学术分流说明";
 
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
+    <Popover>
+      <PopoverTrigger asChild>
+        <IconButton
+          label={label}
+          variant="ghost"
           className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          aria-label={label}
-          title={label}
           onClick={(e) => e.stopPropagation()}
         >
           <HelpCircle className="h-3.5 w-3.5" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
+        </IconButton>
+      </PopoverTrigger>
+        <PopoverContent
           side="bottom"
           align="start"
           sideOffset={8}
@@ -86,10 +90,9 @@ function ModuleHintPopover({ moduleId }: { moduleId: string }) {
               </ul>
             </div>
           )}
-          <Popover.Arrow className="fill-white/10" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+          <PopoverArrow className="fill-white/10" />
+        </PopoverContent>
+    </Popover>
   );
 }
 
@@ -250,19 +253,23 @@ export function ProxyGroupsModuleCard({
       <div
         className={cn(
           "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-2 py-2",
-          hasExpandedContent && "cursor-pointer transition-colors hover:bg-white/5"
+          hasExpandedContent && "transition-colors hover:bg-white/[0.03]"
         )}
-        onClick={() => {
-          if (hasExpandedContent) onToggleRulesExpanded();
-        }}
-        title={hasExpandedContent ? (isRulesExpanded ? "收起" : "展开") : undefined}
       >
         {!isEditing && (hasExpandedContent ? (
-          isRulesExpanded ? (
-            <ChevronDown className="h-4 w-4 shrink-0 text-white/50" />
-          ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-white/50" />
-          )
+          <IconButton
+            label={isRulesExpanded ? `收起 ${display.full}` : `展开 ${display.full}`}
+            variant="ghost"
+            className="h-6 w-6 rounded-md text-white/50"
+            aria-expanded={isRulesExpanded}
+            onClick={onToggleRulesExpanded}
+          >
+            {isRulesExpanded ? (
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            )}
+          </IconButton>
         ) : (
           <span className="h-4 w-4 shrink-0" />
         ))}
@@ -270,7 +277,6 @@ export function ProxyGroupsModuleCard({
           {isEditing ? (
             <div
               className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1"
-              onClick={(e) => e.stopPropagation()}
             >
               <div
                 className={cn(
@@ -359,8 +365,9 @@ export function ProxyGroupsModuleCard({
         </div>
 
         {!isEditing && (
-          <div className="flex shrink-0 items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex shrink-0 items-center justify-end gap-2">
             <Switch
+              aria-label={`启用 ${display.full} 分流组`}
               checked={isEnabled}
               onCheckedChange={onToggleEnabled}
               onClick={(e) => e.stopPropagation()}

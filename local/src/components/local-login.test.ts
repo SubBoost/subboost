@@ -181,7 +181,7 @@ describe("local login component", () => {
 
     await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });
 
-    expect(setters[6]).toHaveBeenCalledWith("密码至少需要 10 个字符");
+    expect(setters[5]).toHaveBeenCalledWith("密码至少需要 10 个字符");
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -197,7 +197,7 @@ describe("local login component", () => {
 
     await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });
 
-    expect(setters[6]).toHaveBeenCalledWith("两次输入的密码不一致，请重新确认");
+    expect(setters[5]).toHaveBeenCalledWith("两次输入的密码不一致，请重新确认");
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -208,7 +208,6 @@ describe("local login component", () => {
       0: { setupRequired: false, authenticated: false },
       1: "admin",
       2: "secret",
-      4: false,
     });
 
     mocks.inputs.find((input) => input.placeholder === "管理员账号").onChange({ target: { value: "root" } });
@@ -218,8 +217,8 @@ describe("local login component", () => {
 
     expect(setters[1]).toHaveBeenCalledWith("root");
     expect(setters[2]).toHaveBeenCalledWith("next");
+    expect((setters[7] as any).lastValue).toBe(true);
     expect(setters[4]).toHaveBeenCalledWith(true);
-    expect(setters[5]).toHaveBeenCalledWith(true);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/auth/login",
       expect.objectContaining({
@@ -228,7 +227,7 @@ describe("local login component", () => {
       }),
     );
     expect(win.location.href).toBe("/dashboard");
-    expect(setters[5]).toHaveBeenLastCalledWith(false);
+    expect(setters[4]).toHaveBeenLastCalledWith(false);
   });
 
   it("submits setup requests and reports server or load errors", async () => {
@@ -239,8 +238,9 @@ describe("local login component", () => {
       1: "admin",
       2: "long-secret",
       3: "long-secret",
-      4: true,
-      7: "setup-secret",
+      6: "setup-secret",
+      7: true,
+      8: true,
     });
 
     expect(mocks.inputs.find((input) => input.placeholder === "密码").type).toBe("text");
@@ -259,15 +259,15 @@ describe("local login component", () => {
         body: JSON.stringify({ username: "admin", password: "long-secret", passwordConfirm: "long-secret" }),
       }),
     );
-    expect(setters[6]).toHaveBeenCalledWith("用户名已存在");
-    expect(setters[5]).toHaveBeenLastCalledWith(false);
+    expect(setters[5]).toHaveBeenCalledWith("用户名已存在");
+    expect(setters[4]).toHaveBeenLastCalledWith(false);
 
     (globalThis as any).fetch = vi.fn(async () => {
       throw new Error("加载失败");
     });
     const load = renderLogin({}, true);
     await flushPromises();
-    expect(load.setters[6]).toHaveBeenCalledWith("加载失败");
+    expect(load.setters[5]).toHaveBeenCalledWith("加载失败");
   });
 
   it("requires the installer fragment and clears it after successful setup", async () => {
@@ -281,7 +281,7 @@ describe("local login component", () => {
     });
     expect(missing.html).toContain("安装器输出的初始化链接");
     await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });
-    expect(missing.setters[6]).toHaveBeenCalledWith("缺少初始化令牌，请使用安装器输出的初始化链接");
+    expect(missing.setters[5]).toHaveBeenCalledWith("缺少初始化令牌，请使用安装器输出的初始化链接");
     expect(globalThis.fetch).not.toHaveBeenCalled();
 
     const win = installWindow("#setup-token=setup-secret");
@@ -291,7 +291,7 @@ describe("local login component", () => {
       1: "admin",
       2: "long-secret",
       3: "long-secret",
-      7: "setup-secret",
+      6: "setup-secret",
     });
     await mocks.forms[0].onSubmit({ preventDefault: vi.fn() });
 

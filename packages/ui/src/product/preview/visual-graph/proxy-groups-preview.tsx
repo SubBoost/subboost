@@ -185,8 +185,9 @@ export function ProxyGroupsPreview({
                 )}
               />
             )}
-            <button
-              onClick={() => hasRules && onToggleExpand(group.id)}
+            <div
+              role="group"
+              aria-label={`${getDisplayName(group.name)} 代理组`}
               onDragOver={(e) => {
                 if (!canReorderGroups) return;
                 const activeId = (
@@ -243,11 +244,12 @@ export function ProxyGroupsPreview({
               }}
               className={cn(
                 "w-full flex items-center gap-2 p-2 text-left",
-                hasRules && "cursor-pointer hover:bg-white/5",
               )}
             >
-              <span
+              <button
+                type="button"
                 draggable={canReorderGroups}
+                disabled={!canReorderGroups}
                 onDragStart={(e) => {
                   if (!canReorderGroups) return;
                   e.stopPropagation();
@@ -287,16 +289,24 @@ export function ProxyGroupsPreview({
                   onSetDraggingGroupId(null);
                   onSetDragOverGroup(null);
                 }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (!canReorderGroups || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+                  event.preventDefault();
+                  const currentIndex = displayGroups.findIndex((item) => item.id === group.id);
+                  const targetIndex = event.key === "ArrowUp" ? currentIndex - 1 : currentIndex + 1;
+                  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= displayGroups.length) return;
+                  const nextOrder = displayGroups.map((item) => item.id);
+                  [nextOrder[currentIndex], nextOrder[targetIndex]] = [nextOrder[targetIndex], nextOrder[currentIndex]];
+                  onSetProxyGroupOrder(nextOrder);
+                }}
                 className={cn(
-                  "flex h-4 w-4 items-center justify-center text-white/40 hover:text-white/70",
+                  "ml-2 flex h-6 w-6 flex-none items-center justify-center text-white/40 hover:text-white/70 disabled:opacity-30",
                   canReorderGroups
                     ? "cursor-grab active:cursor-grabbing"
                     : "cursor-default opacity-30",
                 )}
-                title="拖动排序"
-                aria-label="拖动排序"
+                title="拖动排序（也可用方向键）"
+                aria-label="调整代理组顺序"
               >
                 <span className="grid grid-cols-2 gap-0.5">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -306,7 +316,15 @@ export function ProxyGroupsPreview({
                     />
                   ))}
                 </span>
-              </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onToggleExpand(group.id)}
+                disabled={!hasRules}
+                aria-expanded={hasRules ? isExpanded : undefined}
+                className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-left disabled:cursor-default"
+              >
 
               {hasRules ? (
                 isExpanded ? (
@@ -345,7 +363,8 @@ export function ProxyGroupsPreview({
                   </span>
                 )}
               </div>
-            </button>
+              </button>
+            </div>
 
             {isDialerGroup && (
               <div className="border-t border-white/10 p-2">

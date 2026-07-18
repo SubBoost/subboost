@@ -3,9 +3,11 @@
 import type * as React from "react";
 import { Check, Copy, Link as LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
+import { FormField } from "@subboost/ui/components/ui/form-field";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
-import { Label } from "@subboost/ui/components/ui/label";
 import { Switch } from "@subboost/ui/components/ui/switch";
+import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { SmartNodeMatchingHelp } from "@subboost/ui/components/subscription/smart-node-matching-help";
 import {
   Dialog,
@@ -83,15 +85,14 @@ export function SubscriptionLinkDialog({
 
         {!subscriptionUrl ? (
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>订阅名称</Label>
+            <FormField label="订阅名称">
               <Input
                 placeholder="例如：我的配置"
                 value={subscriptionName}
                 onChange={(e) => setSubscriptionName(e.target.value)}
                 maxLength={100}
               />
-            </div>
+            </FormField>
 
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
               <div className="flex items-center justify-between gap-4">
@@ -101,22 +102,28 @@ export function SubscriptionLinkDialog({
                     <SmartNodeMatchingHelp enabled={smartNodeMatchingEnabled} />
                   </div>
                 </div>
-                <Switch checked={smartNodeMatchingEnabled} onCheckedChange={setSmartNodeMatchingEnabled} />
+                <Switch
+                  checked={smartNodeMatchingEnabled}
+                  onCheckedChange={setSmartNodeMatchingEnabled}
+                  aria-label="更新时智能匹配节点"
+                />
               </div>
 
               <div className="my-3 border-t border-white/10" />
 
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm text-white/80">启用自动更新</p>
-                  <p className="mt-1 text-xs text-white/45">开启后服务器会按设定间隔刷新缓存</p>
-                </div>
-                <Switch checked={autoUpdateEnabled} onCheckedChange={setAutoUpdateEnabled} />
-              </div>
+              <SwitchField
+                label="启用自动更新"
+                description="开启后服务器会按设定间隔刷新缓存"
+                checked={autoUpdateEnabled}
+                onCheckedChange={setAutoUpdateEnabled}
+              />
 
               {autoUpdateEnabled && (
-                <div className="mt-4 space-y-2">
-                  <Label>自动更新间隔（小时）</Label>
+                <FormField
+                  label="自动更新间隔（小时）"
+                  description={`最小 ${minAutoUpdateLabel}，按创建时间计时`}
+                  className="mt-4"
+                >
                   <Input
                     type="number"
                     min={autoUpdatePolicy.minHours}
@@ -124,8 +131,7 @@ export function SubscriptionLinkDialog({
                     value={autoUpdateHours}
                     onChange={(e) => setAutoUpdateHours(Number(e.target.value))}
                   />
-                  <p className="text-xs text-white/45">最小 {minAutoUpdateLabel}，按创建时间计时</p>
-                </div>
+                </FormField>
               )}
             </div>
 
@@ -149,12 +155,12 @@ export function SubscriptionLinkDialog({
         ) : (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">订阅链接</label>
+              <p className="text-sm font-medium">订阅链接</p>
               <div className="flex gap-2">
                 <Input value={subscriptionUrl} readOnly className="font-mono text-xs" />
-                <Button
+                <IconButton
+                  label={copied ? "已复制订阅链接" : "复制订阅链接"}
                   variant="outline"
-                  size="icon"
                   onClick={handleCopyUrl}
                   className="flex-shrink-0"
                 >
@@ -163,7 +169,7 @@ export function SubscriptionLinkDialog({
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
-                </Button>
+                </IconButton>
               </div>
             </div>
 

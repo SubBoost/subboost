@@ -3,8 +3,9 @@
 import * as React from "react";
 import { ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
+import { Button } from "@subboost/ui/components/ui/button";
 import { confirmDialog } from "@subboost/ui/components/ui/confirm-dialog";
-import { Switch } from "@subboost/ui/components/ui/switch";
+import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -298,10 +299,10 @@ export function ProxyGroupsCategories() {
 
   return (
     <>
-      <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_128px] gap-3">
         <div className="min-w-0 space-y-1">
           <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>
-            <label className={PROXY_GROUP_SECTION_LABEL_CLASS}>规则集 URL</label>
+            <p className={PROXY_GROUP_SECTION_LABEL_CLASS}>规则集 URL</p>
           </div>
           <div
             className="min-w-0 rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/65"
@@ -310,33 +311,33 @@ export function ProxyGroupsCategories() {
             <span className="block truncate">{ruleProviderBaseUrl}</span>
           </div>
         </div>
-        <div className="min-w-0 space-y-1">
-          <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>
-            <label className="text-xs text-amber-300">高级模式</label>
-          </div>
-          <div className="flex h-9 w-full items-center justify-center gap-1 rounded-md border border-white/10 bg-white/5 px-2">
-            <span className="text-[10px] text-white/65">
-              {proxyGroupAdvancedModeEnabled ? "已开启" : "未开启"}
-            </span>
-            <Switch checked={proxyGroupAdvancedModeEnabled} onCheckedChange={setProxyGroupAdvancedModeEnabled} />
-          </div>
+        <div className="min-w-0 self-end">
+          <SwitchField
+            label="高级模式"
+            description={proxyGroupAdvancedModeEnabled ? "已开启" : "未开启"}
+            checked={proxyGroupAdvancedModeEnabled}
+            onCheckedChange={setProxyGroupAdvancedModeEnabled}
+            density="compact"
+          />
         </div>
       </div>
 
       <div className="space-y-1">
         <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>
-          <label className={PROXY_GROUP_SECTION_LABEL_CLASS}>分流规则组</label>
+          <p className={PROXY_GROUP_SECTION_LABEL_CLASS}>分流规则组</p>
           {hiddenModules.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
+                <Button
                   type="button"
-                  className="ml-auto inline-flex h-6 items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 text-[10px] text-white/60 transition-colors hover:bg-white/10 hover:text-white/85"
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto h-6 gap-1 rounded-md px-2 text-[10px] text-white/60 hover:bg-white/10 hover:text-white/85"
                   title="恢复隐藏分组"
                 >
                   <RotateCcw className="h-3 w-3" />
                   已隐藏 {hiddenModules.length}
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="text-xs">恢复隐藏分组</DropdownMenuLabel>

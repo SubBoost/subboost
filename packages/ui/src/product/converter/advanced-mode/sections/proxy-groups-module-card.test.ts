@@ -14,8 +14,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@radix-ui/react-popover", () => ({
+  Anchor: (props: any) => React.createElement("span", null, props.children),
   Arrow: () => null,
   Content: ({ align, children, className, side }: any) => React.createElement("div", { align, className, side }, children),
+  Close: (props: any) => React.createElement("button", null, props.children),
   Portal: (props: any) => React.createElement("div", null, props.children),
   Root: (props: any) => React.createElement("div", null, props.children),
   Trigger: (props: any) => React.createElement("div", null, props.children),

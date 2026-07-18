@@ -202,24 +202,25 @@ describe("ProxyGroupsPreview", () => {
     vi.useFakeTimers();
     const props = makeProps({ dragOverGroup: null });
     const tree = renderTree(props);
-    const buttons = collectElements(tree, (element) => element.type === "button");
+    const groupRows = collectElements(tree, (element) => element.props.role === "group" && typeof element.props.onDragOver === "function");
+    const disclosureButtons = collectElements(tree, (element) => element.type === "button" && "aria-expanded" in element.props);
 
-    buttons[0].props.onClick();
+    disclosureButtons[0].props.onClick();
     expect(props.onToggleExpand).toHaveBeenCalledWith("module:select");
 
-    const rejectButton = buttons[3];
+    const rejectRow = groupRows[3];
     const dragEvent = {
       clientY: 25,
       currentTarget: { getBoundingClientRect: () => ({ top: 10, height: 20 }) },
       dataTransfer: { getData: vi.fn(() => "module:auto"), dropEffect: "" },
       preventDefault: vi.fn(),
     };
-    rejectButton.props.onDragOver(dragEvent);
+    rejectRow.props.onDragOver(dragEvent);
     expect(dragEvent.preventDefault).toHaveBeenCalled();
     expect(dragEvent.dataTransfer.dropEffect).toBe("move");
     expect(props.onSetDragOverGroup).toHaveBeenCalledWith({ id: "custom:reject", position: "after" });
 
-    rejectButton.props.onDrop(dragEvent);
+    rejectRow.props.onDrop(dragEvent);
     expect(props.onSetProxyGroupOrder).toHaveBeenCalledWith([
       "module:select",
       "dialer:relay",
@@ -232,8 +233,8 @@ describe("ProxyGroupsPreview", () => {
     expect(props.onSetDraggingGroupId).toHaveBeenLastCalledWith(null);
 
     const dragLeaveProps = makeProps({ dragOverGroup: { id: "custom:reject", position: "before" } });
-    const dragLeaveButtons = collectElements(renderTree(dragLeaveProps), (element) => element.type === "button");
-    dragLeaveButtons[3].props.onDragLeave();
+    const dragLeaveRows = collectElements(renderTree(dragLeaveProps), (element) => element.props.role === "group" && typeof element.props.onDragOver === "function");
+    dragLeaveRows[3].props.onDragLeave();
     expect(dragLeaveProps.onSetDragOverGroup).toHaveBeenCalledWith(null);
 
     const remove = vi.fn();
@@ -243,7 +244,7 @@ describe("ProxyGroupsPreview", () => {
       getBoundingClientRect: () => ({ width: 320 }),
     };
     vi.stubGlobal("document", { body: { appendChild: vi.fn() } });
-    const handles = collectElements(tree, (element) => element.type === "span" && element.props.title === "拖动排序");
+    const handles = collectElements(tree, (element) => element.type === "button" && element.props.title === "拖动排序（也可用方向键）");
     const stopPropagation = vi.fn();
     handles[0].props.onDragStart({
       currentTarget: { closest: vi.fn(() => card) },
@@ -261,8 +262,7 @@ describe("ProxyGroupsPreview", () => {
     vi.runAllTimers();
     expect(remove).toHaveBeenCalled();
 
-    handles[0].props.onPointerDown({ stopPropagation });
-    handles[0].props.onClick({ stopPropagation });
+    handles[0].props.onKeyDown({ key: "ArrowDown", preventDefault: vi.fn() });
     handles[0].props.onDragEnd();
     expect(props.onSetDragOverGroup).toHaveBeenLastCalledWith(null);
     expect(props.onSetDraggingGroupId).toHaveBeenLastCalledWith(null);
@@ -274,7 +274,7 @@ describe("ProxyGroupsPreview", () => {
       draggingGroupId: null,
       dragOverGroup: null,
     });
-    const buttons = collectElements(renderTree(props), (element) => element.type === "button");
+    const groupRows = collectElements(renderTree(props), (element) => element.props.role === "group" && typeof element.props.onDragOver === "function");
     const event = {
       clientY: 0,
       currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 20 }) },
@@ -282,22 +282,22 @@ describe("ProxyGroupsPreview", () => {
       preventDefault: vi.fn(),
     };
 
-    buttons[0].props.onDragOver(event);
-    buttons[0].props.onDrop(event);
+    groupRows[0].props.onDragOver(event);
+    groupRows[0].props.onDrop(event);
 
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(props.onSetProxyGroupOrder).not.toHaveBeenCalled();
     expect(props.onSetDragOverGroup).not.toHaveBeenCalled();
 
     const sameActiveProps = makeProps({ draggingGroupId: "module:select", dragOverGroup: { id: "module:select", position: "before" } });
-    const sameActiveButtons = collectElements(renderTree(sameActiveProps), (element) => element.type === "button");
-    sameActiveButtons[0].props.onDragOver({
+    const sameActiveRows = collectElements(renderTree(sameActiveProps), (element) => element.props.role === "group" && typeof element.props.onDragOver === "function");
+    sameActiveRows[0].props.onDragOver({
       clientY: 0,
       currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 20 }) },
       dataTransfer: { getData: vi.fn(() => "module:select"), dropEffect: "" },
       preventDefault: vi.fn(),
     });
-    sameActiveButtons[0].props.onDrop({
+    sameActiveRows[0].props.onDrop({
       clientY: 0,
       currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 20 }) },
       dataTransfer: { getData: vi.fn(() => "module:select"), dropEffect: "" },
@@ -309,8 +309,8 @@ describe("ProxyGroupsPreview", () => {
       draggingGroupId: "module:auto",
       dragOverGroup: { id: "custom:reject", position: "after" },
     });
-    const unchangedButtons = collectElements(renderTree(unchangedDragOverProps), (element) => element.type === "button");
-    unchangedButtons[3].props.onDragOver({
+    const unchangedRows = collectElements(renderTree(unchangedDragOverProps), (element) => element.props.role === "group" && typeof element.props.onDragOver === "function");
+    unchangedRows[3].props.onDragOver({
       clientY: 25,
       currentTarget: { getBoundingClientRect: () => ({ top: 10, height: 20 }) },
       dataTransfer: { getData: vi.fn(() => "module:auto"), dropEffect: "" },
@@ -321,7 +321,7 @@ describe("ProxyGroupsPreview", () => {
     vi.useFakeTimers();
     const dragStartProps = makeProps();
     const dragStartTree = renderTree(dragStartProps);
-    const handles = collectElements(dragStartTree, (element) => element.type === "span" && element.props.title === "拖动排序");
+    const handles = collectElements(dragStartTree, (element) => element.type === "button" && element.props.title === "拖动排序（也可用方向键）");
     handles[0].props.onDragStart({
       currentTarget: { closest: vi.fn(() => null) },
       dataTransfer: {
@@ -359,7 +359,7 @@ describe("ProxyGroupsPreview", () => {
       draggingGroupId: null,
       dragOverGroup: null,
     });
-    const buttons = collectElements(renderTree(props), (element) => element.type === "button");
+    const groupRows = collectElements(renderTree(props), (element) => element.props.role === "group" && typeof element.props.onDragOver === "function");
     const beforeEvent = {
       clientY: 5,
       currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 20 }) },
@@ -367,11 +367,11 @@ describe("ProxyGroupsPreview", () => {
       preventDefault: vi.fn(),
     };
 
-    buttons[3].props.onDragOver(beforeEvent);
+    groupRows[3].props.onDragOver(beforeEvent);
     expect(beforeEvent.preventDefault).toHaveBeenCalled();
     expect(props.onSetDragOverGroup).toHaveBeenCalledWith({ id: "custom:reject", position: "before" });
 
-    buttons[3].props.onDrop(beforeEvent);
+    groupRows[3].props.onDrop(beforeEvent);
     expect(props.onSetProxyGroupOrder).toHaveBeenCalledWith([
       "module:select",
       "dialer:relay",
@@ -381,7 +381,7 @@ describe("ProxyGroupsPreview", () => {
       "custom:fallback",
     ]);
 
-    buttons[0].props.onDragLeave();
+    groupRows[0].props.onDragLeave();
     expect(props.onSetDragOverGroup).not.toHaveBeenCalledWith({ id: "module:select", position: expect.any(String) });
 
     const singleProps = makeProps({
@@ -389,7 +389,7 @@ describe("ProxyGroupsPreview", () => {
       draggingGroupId: null,
       dragOverGroup: null,
     });
-    const singleHandles = collectElements(renderTree(singleProps), (element) => element.type === "span" && element.props.title === "拖动排序");
+    const singleHandles = collectElements(renderTree(singleProps), (element) => element.type === "button" && element.props.title === "拖动排序（也可用方向键）");
     singleHandles[0].props.onDragStart({
       currentTarget: { closest: vi.fn() },
       dataTransfer: {

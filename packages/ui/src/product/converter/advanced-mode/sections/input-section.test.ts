@@ -77,6 +77,8 @@ vi.mock("react/jsx-runtime", async (importOriginal) => {
 });
 
 vi.mock("@radix-ui/react-popover", () => ({
+  Anchor: (props: any) => props.children,
+  Close: (props: any) => props.children,
   Root: (props: any) => props.children,
   Trigger: (props: any) => props.children,
   Portal: (props: any) => props.children,
@@ -88,8 +90,11 @@ vi.mock("lucide-react", () => ({
   Check: () => null,
   ChevronDown: () => null,
   ChevronUp: () => null,
+  CircleHelp: () => null,
+  FileCode: () => null,
   HelpCircle: () => null,
   Loader2: () => null,
+  Link2: () => null,
   Maximize2: () => null,
   Menu: () => null,
   Plus: () => null,
@@ -123,6 +128,12 @@ vi.mock("@subboost/core/node-name-template", () => ({
   DEFAULT_NODE_NAME_TEMPLATE: "[{tag}] {name}",
   formatNodeNameFromTemplate: ({ originName, tag, template }: any) => `${template || "{name}"}:${tag || ""}:${originName}`,
 }));
+vi.mock("@subboost/ui/components/ui/icon-button", () => ({
+  IconButton: (props: any) => {
+    mocks.captures.iconButtons.push(props);
+    return null;
+  },
+}));
 vi.mock("@subboost/ui/lib/utils", () => ({ cn: (...parts: unknown[]) => parts.filter(Boolean).join(" ") }));
 vi.mock("@subboost/ui/store/config-store", () => {
   const useConfigStore = () => mocks.store;
@@ -143,6 +154,20 @@ vi.mock("@subboost/ui/product/subscription/source-order", () => ({ moveSubscript
 vi.mock("@subboost/ui/product/converter/source-display-label", () => ({
   buildSourceDisplayLabel: ({ typeLabel, order, total, tag }: any) => `${typeLabel} ${order}/${total}${tag ? ` ${tag}` : ""}`,
 }));
+vi.mock("@subboost/ui/product/converter/source-controls", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@subboost/ui/product/converter/source-controls")>();
+  return {
+    ...actual,
+    AddSourceMenu: (props: any) => {
+      mocks.captures.addSourceMenus.push(props);
+      return null;
+    },
+    SourceTypeChoices: (props: any) => {
+      mocks.captures.sourceTypeChoices.push(props);
+      return null;
+    },
+  };
+});
 vi.mock("@subboost/ui/product/interactions", () => ({ useProductInteractionAdapter: () => mocks.interactions }));
 vi.mock("../constants", () => ({
   sourceTypeInfo: {
@@ -202,7 +227,10 @@ function renderSection(overrides: Record<number, unknown> = {}, props = { isExpa
   stateMock.setters = [];
   mocks.captures.buttons = [];
   mocks.captures.inputs = [];
+  mocks.captures.iconButtons = [];
+  mocks.captures.addSourceMenus = [];
   mocks.captures.rawButtons = [];
+  mocks.captures.sourceTypeChoices = [];
   mocks.captures.textareas = [];
   try {
     const html = renderToStaticMarkup(React.createElement(InputSection, props));
@@ -212,17 +240,18 @@ function renderSection(overrides: Record<number, unknown> = {}, props = { isExpa
   }
 }
 
-function findRawButton(match: (props: any) => boolean): any {
-  const button = mocks.captures.rawButtons.find(match);
-  expect(button).toBeTruthy();
-  return button;
-}
-
 describe("advanced mode InputSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stateMock.runEffects = false;
-    mocks.captures = { buttons: [], inputs: [], textareas: [] };
+    mocks.captures = {
+      addSourceMenus: [],
+      buttons: [],
+      iconButtons: [],
+      inputs: [],
+      sourceTypeChoices: [],
+      textareas: [],
+    };
     mocks.userInfoDisplay = { traffic: "1 GB", expire: "2026-01-01" };
     mocks.markSourceAsPendingImport.mockImplementation((source) => ({ ...source, pendingImport: true }));
     mocks.moveSubscriptionSource.mockImplementation((sources) => sources.slice().reverse());
@@ -252,7 +281,7 @@ describe("advanced mode InputSection", () => {
     );
     expect(mocks.captures.inputs.some((props: any) => props.value === "https://example.com/sub")).toBe(true);
     expect(mocks.captures.textareas.some((props: any) => props.value === "ss://node")).toBe(true);
-    expect(mocks.captures.buttons.at(-1)).toEqual(expect.objectContaining({ variant: "outline", size: "sm" }));
+    expect(mocks.captures.addSourceMenus[0]).toEqual(expect.objectContaining({ open: true, compact: true }));
   });
 
   it("updates source content and metadata through captured fields", () => {
@@ -371,10 +400,7 @@ describe("advanced mode InputSection", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(123456);
     try {
       renderSection({ 0: true });
-      const addYamlButton = mocks.captures.rawButtons.filter((props: any) =>
-        String(props.className).includes("w-full flex items-center")
-      )[1];
-      addYamlButton.onClick();
+      mocks.captures.addSourceMenus[0].onAdd("yaml");
 
       expect(mocks.store.setSources).toHaveBeenCalledWith([
         urlSource,
@@ -391,15 +417,12 @@ describe("advanced mode InputSection", () => {
       mocks.store.setSources.mockClear();
       mocks.interactions.sourceAdded.mockClear();
       renderSection({ 0: true });
-      const addUrlButton = mocks.captures.rawButtons.filter((props: any) =>
-        String(props.className).includes("w-full flex items-center")
-      )[0];
-      addUrlButton.onClick();
+      mocks.captures.addSourceMenus[0].onAdd("url");
       expect(mocks.toast).not.toHaveBeenCalled();
 
       mocks.userStore = { user: { isAdmin: false, quota: { maxImportSourcesPerType: 1 } } };
       renderSection({ 0: true });
-      findRawButton((props) => String(props.className).includes("w-full flex items-center")).onClick();
+      mocks.captures.addSourceMenus[0].onAdd("url");
       expect(mocks.toast).toHaveBeenCalledWith({ title: "每种导入方式最多 1 个", variant: "warning" });
 
       mocks.toast.mockClear();
@@ -409,7 +432,7 @@ describe("advanced mode InputSection", () => {
         { ...urlSource, id: "s2" },
       ];
       renderSection({ 0: true });
-      findRawButton((props) => String(props.className).includes("w-full flex items-center")).onClick();
+      mocks.captures.addSourceMenus[0].onAdd("url");
       expect(mocks.toast).toHaveBeenCalledWith({
         title: "未登录用户每种导入方式最多 2 个（登录后可提升）",
         variant: "warning",
@@ -419,7 +442,7 @@ describe("advanced mode InputSection", () => {
       mocks.userStore = { user: { isAdmin: false, quota: { maxImportSourcesPerType: "bad" } } };
       mocks.store.sources = Array.from({ length: 5 }, (_, index) => ({ ...urlSource, id: `url-${index}` }));
       renderSection({ 0: true });
-      findRawButton((props) => String(props.className).includes("w-full flex items-center")).onClick();
+      mocks.captures.addSourceMenus[0].onAdd("url");
       expect(mocks.toast).toHaveBeenCalledWith({ title: "每种导入方式最多 5 个", variant: "warning" });
     } finally {
       now.mockRestore();
@@ -429,7 +452,7 @@ describe("advanced mode InputSection", () => {
   it("switches source types, moves sources, and removes sources", () => {
     renderSection();
 
-    findRawButton((props) => props.title === "YAML 配置").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "url").onChange("yaml");
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "",
@@ -445,7 +468,7 @@ describe("advanced mode InputSection", () => {
     expect(mocks.store.setSources).toHaveBeenCalledWith(expect.any(Array));
 
     mocks.store.setSources.mockClear();
-    findRawButton((props) => props.title === "订阅链接").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "url").onChange("url");
     expect(mocks.store.setSources).not.toHaveBeenCalled();
 
     mocks.store.sources = [
@@ -459,7 +482,7 @@ describe("advanced mode InputSection", () => {
       },
     ];
     renderSection();
-    findRawButton((props) => props.title === "订阅链接").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "yaml").onChange("url");
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "url",
@@ -471,19 +494,19 @@ describe("advanced mode InputSection", () => {
 
     mocks.store.sources = [urlSource, nodesSource];
     renderSection();
-    findRawButton((props) => props["aria-label"] === "下移" && !props.disabled).onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "下移" && !props.disabled).onClick();
     expect(mocks.moveSubscriptionSource).toHaveBeenCalledWith(mocks.store.sources, "s1", "down");
     expect(mocks.store.setSources).toHaveBeenCalledWith([nodesSource, urlSource]);
 
     mocks.store.setSources.mockClear();
-    findRawButton((props) => props["aria-label"] === "上移" && !props.disabled).onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "上移" && !props.disabled).onClick();
     expect(mocks.moveSubscriptionSource).toHaveBeenCalledWith(mocks.store.sources, "s2", "up");
 
-    findRawButton((props) => props.title === "高级编辑").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "高级编辑").onClick();
     expect(stateMock.setters[1]).toHaveBeenCalledWith(expect.any(String));
 
     mocks.store.setSources.mockClear();
-    findRawButton((props) => props.title === "删除").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "删除导入源").onClick();
     expect(mocks.store.setSources).toHaveBeenCalledWith([nodesSource]);
   });
 
@@ -491,7 +514,7 @@ describe("advanced mode InputSection", () => {
     mocks.userStore = { user: { isAdmin: false, quota: { maxImportSourcesPerType: 1 } } };
     renderSection();
 
-    findRawButton((props) => props.title === "节点链接").onClick();
+    mocks.captures.sourceTypeChoices.find((props: any) => props.value === "url").onChange("nodes");
 
     expect(mocks.toast).toHaveBeenCalledWith({ title: "每种导入方式最多 1 个", variant: "warning" });
     expect(mocks.store.setSources).not.toHaveBeenCalled();
@@ -499,7 +522,7 @@ describe("advanced mode InputSection", () => {
 
   it("imports sources and reports success, runtime, and validation outcomes", async () => {
     renderSection();
-    findRawButton((props) => props.title === "重新导入").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "重新导入").onClick();
     await Promise.resolve();
     await Promise.resolve();
     expect(mocks.store.parseSingleSource).toHaveBeenCalledWith("s1");
@@ -516,7 +539,7 @@ describe("advanced mode InputSection", () => {
     mocks.store.parseSingleSource.mockClear();
     mocks.store.sources = [{ ...urlSource, parsed: false, error: "failed", nodeCount: 0 }];
     renderSection();
-    findRawButton((props) => props.title === "导入此源").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入此源").onClick();
     await Promise.resolve();
     await Promise.resolve();
     expect(mocks.interactions.sourceImported).toHaveBeenCalledWith(expect.objectContaining({ result: "runtimeError" }));
@@ -524,7 +547,7 @@ describe("advanced mode InputSection", () => {
     mocks.interactions.sourceImported.mockClear();
     mocks.store.sources = [{ ...urlSource, parsed: false, error: undefined, errorInfo: undefined, nodeCount: undefined }];
     renderSection();
-    findRawButton((props) => props.title === "导入此源").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入此源").onClick();
     await Promise.resolve();
     await Promise.resolve();
     expect(mocks.interactions.sourceImported).toHaveBeenCalledWith(expect.objectContaining({ result: "validationError" }));
@@ -535,7 +558,7 @@ describe("advanced mode InputSection", () => {
       mocks.store.sources = [];
     });
     renderSection();
-    findRawButton((props) => props.title === "导入此源").onClick();
+    mocks.captures.iconButtons.find((props: any) => props.label === "导入此源").onClick();
     await Promise.resolve();
     await Promise.resolve();
     expect(mocks.interactions.sourceImported).toHaveBeenCalledWith(expect.objectContaining({ result: "runtimeError" }));
@@ -553,7 +576,7 @@ describe("advanced mode InputSection", () => {
     const { setters } = renderSection();
     expect(mocks.captures.editor).toEqual(expect.objectContaining({ source: null }));
 
-    mocks.captures.buttons.at(-1).onClick();
+    mocks.captures.addSourceMenus[0].onOpenChange(true);
     expect(setters[0]).toHaveBeenCalledWith(true);
 
     mocks.userInfoDisplay = { traffic: "", expire: "" };

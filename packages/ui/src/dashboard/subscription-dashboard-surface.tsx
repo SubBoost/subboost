@@ -354,12 +354,12 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {adapter.renderHeaderActions?.({ user })}
-          <Link href={newSubscriptionHref}>
-            <Button className="gap-2">
+          <Button asChild className="gap-2">
+            <Link href={newSubscriptionHref}>
               <Plus className="h-4 w-4" />
               新建订阅
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -383,12 +383,12 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
               <FileCode className="h-12 w-12 mx-auto text-white/40 mb-4" />
               <h3 className="text-lg font-medium mb-2">暂无订阅</h3>
               <p className="text-white/50 mb-4">创建您的第一个订阅配置</p>
-              <Link href={newSubscriptionHref}>
-                <Button>
+              <Button asChild>
+                <Link href={newSubscriptionHref}>
                   <Plus className="mr-2 h-4 w-4" />
                   新建订阅
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -478,9 +478,9 @@ function LoginPrompt({ loginHref }: { loginHref: string }) {
         <Shield className="h-16 w-16 mx-auto text-white/50" />
         <h1 className="text-2xl font-bold">请先登录</h1>
         <p className="text-white/50">登录后可以管理您的订阅和模板</p>
-        <Link href={loginHref}>
-          <Button size="lg">登录</Button>
-        </Link>
+        <Button asChild size="lg">
+          <Link href={loginHref}>登录</Link>
+        </Button>
       </div>
     </div>
   );
@@ -543,12 +543,12 @@ function SubscriptionRow({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
-        <Link href={editHref}>
-          <Button variant="ghost" size="sm" className="gap-0 sm:gap-2" title="回到首页编辑该订阅（更新后链接不变）">
+        <Button asChild variant="ghost" size="sm" className="gap-0 sm:gap-2" title="回到首页编辑该订阅（更新后链接不变）">
+          <Link href={editHref}>
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">编辑</span>
-          </Button>
-        </Link>
+          </Link>
+        </Button>
         <Button
           variant="ghost"
           size="sm"

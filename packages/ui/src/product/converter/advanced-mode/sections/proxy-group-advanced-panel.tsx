@@ -4,7 +4,9 @@ import * as React from "react";
 import { Plus, X } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
+import { ChoiceChip, ChoiceGroup } from "@subboost/ui/components/ui/choice-group";
 import { confirmDialog } from "@subboost/ui/components/ui/confirm-dialog";
+import { FormField } from "@subboost/ui/components/ui/form-field";
 import { Input } from "@subboost/ui/components/ui/input";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { cn } from "@subboost/ui/lib/utils";
@@ -434,48 +436,49 @@ export function ProxyGroupAdvancedPanel({
 
         <div className="relative p-3 before:absolute before:bottom-3 before:left-0 before:top-3 before:w-px before:bg-white/10">
           <div className={ADVANCED_PANEL_TITLE_CLASS}>地区</div>
-          <div className="flex flex-wrap gap-1.5">
+          <ChoiceGroup label="地区筛选" className="gap-1.5">
             {REGION_PRESETS.map((region) => {
               const active = regions.includes(region.id);
               return (
-                <button
+                <ChoiceChip
                   key={region.id}
-                  type="button"
+                  label={`${region.emoji} ${region.label}`}
+                  selected={active}
                   onClick={() => onChange({ regions: toggleValue(regions, region.id as NodeRegion) })}
                   className={cn(
-                    "rounded border px-2 py-1 text-[10px] transition-colors",
-                    active
-                      ? "border-indigo-400/40 bg-indigo-500/20 text-indigo-100"
-                      : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10",
+                    "min-h-0 rounded px-2 py-1 text-[10px]",
+                    active && "border-indigo-400/40 bg-indigo-500/20 text-indigo-100",
                   )}
-                >
-                  {region.emoji} {region.label}
-                </button>
+                />
               );
             })}
-          </div>
+          </ChoiceGroup>
           <div className="mt-1 text-[10px] text-white/35">不选择表示匹配所有地区</div>
         </div>
 
         <div className="relative space-y-3 p-3 before:absolute before:bottom-3 before:left-0 before:top-3 before:w-px before:bg-white/10">
-          <label className="block">
-            <span className={ADVANCED_PANEL_TITLE_CLASS}>包含正则（可选）</span>
+          <FormField
+            label={<span className="text-[11px] font-medium text-white/50">包含正则（可选）</span>}
+            className="space-y-1"
+          >
             <Input
               value={advanced.includeRegex ?? ""}
               onChange={(event) => onChange({ includeRegex: event.target.value })}
               placeholder="例如: IEPL|专线|家宽"
               className="h-8 border-white/10 bg-white/5 text-xs"
             />
-          </label>
-          <label className="block">
-            <span className={ADVANCED_PANEL_TITLE_CLASS}>排除正则（可选）</span>
+          </FormField>
+          <FormField
+            label={<span className="text-[11px] font-medium text-white/50">排除正则（可选）</span>}
+            className="space-y-1"
+          >
             <Input
               value={advanced.excludeRegex ?? ""}
               onChange={(event) => onChange({ excludeRegex: event.target.value })}
               placeholder="例如: 测试|过期"
               className="h-8 border-white/10 bg-white/5 text-xs"
             />
-          </label>
+          </FormField>
         </div>
       </div>
 
@@ -498,10 +501,11 @@ export function ProxyGroupAdvancedPanel({
             暂无已启用成员
           </div>
         ) : (
-          <div className="max-h-52 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
+          <div role="list" className="max-h-52 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
             {includedMembers.map((member) => (
               <div
                 key={member.key}
+                role="listitem"
                 draggable
                 onDragStart={() => setDraggingKey(member.key)}
                 onDragOver={(event) => event.preventDefault()}
@@ -555,16 +559,18 @@ export function ProxyGroupAdvancedPanel({
             <div className="max-h-52 overflow-y-auto pr-1 custom-scrollbar flex flex-wrap gap-1.5">
               {excludedMembers.map((member) => {
                 return (
-                  <button
+                  <Button
                     key={member.key}
                     type="button"
-                    className="inline-flex max-w-full items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/55 transition-colors hover:border-emerald-400/30 hover:bg-emerald-500/10 hover:text-emerald-100"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto max-w-full gap-1 rounded px-2 py-1 text-[10px] text-white/55 hover:border-emerald-400/30 hover:bg-emerald-500/10 hover:text-emerald-100"
                     title={memberLabel(member)}
                     onClick={() => enableMember(member)}
                   >
                     <Plus className="h-3 w-3" />
                     <span className="truncate">{memberLabel(member)}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

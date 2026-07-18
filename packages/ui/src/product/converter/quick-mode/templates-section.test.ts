@@ -154,6 +154,10 @@ function flushPromises() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+function catalogApplyButtons() {
+  return mocks.captures.buttons.filter((props: any) => props.className === "flex-shrink-0");
+}
+
 function renderSection(overrides: Record<number, unknown> = {}) {
   stateMock.enabled = true;
   stateMock.callIndex = 0;
@@ -207,14 +211,14 @@ describe("quick mode TemplatesSection", () => {
   it("selects built-in templates and opens the catalog", () => {
     const { setters } = renderSection();
 
-    mocks.captures.cards[1].onClick();
+    mocks.captures.rawButtons.find((props: any) => props["aria-label"] === "选择 Standard 模板").onClick();
     expect(mocks.store.setTemplate).toHaveBeenCalledWith("standard");
     expect(mocks.interactions.templateSelected).toHaveBeenCalledWith({
       source: "builtin",
       templateType: "standard",
     });
 
-    mocks.captures.cards.at(-1).onClick();
+    mocks.captures.rawButtons.find((props: any) => props["aria-label"] === "打开Catalog").onClick();
     expect(setters[0]).toHaveBeenCalledWith(true);
     expect(mocks.interactions.templateCatalogOpened).toHaveBeenCalledWith({ mode: "quick" });
   });
@@ -240,7 +244,7 @@ describe("quick mode TemplatesSection", () => {
     });
 
     const { setters } = renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[0].onClick();
+    catalogApplyButtons()[0].onClick();
     await flushPromises();
 
     expect(setters[4]).toHaveBeenCalledWith("tpl-config");
@@ -260,7 +264,7 @@ describe("quick mode TemplatesSection", () => {
   it("rejects unsupported catalog templates and missing details", async () => {
     mocks.productApi.templates.loadTemplateDetail.mockResolvedValue({ kind: "yaml", name: "Raw YAML" });
     renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[1].onClick();
+    catalogApplyButtons()[1].onClick();
     await flushPromises();
     expect(mocks.interactions.templateApplied).toHaveBeenCalledWith({
       source: "catalog",
@@ -271,7 +275,7 @@ describe("quick mode TemplatesSection", () => {
 
     mocks.productApi.templates.loadTemplateDetail.mockResolvedValue(null);
     renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[0].onClick();
+    catalogApplyButtons()[0].onClick();
     await flushPromises();
     expect(mocks.interactions.templateApplied).toHaveBeenCalledWith({
       source: "catalog",
@@ -285,7 +289,7 @@ describe("quick mode TemplatesSection", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.productApi.templates.loadTemplateDetail.mockRejectedValue(new Error("network"));
     renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[0].onClick();
+    catalogApplyButtons()[0].onClick();
     await flushPromises();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "应用模板失败，请稍后重试", variant: "destructive" }));
     expect(errorSpy).toHaveBeenCalledWith(expect.objectContaining({ message: "network" }));
@@ -331,11 +335,9 @@ describe("quick mode TemplatesSection", () => {
       full: { id: "builtin-full", engagementCount: 0, isEngaged: false },
     });
 
-    const stopPropagation = vi.fn();
-    mocks.captures.rawButtons.find((props: any) => props.title === "Like").onClick({ stopPropagation });
+    mocks.captures.rawButtons.find((props: any) => props.title === "Like").onClick();
     await flushPromises();
 
-    expect(stopPropagation).toHaveBeenCalled();
     expect(mocks.productApi.templates.toggleTemplateEngagement).toHaveBeenCalledWith("builtin-minimal");
     expect(mocks.interactions.templateEngagementToggled).toHaveBeenCalledWith({ source: "builtin", engaged: true });
     expect(setters[5]).toHaveBeenCalledWith(expect.any(Function));
@@ -413,14 +415,14 @@ describe("quick mode TemplatesSection", () => {
       config: { template: "minimal" },
     });
     const unnamed = renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[0].onClick();
+    catalogApplyButtons()[0].onClick();
     await flushPromises();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "已应用模板：未命名模板" }));
     expect(unnamed.setters[4]).toHaveBeenCalledWith(null);
 
     mocks.productApi.templates.loadTemplateDetail.mockResolvedValue({ kind: "markdown", name: "Doc" });
     renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[0].onClick();
+    catalogApplyButtons()[0].onClick();
     await flushPromises();
     expect(mocks.interactions.templateApplied).toHaveBeenCalledWith({
       source: "catalog",
@@ -430,7 +432,7 @@ describe("quick mode TemplatesSection", () => {
 
     mocks.productApi.templates.loadTemplateDetail = undefined;
     const noLoader = renderSection({ 0: true, 1: false, 2: catalogItems, 3: "" });
-    mocks.captures.buttons[0].onClick();
+    catalogApplyButtons()[0].onClick();
     await flushPromises();
     expect(noLoader.setters[4]).not.toHaveBeenCalled();
   });

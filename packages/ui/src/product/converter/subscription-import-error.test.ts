@@ -46,6 +46,13 @@ vi.mock("@subboost/ui/lib/utils", () => ({
   cn: (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(" "),
 }));
 
+vi.mock("@subboost/ui/components/ui/button", () => ({
+  Button: (props: any) => {
+    if (typeof props.onClick === "function") mocks.buttons.push(props);
+    return React.createElement("button", props, props.children);
+  },
+}));
+
 vi.mock("@subboost/ui/components/ui/toaster", () => ({
   toast: mocks.toast,
 }));

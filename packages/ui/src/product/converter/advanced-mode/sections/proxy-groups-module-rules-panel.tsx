@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import * as Popover from "@radix-ui/react-popover";
 import { HelpCircle, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
 import { Button } from "@subboost/ui/components/ui/button";
 import { confirmDialog } from "@subboost/ui/components/ui/confirm-dialog";
+import { HelpPopover } from "@subboost/ui/components/ui/popover";
 import { Switch } from "@subboost/ui/components/ui/switch";
 import { PROXY_GROUP_MODULES, type ProxyGroupModule, type ProxyGroupRule } from "@subboost/core/generator/proxy-groups";
 import {
@@ -349,7 +349,11 @@ export function ProxyGroupsModuleRulesPanel({
                       <div className="flex h-7 shrink-0 items-center gap-1">
                         <CnIpNoResolveHelpButton />
                         <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">no-resolve</span>
-                        <Switch checked={cnIpNoResolve} onCheckedChange={onChangeCnIpNoResolve} />
+                        <Switch
+                          checked={cnIpNoResolve}
+                          onCheckedChange={onChangeCnIpNoResolve}
+                          aria-label="国内 IP 规则不解析域名"
+                        />
                       </div>
                     )}
                     <ProxyGroupRuleMoveMenu
@@ -492,40 +496,23 @@ export function ProxyGroupsModuleRulesPanel({
         <div className="rounded border border-white/10 bg-white/[0.03] px-2 py-2">
           <div className="mb-2 flex items-center gap-1.5">
             <div className="text-xs font-medium text-white">中国相关子规则集</div>
-            <Popover.Root>
-              <Popover.Trigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                  aria-label="实验性：中国业务子规则集"
-                  title="实验性：中国业务子规则集"
-                >
-                  <HelpCircle className="h-3.5 w-3.5" />
-                </button>
-              </Popover.Trigger>
-              <Popover.Portal>
-                <Popover.Content
-                  side="bottom"
-                  align="start"
-                  sideOffset={8}
-                  className="z-50 w-[420px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-md shadow-2xl p-3"
-                >
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <HelpCircle className="h-4 w-4 text-amber-300" />
-                      <div className="text-white font-medium">
-                        实验性：中国业务子规则集
-                      </div>
-                    </div>
-                    <div className="text-white/60 leading-relaxed">
-                      这些是已启用规则集的中国子集，通常表示对应服务有中国业务；但不代表必然适合分流至
-                      <span className="text-white/75"> 🔒 国内服务</span>，请按自身需求启用。
-                    </div>
-                  </div>
-                  <Popover.Arrow className="fill-white/10" />
-                </Popover.Content>
-              </Popover.Portal>
-            </Popover.Root>
+            <HelpPopover
+              label="实验性：中国业务子规则集"
+              side="bottom"
+              align="start"
+              contentClassName="w-[420px] bg-black/90 p-3"
+            >
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4 text-amber-300" aria-hidden="true" />
+                  <p className="font-medium text-white">实验性：中国业务子规则集</p>
+                </div>
+                <p className="leading-relaxed text-white/60">
+                  这些是已启用规则集的中国子集，通常表示对应服务有中国业务；但不代表必然适合分流至
+                  <span className="text-white/75"> 🔒 国内服务</span>，请按自身需求启用。
+                </p>
+              </div>
+            </HelpPopover>
           </div>
           <div className="space-y-1">
             {availableCnCandidateRules.map((rule) => (

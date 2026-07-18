@@ -251,7 +251,8 @@ export function ProxyGroupsRulesLibrary() {
               }
 
               return (
-                <div
+                <button
+                  type="button"
                   key={rule.id}
                   onClick={() => {
                     if (isSelected) {
@@ -263,7 +264,7 @@ export function ProxyGroupsRulesLibrary() {
                     }
                   }}
                   className={cn(
-                    "flex items-center gap-1.5 px-1.5 py-1 rounded cursor-pointer transition-colors",
+                    "flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left transition-colors",
                     isSelected
                       ? "bg-indigo-500/20 text-indigo-400"
                       : "hover:bg-white/5 text-white/70",
@@ -294,7 +295,7 @@ export function ProxyGroupsRulesLibrary() {
                   >
                     {rule.behavior === "ipcidr" ? "IP" : "域名"}
                   </Badge>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -347,12 +348,15 @@ export function ProxyGroupsRulesLibrary() {
                 </span>{" "}
                 条未分配的规则
               </span>
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setSelectedRules([])}
-                className="text-[10px] text-white/40 hover:text-white/60"
+                className="h-auto p-0 text-[10px] text-white/40 hover:bg-transparent hover:text-white/60"
               >
                 清空
-              </button>
+              </Button>
             </div>
             <div className="flex flex-wrap gap-0.5">
               {selectedRules.slice(0, 5).map((rule) => (

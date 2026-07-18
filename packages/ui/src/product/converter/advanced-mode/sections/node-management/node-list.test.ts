@@ -170,13 +170,13 @@ describe("NodeManagementNodeList", () => {
   it("handles list actions for rename, listener ports, ordering, delete, and restore", () => {
     const props = makeProps();
     const tree = renderTree(props);
-    const buttons = collectElements(tree, (element) => element.type === "button");
+    const buttons = collectElements(tree, (element) => typeof element.props.label === "string");
     const inputs = collectInputs(tree);
 
-    buttons.find((button) => button.props.title === "恢复原名: Original Alpha")?.props.onClick();
+    buttons.find((button) => button.props.label === "恢复原名: Original Alpha")?.props.onClick();
     expect(props.restoreNodeName).toHaveBeenCalledWith(alpha.name);
 
-    const renameButtons = buttons.filter((button) => button.props.title === "重命名");
+    const renameButtons = buttons.filter((button) => button.props.label === "重命名节点");
     renameButtons[0].props.onClick();
     expect(props.setEditingNodeName).toHaveBeenCalledWith(alpha.name);
     expect(props.setEditNodeValue).toHaveBeenCalledWith("Alpha");
@@ -201,22 +201,22 @@ describe("NodeManagementNodeList", () => {
     expect(props.setNodeOrder).toHaveBeenCalledWith(alpha.name, 2);
     expect(props.setOrderDrafts).toHaveBeenCalled();
 
-    buttons.find((button) => button.props.title === "上移")?.props.onClick();
-    buttons.find((button) => button.props.title === "下移")?.props.onClick();
+    buttons.find((button) => button.props.label === "上移节点")?.props.onClick();
+    buttons.find((button) => button.props.label === "下移节点")?.props.onClick();
     expect(props.moveNode).toHaveBeenCalledWith(alpha.name, "up");
     expect(props.moveNode).toHaveBeenCalledWith(alpha.name, "down");
 
-    buttons.find((button) => button.props.title === "删除")?.props.onClick();
+    buttons.find((button) => button.props.label === "删除节点")?.props.onClick();
     expect(props.removeNode).toHaveBeenCalledWith(alpha.name);
 
-    buttons.find((button) => button.props.title === "恢复")?.props.onClick();
+    buttons.find((button) => button.props.label === "恢复节点 Deleted")?.props.onClick();
     expect(props.restoreDeletedNode).toHaveBeenCalledWith("Deleted");
   });
 
   it("commits and cancels rename while editing a node", () => {
     const props = makeProps({ editingNodeName: alpha.name, editNodeValue: " Gamma " });
     const tree = renderTree(props);
-    const buttons = collectElements(tree, (element) => element.type === "button");
+    const buttons = collectElements(tree, (element) => typeof element.props.label === "string");
     const input = collectInputs(tree).find((element) => element.props.autoFocus);
     expect(input).toBeDefined();
 
@@ -230,10 +230,10 @@ describe("NodeManagementNodeList", () => {
     input!.props.onKeyDown({ key: "Escape" });
     expect(props.setEditingNodeName).toHaveBeenCalledWith(null);
 
-    buttons.find((button) => button.props.title === "保存")?.props.onClick();
+    buttons.find((button) => button.props.label === "保存节点名称")?.props.onClick();
     expect(props.renameNode).toHaveBeenCalledWith(alpha.name, "[HK] Gamma");
 
-    buttons.find((button) => button.props.title === "取消")?.props.onClick();
+    buttons.find((button) => button.props.label === "取消重命名")?.props.onClick();
     expect(props.setEditingNodeName).toHaveBeenCalledWith(null);
   });
 

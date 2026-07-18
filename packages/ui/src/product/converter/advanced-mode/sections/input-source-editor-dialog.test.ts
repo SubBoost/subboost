@@ -11,14 +11,20 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@radix-ui/react-popover", () => ({
+  Anchor: (props: any) => React.createElement("span", null, props.children),
   Arrow: () => React.createElement("span", null, "arrow"),
   Content: ({ children, sideOffset: _sideOffset, ...props }: any) => React.createElement("div", props, children),
+  Close: (props: any) => React.createElement("button", null, props.children),
   Portal: (props: any) => React.createElement("div", null, props.children),
   Root: (props: any) => React.createElement("div", null, props.children),
   Trigger: (props: any) => React.createElement("div", null, props.children),
 }));
 vi.mock("lucide-react", () => ({
+  CircleHelp: () => React.createElement("span", null, "circle-help-icon"),
+  FileCode: () => React.createElement("span", null, "file-code-icon"),
   HelpCircle: () => React.createElement("span", null, "help-icon"),
+  Link2: () => React.createElement("span", null, "link-icon"),
+  Server: () => React.createElement("span", null, "server-icon"),
 }));
 vi.mock("@subboost/ui/components/ui/button", () => ({
   Button: (props: any) => {

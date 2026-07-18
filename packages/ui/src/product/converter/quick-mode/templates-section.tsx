@@ -193,25 +193,31 @@ export function TemplatesSection() {
     <>
       {/* Template Selection */}
       <div className="space-y-1.5">
-        <label className="text-xs text-white/50">选择模板</label>
+        <p className="text-xs text-white/50">选择模板</p>
         <div className="grid gap-1.5">
           {templates.map((template) => (
             <Card
               key={template.id}
               className={cn(
-                "p-2.5 cursor-pointer transition-all border-2",
+                "p-2.5 transition-all border-2",
                 selectedTemplate === template.id ? "border-indigo-500 bg-indigo-500/10" : "border-transparent hover:border-white/20"
               )}
-              onClick={() => {
-                setTemplate(template.id);
-                interactions.templateSelected?.({
-                  source: "builtin",
-                  templateType: template.id,
-                });
-              }}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  aria-pressed={selectedTemplate === template.id}
+                  aria-label={`选择 ${template.name} 模板`}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                  onClick={() => {
+                    setTemplate(template.id);
+                    interactions.templateSelected?.({
+                      source: "builtin",
+                      templateType: template.id,
+                    });
+                  }}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
                   <div
                     className={cn(
                       "w-4 h-4 rounded-full border-2 flex items-center justify-center",
@@ -223,45 +229,50 @@ export function TemplatesSection() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white">{template.name}</span>
-                      {builtinEngagementEnabled && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void toggleBuiltinEngagement(template.id);
-                          }}
-                          disabled={!user}
-                          className={cn(
-                            "inline-flex items-center gap-0.5 text-xs transition-colors",
-                            builtinEngagement[template.id]?.isEngaged ? "text-red-400" : "text-white/40 hover:text-red-400",
-                            !user && "cursor-not-allowed opacity-50"
-                          )}
-                          title={user ? engagementAction : engagementLoginRequired}
-                        >
-                          <Heart className={cn("h-3 w-3", builtinEngagement[template.id]?.isEngaged && "fill-current")} />
-                          <span>{builtinEngagement[template.id]?.engagementCount ?? 0}</span>
-                        </button>
-                      )}
                     </div>
                     <p className="text-xs text-white/40 mt-0.5">{template.description}</p>
                   </div>
-                </div>
-                <div className="text-right text-xs text-white/40 space-y-0.5">
-                  <div>{template.groups} 代理组</div>
-                  <div>{template.rules} 规则集</div>
-                </div>
+                  </div>
+                  <div className="space-y-0.5 text-right text-xs text-white/40">
+                    <div>{template.groups} 代理组</div>
+                    <div>{template.rules} 规则集</div>
+                  </div>
+                </button>
+                {builtinEngagementEnabled && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void toggleBuiltinEngagement(template.id)}
+                    disabled={!user}
+                    className={cn(
+                      "h-auto gap-0.5 p-0 text-xs transition-colors hover:bg-transparent",
+                      builtinEngagement[template.id]?.isEngaged ? "text-red-400" : "text-white/40 hover:text-red-400",
+                      !user && "cursor-not-allowed opacity-50"
+                    )}
+                    title={user ? engagementAction : engagementLoginRequired}
+                  >
+                    <Heart className={cn("h-3 w-3", builtinEngagement[template.id]?.isEngaged && "fill-current")} />
+                    <span>{builtinEngagement[template.id]?.engagementCount ?? 0}</span>
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
 
           {catalogEnabled && (
             <Card
-              className="p-2.5 cursor-pointer transition-all border-2 border-dashed border-white/15 hover:border-white/25 bg-white/5"
-              onClick={() => {
-                setCatalogOpen(true);
-                interactions.templateCatalogOpened?.({ mode: "quick" });
-              }}
+              className="p-2.5 transition-all border-2 border-dashed border-white/15 hover:border-white/25 bg-white/5"
             >
-              <div className="flex items-center justify-between">
+              <button
+                type="button"
+                aria-label={`打开${catalogName}`}
+                className="flex w-full items-center justify-between text-left"
+                onClick={() => {
+                  setCatalogOpen(true);
+                  interactions.templateCatalogOpened?.({ mode: "quick" });
+                }}
+              >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-4 h-4 rounded-full border-2 border-white/30 flex items-center justify-center flex-shrink-0">
                     <Globe className="h-3 w-3 text-indigo-400" />
@@ -274,7 +285,7 @@ export function TemplatesSection() {
                 <div className="text-right text-xs text-white/40 flex-shrink-0">
                   <div>{catalogSelectAction}</div>
                 </div>
-              </div>
+              </button>
             </Card>
           )}
         </div>

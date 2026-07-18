@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
 import { Input } from "@subboost/ui/components/ui/input";
-import { Switch } from "@subboost/ui/components/ui/switch";
+import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { formatNodeNameFromTemplate } from "@subboost/core/node-name-template";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
@@ -228,15 +228,19 @@ export function NodeManagementBulkEditDialog({
                 <div className="text-[10px] text-white/40">支持 $1、$2… 分组引用；留空表示删除匹配内容</div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Switch checked={nameRulesTrim} onCheckedChange={setNameRulesTrim} />
-                  <span className="text-xs text-white/70">去除首尾空格</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={nameRulesCollapseSpaces} onCheckedChange={setNameRulesCollapseSpaces} />
-                  <span className="text-xs text-white/70">空白归一化</span>
-                </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <SwitchField
+                  label="去除首尾空格"
+                  checked={nameRulesTrim}
+                  onCheckedChange={setNameRulesTrim}
+                  density="compact"
+                />
+                <SwitchField
+                  label="空白归一化"
+                  checked={nameRulesCollapseSpaces}
+                  onCheckedChange={setNameRulesCollapseSpaces}
+                  density="compact"
+                />
               </div>
             </div>
 

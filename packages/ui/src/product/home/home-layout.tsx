@@ -223,19 +223,20 @@ export function HomeLayout({
                   )}
                 </Button>
                 {user && templateUploadHref && (
-                  <Link href={templateUploadHref}>
-                    <Button
+                  <Button
+                    asChild
                       variant="outline"
                       className="h-10 gap-2"
                       onClick={() => {
                         onTemplateUploadOpen?.();
                         interactions.templateUploadOpened?.({ entry: "home" });
                       }}
-                    >
+                  >
+                    <Link href={templateUploadHref}>
                       <Upload className="h-4 w-4" />
                       上传模板
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 )}
               </CardFooter>
             </Card>

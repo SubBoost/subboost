@@ -7,7 +7,8 @@ const reactMocks = vi.hoisted(() => ({
   useState: vi.fn((initial: unknown) => [initial, vi.fn()]),
 }));
 
-vi.mock("react", () => ({
+vi.mock("react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react")>()),
   useMemo: reactMocks.useMemo,
   useEffect: reactMocks.useEffect,
   useState: reactMocks.useState,

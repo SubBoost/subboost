@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Check, ChevronDown, ChevronUp, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Badge } from "@subboost/ui/components/ui/badge";
+import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
 import { ProtocolBadge } from "@subboost/ui/components/ui/protocol-badge";
 import { toast } from "@subboost/ui/components/ui/toaster";
@@ -144,23 +145,25 @@ export function NodeManagementNodeList({
                           className="flex-1 h-6 text-xs bg-white/10"
                           autoFocus
                         />
-                        <button
+                        <IconButton
+                          label="保存节点名称"
+                          variant="ghost"
                           onClick={() => {
                             commitRename();
                             setEditingNodeName(null);
                           }}
-                          className="p-1 text-green-400 hover:text-green-300"
-                          title="保存"
+                          className="h-6 w-6 p-1 text-green-400 hover:text-green-300"
                         >
                           <Check className="h-3 w-3" />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
+                          label="取消重命名"
+                          variant="ghost"
                           onClick={() => setEditingNodeName(null)}
-                          className="p-1 text-white/30 hover:text-white/50"
-                          title="取消"
+                          className="h-6 w-6 p-1 text-white/30 hover:text-white/50"
                         >
                           <X className="h-3 w-3" />
-                        </button>
+                        </IconButton>
                       </>
                     ) : (
                       <>
@@ -178,13 +181,14 @@ export function NodeManagementNodeList({
                             {parts.canEditBase ? parts.baseName : node.name}
                           </span>
                           {isRenamed && (
-                            <button
+                            <IconButton
+                              label={`恢复原名: ${originName}`}
+                              variant="ghost"
                               onClick={() => restoreNodeName(node.name)}
-                              className="p-0.5 text-white/30 hover:text-amber-400 transition-colors"
-                              title={`恢复原名: ${originName}`}
+                              className="h-5 w-5 p-0.5 text-white/30 transition-colors hover:text-amber-400"
                             >
                               <RotateCcw className="h-2.5 w-2.5" />
-                            </button>
+                            </IconButton>
                           )}
                         </span>
                         {isListenerPortVisible && (
@@ -271,25 +275,29 @@ export function NodeManagementNodeList({
                             className="h-6 w-10 text-[10px] bg-white/10 border-white/10 text-center px-1"
                           />
                           <div className="flex flex-col">
-                            <button
+                            <IconButton
+                              label="上移节点"
+                              variant="ghost"
                               onClick={() => moveNode(node.name, "up")}
                               disabled={(nodeIndexByName.get(node.name) ?? 0) <= 0}
                               className="h-3 w-4 flex items-center justify-center text-white/30 hover:text-indigo-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              title="上移"
                             >
                               <ChevronUp className="h-2.5 w-2.5" />
-                            </button>
-                            <button
+                            </IconButton>
+                            <IconButton
+                              label="下移节点"
+                              variant="ghost"
                               onClick={() => moveNode(node.name, "down")}
                               disabled={(nodeIndexByName.get(node.name) ?? 0) >= nodes.length - 1}
                               className="h-3 w-4 flex items-center justify-center text-white/30 hover:text-indigo-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              title="下移"
                             >
                               <ChevronDown className="h-2.5 w-2.5" />
-                            </button>
+                            </IconButton>
                           </div>
                         </div>
-                        <button
+                        <IconButton
+                          label="重命名节点"
+                          variant="ghost"
                           onClick={() => {
                             if (parts.tag && !parts.canEditBase) {
                               toast({
@@ -303,18 +311,18 @@ export function NodeManagementNodeList({
                             setEditingNodeName(node.name);
                             setEditNodeValue(parts.baseName);
                           }}
-                          className="p-1 text-white/50 hover:text-indigo-400 transition-colors"
-                          title="重命名"
+                          className="h-6 w-6 p-1 text-white/50 hover:text-indigo-400 transition-colors"
                         >
                           <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
+                          label="删除节点"
+                          variant="ghost"
                           onClick={() => removeNode(node.name)}
-                          className="p-1 text-white/50 hover:text-red-400 transition-colors"
-                          title="删除"
+                          className="h-6 w-6 p-1 text-white/50 hover:text-red-400 transition-colors"
                         >
                           <Trash2 className="h-3 w-3" />
-                        </button>
+                        </IconButton>
                       </>
                     )}
                   </div>
@@ -354,13 +362,14 @@ export function NodeManagementNodeList({
                         >
                           已删除
                         </Badge>
-                        <button
+                        <IconButton
+                          label={`恢复节点 ${originName}`}
+                          variant="ghost"
                           onClick={() => restoreDeletedNode(originName)}
-                          className="p-1 text-white/30 hover:text-white/60"
-                          title="恢复"
+                          className="h-6 w-6 p-1 text-white/30 hover:text-white/60"
                         >
                           <RotateCcw className="h-3 w-3" />
-                        </button>
+                        </IconButton>
                       </div>
                     ))}
                   </div>

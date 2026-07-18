@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@subboost/ui/components/ui/dialog";
+import { Button } from "@subboost/ui/components/ui/button";
 import { cn } from "@subboost/ui/lib/utils";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { formatInBeijing } from "@subboost/core/time/beijing";
@@ -77,14 +78,16 @@ function ErrorDetailDialog({ error, children }: ErrorDetailDialogProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-white/50 text-xs">{error.isUserFacingReason ? "提示内容" : "错误信息"}</span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => copyText(message)}
-                className="text-xs text-white/40 hover:text-white flex items-center gap-1 transition-colors"
+                className="h-auto gap-1 p-0 text-xs text-white/40 hover:bg-transparent hover:text-white"
               >
                 <Copy className="h-3 w-3" />
                 复制
-              </button>
+              </Button>
             </div>
             <div
               className={cn(
@@ -102,14 +105,16 @@ function ErrorDetailDialog({ error, children }: ErrorDetailDialogProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-white/50 text-xs">技术细节</span>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => copyText(technicalDetail!, "已复制技术细节")}
-                  className="text-xs text-white/40 hover:text-white flex items-center gap-1 transition-colors"
+                  className="h-auto gap-1 p-0 text-xs text-white/40 hover:bg-transparent hover:text-white"
                 >
                   <Copy className="h-3 w-3" />
                   复制
-                </button>
+                </Button>
               </div>
               <div className="bg-black/30 border border-white/5 rounded-lg p-3 text-white/80 text-xs font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto custom-scrollbar">
                 {technicalDetail}
@@ -163,10 +168,12 @@ export function SubscriptionImportErrorBadge({
 
   return (
     <ErrorDetailDialog error={normalized}>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         className={cn(
-          "inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
+          "h-auto rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
           "bg-red-500/15 text-red-300 border border-red-500/20",
           "hover:bg-red-500/25 hover:text-red-200 transition-colors cursor-pointer",
           "focus:outline-none focus:ring-2 focus:ring-red-500/40",
@@ -176,7 +183,7 @@ export function SubscriptionImportErrorBadge({
       >
         <span>{badgeText}</span>
         <Menu className="ml-1 h-3 w-3 text-red-200/70" aria-hidden="true" />
-      </button>
+      </Button>
     </ErrorDetailDialog>
   );
 }
