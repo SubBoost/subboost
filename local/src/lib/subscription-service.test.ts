@@ -153,7 +153,11 @@ describe("local subscription service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAppUrl.mockReturnValue("http://127.0.0.1:3001");
-    mocks.prepareRefreshCacheResult.mockReturnValue({ ok: true, nodeCount: 1 });
+    mocks.prepareRefreshCacheResult.mockReturnValue({
+      ok: true,
+      nodeCount: 1,
+      refreshedConfig: { sources: [{ id: "source-1", type: "url", content: "https://example.com/sub" }] },
+    });
     mocks.refreshNodeSnapshot.mockResolvedValue({
       nodes: [node("Fresh")],
       savedSources: [{ id: "source-1", type: "url", content: "https://example.com/sub" }],

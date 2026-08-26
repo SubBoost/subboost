@@ -21,6 +21,7 @@ import {
   type SubscriptionImportErrorInfo,
 } from "@subboost/core/subscription/import-error";
 import { stripImportedNodeControlFieldsFromList } from "@subboost/core/subscription/imported-node-controls";
+import { reconcileNodeNameReferences } from "@subboost/core/subscription/node-name-references";
 import { tryNormalizeSubscriptionUrlInput } from "@subboost/core/subscription/url-input";
 import type { ConfigActions, SubscriptionSource } from "./definitions";
 import {
@@ -316,44 +317,18 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           });
 
           const nextNodes = merged.nodes;
-          const availableNames = new Set(nextNodes.map((n) => n.name));
-          const nextListenerPorts: Record<string, number> = {};
-          for (const [name, port] of Object.entries(state.listenerPorts)) {
-            const mappedName = merged.renameMap.get(name) ?? name;
-            if (!availableNames.has(mappedName)) continue;
-            if (typeof port !== "number" || !Number.isInteger(port)) continue;
-            nextListenerPorts[mappedName] = port;
-          }
-
-          const replaceNames = (list: string[], opts?: { keepDirect?: boolean }) => {
-            const out: string[] = [];
-            const seen = new Set<string>();
-            for (const item of list) {
-              if (opts?.keepDirect && item === "DIRECT") {
-                if (!seen.has(item)) out.push(item);
-                seen.add(item);
-                continue;
-              }
-              const next = merged.renameMap.get(item) ?? item;
-              if (seen.has(next)) continue;
-              seen.add(next);
-              out.push(next);
-            }
-            return out;
-          };
-
-          const nextDialerProxyGroups = state.dialerProxyGroups.map((g) => {
-            const relayNodes = replaceNames(g.relayNodes, { keepDirect: true }).filter(
-              (n) => n === "DIRECT" || availableNames.has(n)
-            );
-            const targetNodes = replaceNames(g.targetNodes).filter((n) => availableNames.has(n));
-            return { ...g, relayNodes, targetNodes };
-          });
+          const reconciledReferences = reconcileNodeNameReferences(
+            {
+              listenerPorts: state.listenerPorts,
+              dialerProxyGroups: state.dialerProxyGroups,
+              proxyGroupAdvanced: state.proxyGroupAdvanced,
+            },
+            { nodes: nextNodes, renameMap: merged.renameMap }
+          );
 
           return {
             nodes: nextNodes,
-            listenerPorts: nextListenerPorts,
-            dialerProxyGroups: nextDialerProxyGroups,
+            ...reconciledReferences,
             sources: state.sources.map((s) =>
               s.id === sourceId
                 ? {

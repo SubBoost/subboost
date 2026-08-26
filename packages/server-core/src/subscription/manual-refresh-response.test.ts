@@ -79,6 +79,7 @@ describe("manual refresh response helpers", () => {
   it("builds the manual refresh success response body from snapshot and cache timestamp", () => {
     const refreshResult: Extract<PreparedRefreshCacheResult, { ok: true }> = {
       ok: true,
+      refreshedConfig: {},
       cacheEntry: { nodes: [], generatedYaml: "yaml", subscriptionInfo: {} },
       generatedYaml: "yaml",
       nodeCount: 3,

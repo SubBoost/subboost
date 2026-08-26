@@ -411,11 +411,31 @@ describe("createSourceActions", () => {
         source({ id: "s2", type: "yaml", content: "proxies: []", parsed: true }),
       ],
       nodes: [node("OLD-Fresh Renamed", { _originName: "Fresh Renamed", _sourceIds: ["s1"] })],
+      listenerPorts: { "OLD-Fresh Renamed": 12000 },
+      dialerProxyGroups: [
+        {
+          id: "chain",
+          name: "Chain",
+          relayNodes: ["OLD-Fresh Renamed"],
+          targetNodes: ["OLD-Fresh Renamed"],
+        },
+      ],
+      proxyGroupAdvanced: {
+        auto: { memberOrder: [{ kind: "node", name: "OLD-Fresh Renamed" }] },
+      },
     });
 
     await actions.parseSingleSource("s1");
 
     expect(getState().nodes).toEqual([expect.objectContaining({ name: "Fresh Renamed" })]);
+    expect(getState().listenerPorts).toEqual({ "Fresh Renamed": 12000 });
+    expect(getState().dialerProxyGroups[0]).toMatchObject({
+      relayNodes: ["Fresh Renamed"],
+      targetNodes: ["Fresh Renamed"],
+    });
+    expect(getState().proxyGroupAdvanced).toEqual({
+      auto: { memberOrder: [{ kind: "node", name: "Fresh Renamed" }] },
+    });
     expect(getState().parseErrors).toEqual([]);
     expect(getState().sources).toEqual([
       expect.objectContaining({
