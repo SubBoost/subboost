@@ -247,7 +247,6 @@ export function DialerProxyGroupsSection({
             const visibleTargetNodes = targetSearchKeyword
               ? availableTargetNodes.filter((node) => node.name.toLowerCase().includes(targetSearchKeyword))
               : availableTargetNodes;
-
             const commitRename = () => {
               const nextName = buildProxyGroupName(editingDialerGroupDraft);
               if (!nextName) return;
