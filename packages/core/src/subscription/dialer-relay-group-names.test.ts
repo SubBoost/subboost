@@ -15,20 +15,20 @@ describe("dialer relay group names", () => {
     ).toEqual(new Set(["🧩 筛选组  美国", "⚡ 自定义自动"]));
   });
 
-  it("uses caller defaults only when enabled groups are absent", () => {
+  it("uses caller defaults when enabled groups are absent, empty, or malformed", () => {
     const config = { proxyGroupNameOverrides: { auto: "自定义自动" } };
     expect(getValidDialerRelayGroupNames(config, { defaultEnabledGroups: ["auto"] })).toEqual(
       new Set(["⚡ 自定义自动"])
     );
     expect(getValidDialerRelayGroupNames({ ...config, enabledGroups: [] }, { defaultEnabledGroups: ["auto"] })).toEqual(
-      new Set()
+      new Set(["⚡ 自定义自动"])
     );
     expect(
       getValidDialerRelayGroupNames(
         { ...config, enabledGroups: "auto" },
         { defaultEnabledGroups: ["auto"] }
       )
-    ).toEqual(new Set());
+    ).toEqual(new Set(["⚡ 自定义自动"]));
   });
 
   it("falls back to no builtin groups when neither config nor defaults enable them", () => {

@@ -26,14 +26,14 @@ export function getValidDialerRelayGroupNames(
         .filter(Boolean)
     : [];
   const overrides = isRecord(config.proxyGroupNameOverrides) ? config.proxyGroupNameOverrides : {};
-  const hasExplicitEnabledGroups = Object.prototype.hasOwnProperty.call(config, "enabledGroups");
-  const enabledGroups = Array.isArray(config.enabledGroups)
+  const configuredEnabledGroups = Array.isArray(config.enabledGroups)
     ? config.enabledGroups
         .map((value) => (typeof value === "string" ? value.trim() : ""))
         .filter(Boolean)
-    : hasExplicitEnabledGroups
-      ? []
-      : [...(options.defaultEnabledGroups ?? [])];
+    : [];
+  const enabledGroups = configuredEnabledGroups.length > 0
+    ? configuredEnabledGroups
+    : [...(options.defaultEnabledGroups ?? [])];
   const enabledGroupIds = new Set(enabledGroups);
   const builtinGroupNames = PROXY_GROUP_MODULES.filter((module) => enabledGroupIds.has(module.id)).map(
     (module) => {

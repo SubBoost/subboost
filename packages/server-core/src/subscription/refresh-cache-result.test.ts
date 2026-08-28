@@ -284,7 +284,7 @@ describe("prepareRefreshCacheResult", () => {
   });
 
   it.each([[], "auto"])(
-    "does not restore template proxy groups for explicit enabledGroups=%j",
+    "keeps legacy template fallback for empty or malformed enabledGroups=%j",
     (enabledGroups) => {
       const result = prepareRefreshCacheResult({
         config: { enabledGroups },
@@ -294,7 +294,7 @@ describe("prepareRefreshCacheResult", () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.generatedYaml).not.toContain("⚡ 自动选择");
+      expect(result.generatedYaml).toContain("⚡ 自动选择");
     }
   );
 
