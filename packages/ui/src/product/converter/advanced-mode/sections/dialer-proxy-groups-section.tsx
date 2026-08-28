@@ -20,6 +20,7 @@ import { toast } from "@subboost/ui/components/ui/toaster";
 import { DEFAULT_LOAD_BALANCE_STRATEGY, type ProxyGroupGroupType } from "@subboost/core/types/config";
 import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
+import { getValidDialerRelayGroupNames } from "@subboost/core/subscription/dialer-relay-group-names";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
 import { cn } from "@subboost/ui/lib/utils";
 import { useConfigStore, PRESET_RELAY_NAMES } from "@subboost/ui/store/config-store";
@@ -59,6 +60,7 @@ export function DialerProxyGroupsSection({
     nodeNameFilter,
     dialerProxyGroups,
     customProxyGroups,
+    enabledProxyGroups,
     proxyGroupNameOverrides,
     addDialerProxyGroup,
     removeDialerProxyGroup,
@@ -97,7 +99,10 @@ export function DialerProxyGroupsSection({
   );
   const rawNodeNameSet = React.useMemo(() => new Set(nodes.map((node) => node.name)), [nodes]);
   const effectiveNodeNameSet = React.useMemo(() => new Set(effectiveNodes.map((node) => node.name)), [effectiveNodes]);
-
+  const validRelayGroupNames = React.useMemo(
+    () => getValidDialerRelayGroupNames({ customProxyGroups, enabledGroups: enabledProxyGroups, proxyGroupNameOverrides }),
+    [customProxyGroups, enabledProxyGroups, proxyGroupNameOverrides],
+  );
   const toggleDialerGroupExpand = (groupId: string) => {
     setExpandedDialerGroups((prev) => {
       const next = new Set(prev);
@@ -170,20 +175,17 @@ export function DialerProxyGroupsSection({
       })) as DialerSelectableNode[];
 
     const availableProxyGroups = [
-      ...PROXY_GROUP_MODULES.map(
-        (module) =>
-          ({
-            name: resolveModuleFullName(module),
-            type: "内置组",
-          }) as DialerSelectableNode,
-      ),
+      ...PROXY_GROUP_MODULES.map((module) => ({
+        name: resolveModuleFullName(module),
+        type: "内置组",
+      }) as DialerSelectableNode).filter((group) => validRelayGroupNames.has(group.name)),
       ...customProxyGroups
         .filter((group) => group.enabled !== false)
         .map((group) => ({
           name: typeof group.name === "string" ? group.name.trim() : "",
           type: "自定义组",
         }))
-        .filter((group) => group.name),
+        .filter((group) => validRelayGroupNames.has(group.name)),
     ];
 
     // 中转组允许选择 DIRECT（直连）作为“入口”

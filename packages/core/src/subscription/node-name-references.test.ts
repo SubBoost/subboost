@@ -79,6 +79,71 @@ describe("node name references", () => {
     expect(reconcileNodeNameReferences(config, { nodes: [node("Hidden")] })).toEqual(config);
   });
 
+  it("preserves valid proxy groups as relays while keeping targets node-only", () => {
+    const migratedCustomGroupName = "🧩 筛选组  美国";
+    const config = {
+      customProxyGroups: [
+        { id: "legacy-us", name: migratedCustomGroupName, enabled: true },
+        { id: "default-enabled", name: " 🧩 默认启用 " },
+        { id: "disabled", name: "🧩 已停用", enabled: false },
+      ],
+      proxyGroupNameOverrides: { auto: "自定义自动", adult: "私密" },
+      dialerProxyGroups: [
+        {
+          id: "chain",
+          name: "Chain",
+          relayNodes: [
+            migratedCustomGroupName,
+            migratedCustomGroupName,
+            "⚡ 自定义自动",
+            "🧩 默认启用",
+            "DIRECT",
+            "Old Node",
+            "🧩 已停用",
+            "🧩 不存在",
+            "🔞 私密",
+          ],
+          targetNodes: [migratedCustomGroupName, "⚡ 自定义自动", "DIRECT", "Old Node", "Missing"],
+        },
+      ],
+    };
+
+    expect(
+      reconcileNodeNameReferences(config, {
+        nodes: [node("New Node")],
+        renameMap: new Map([
+          ["Old Node", "New Node"],
+          [migratedCustomGroupName, "New Node"],
+        ]),
+      }).dialerProxyGroups
+    ).toEqual([
+      {
+        id: "chain",
+        name: "Chain",
+        relayNodes: [migratedCustomGroupName, "⚡ 自定义自动", "🧩 默认启用", "DIRECT", "New Node"],
+        targetNodes: ["New Node"],
+      },
+    ]);
+  });
+
+  it("uses the active template defaults only when enabled groups are omitted", () => {
+    const dialerProxyGroups = [
+      {
+        relayNodes: ["⚡ 自动选择", "🤖 AI 服务"],
+        targetNodes: [],
+      },
+    ];
+
+    expect(
+      reconcileNodeNameReferences({ template: "minimal", dialerProxyGroups }, { nodes: [] })
+        .dialerProxyGroups[0].relayNodes
+    ).toEqual(["⚡ 自动选择"]);
+    expect(
+      reconcileNodeNameReferences({ template: "full", dialerProxyGroups }, { nodes: [] })
+        .dialerProxyGroups[0].relayNodes
+    ).toEqual(["⚡ 自动选择", "🤖 AI 服务"]);
+  });
+
   it("normalizes object rename maps and ignores blank or self mappings", () => {
     expect(
       Array.from(

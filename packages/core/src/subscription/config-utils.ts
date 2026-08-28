@@ -283,7 +283,9 @@ export function buildGenerateOptionsFromConfig(
 
   const template = normalizeTemplate(config.template, "standard");
 
-  const enabledGroups = normalizeEnabledList(config.enabledGroups);
+  const hasExplicitEnabledGroups = Object.hasOwn(config, "enabledGroups");
+  const enabledGroups =
+    normalizeEnabledList(config.enabledGroups) ?? (hasExplicitEnabledGroups ? [] : undefined);
   const enabledRules = normalizeEnabledList(config.enabledRules);
   const customRules = normalizeCustomRules(config.customRules);
   const ruleModel = normalizeRuleModelFromConfig(config);

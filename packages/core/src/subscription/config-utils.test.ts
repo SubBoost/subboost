@@ -304,7 +304,7 @@ describe("subscription config utils", () => {
       testUrl: "https://www.gstatic.com/generate_204",
       testInterval: 300,
     });
-    expect(options.userConfig).not.toHaveProperty("enabledGroups");
+    expect(options.userConfig?.enabledGroups).toEqual([]);
     expect(options.userConfig).not.toHaveProperty("enabledRules");
     expect(options.userConfig).not.toHaveProperty("mixedPort");
     expect(options.userConfig).not.toHaveProperty("allowLan");
@@ -316,6 +316,18 @@ describe("subscription config utils", () => {
     expect(options.dialerProxyGroups).toBeUndefined();
     expect(options.proxyGroupNameOverrides).toBeUndefined();
     expect(options.proxyGroupOrder).toBeUndefined();
+  });
+
+  it("distinguishes absent enabled groups from explicit empty or malformed values", () => {
+    expect(buildGenerateOptionsFromConfig({}, { nodes: [node()] }).userConfig).not.toHaveProperty(
+      "enabledGroups"
+    );
+    expect(
+      buildGenerateOptionsFromConfig({ enabledGroups: [] }, { nodes: [node()] }).userConfig?.enabledGroups
+    ).toEqual([]);
+    expect(
+      buildGenerateOptionsFromConfig({ enabledGroups: "auto" }, { nodes: [node()] }).userConfig?.enabledGroups
+    ).toEqual([]);
   });
 
   it("keeps alternate valid group and template variants", () => {

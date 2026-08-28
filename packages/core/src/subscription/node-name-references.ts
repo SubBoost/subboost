@@ -1,4 +1,6 @@
+import { buildDefaultUserConfig } from "../config/defaults";
 import type { ParsedNode } from "../types/node";
+import { getValidDialerRelayGroupNames } from "./dialer-relay-group-names";
 
 export type NodeNameRenameMap = ReadonlyMap<string, string> | Readonly<Record<string, string>>;
 
@@ -60,7 +62,7 @@ function remapNameList(
   value: unknown,
   renameMap: ReadonlyMap<string, string>,
   availableNames: ReadonlySet<string>,
-  options: { keepDirect?: boolean } = {}
+  options: { keepDirect?: boolean; preservedNames?: ReadonlySet<string> } = {}
 ): unknown {
   if (!Array.isArray(value)) return value;
   const out: unknown[] = [];
@@ -73,6 +75,11 @@ function remapNameList(
     const name = item.trim();
     if (!name) continue;
     if (options.keepDirect && name === "DIRECT") {
+      if (!seenNames.has(name)) out.push(name);
+      seenNames.add(name);
+      continue;
+    }
+    if (options.preservedNames?.has(name)) {
       if (!seenNames.has(name)) out.push(name);
       seenNames.add(name);
       continue;
@@ -141,6 +148,13 @@ export function reconcileNodeNameReferences<T extends object>(
   const rawConfig = config as Record<string, unknown>;
   const renameMap = toRenameMap(options.renameMap);
   const availableNames = new Set(options.nodes.map((node) => node.name.trim()).filter(Boolean));
+  const template =
+    rawConfig.template === "minimal" || rawConfig.template === "standard" || rawConfig.template === "full"
+      ? rawConfig.template
+      : "standard";
+  const validRelayGroupNames = getValidDialerRelayGroupNames(rawConfig, {
+    defaultEnabledGroups: buildDefaultUserConfig(template).enabledGroups,
+  });
 
   const listenerPorts = isRecord(rawConfig.listenerPorts)
     ? Object.fromEntries(
@@ -162,7 +176,10 @@ export function reconcileNodeNameReferences<T extends object>(
         if (!isRecord(rawGroup)) return rawGroup;
         return {
           ...rawGroup,
-          relayNodes: remapNameList(rawGroup.relayNodes, renameMap, availableNames, { keepDirect: true }),
+          relayNodes: remapNameList(rawGroup.relayNodes, renameMap, availableNames, {
+            keepDirect: true,
+            preservedNames: validRelayGroupNames,
+          }),
           targetNodes: remapNameList(rawGroup.targetNodes, renameMap, availableNames),
         };
       })

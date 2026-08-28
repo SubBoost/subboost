@@ -166,6 +166,7 @@ describe("createSourceActions", () => {
   });
 
   it("imports proxy-provider URL sources without fetching node content", async () => {
+    const migratedCustomGroupName = "🧩 筛选组  美国";
     const { actions, getState } = createHarness({
       sources: [
         source({
@@ -178,13 +179,19 @@ describe("createSourceActions", () => {
         }),
       ],
       nodes: [node("Provider Node", { _sourceIds: ["s1"], _originName: "Provider Node" }), node("Manual")],
+      enabledProxyGroups: ["auto"],
+      customProxyGroups: [
+        { id: "legacy-us", name: migratedCustomGroupName, emoji: "🧩", enabled: true, groupType: "select" },
+        { id: "disabled", name: "🧩 已停用", emoji: "🧩", enabled: false, groupType: "select" },
+      ],
+      proxyGroupNameOverrides: { auto: "自定义自动" },
       listenerPorts: { "Provider Node": 41000, Manual: 41001 },
       dialerProxyGroups: [
         {
           id: "dialer-1",
           name: "Relay",
-          relayNodes: ["DIRECT", "Provider Node", "Manual"],
-          targetNodes: ["Provider Node"],
+          relayNodes: [migratedCustomGroupName, "⚡ 自定义自动", "DIRECT", "Provider Node", "Manual", "🧩 已停用"],
+          targetNodes: [migratedCustomGroupName, "⚡ 自定义自动", "Provider Node"],
         },
       ],
     });
@@ -196,7 +203,7 @@ describe("createSourceActions", () => {
     expect(getState().nodes.map((item: ParsedNode) => item.name)).toEqual(["Manual"]);
     expect(getState().listenerPorts).toEqual({ Manual: 41001 });
     expect(getState().dialerProxyGroups[0]).toMatchObject({
-      relayNodes: ["DIRECT", "Manual"],
+      relayNodes: [migratedCustomGroupName, "⚡ 自定义自动", "DIRECT", "Manual"],
       targetNodes: [],
     });
     expect(getState().sources[0]).toMatchObject({
@@ -514,9 +521,16 @@ describe("createSourceActions", () => {
   });
 
   it("keeps listener ports and dialer groups aligned after a single source parse", async () => {
+    const migratedCustomGroupName = "🧩 筛选组  美国";
     mocks.parseSubscription.mockReturnValueOnce(parseResult([node("Fresh"), node("Relay Target")]));
     const { actions, getState } = createHarness({
       sources: [source({ id: "s1", type: "yaml", content: "proxies: []" })],
+      enabledProxyGroups: ["auto"],
+      customProxyGroups: [
+        { id: "legacy-us", name: migratedCustomGroupName, emoji: "🧩", enabled: true, groupType: "select" },
+        { id: "disabled", name: "🧩 已停用", emoji: "🧩", enabled: false, groupType: "select" },
+      ],
+      proxyGroupNameOverrides: { auto: "自定义自动" },
       listenerPorts: {
         Fresh: 41000,
         Stale: 41001,
@@ -526,8 +540,17 @@ describe("createSourceActions", () => {
         {
           id: "dialer-1",
           name: "Relay",
-          relayNodes: ["DIRECT", "Fresh", "Fresh", "Stale", "Relay Target"],
-          targetNodes: ["Fresh", "Stale", "Relay Target"],
+          relayNodes: [
+            migratedCustomGroupName,
+            "⚡ 自定义自动",
+            "DIRECT",
+            "Fresh",
+            "Fresh",
+            "Stale",
+            "Relay Target",
+            "🧩 已停用",
+          ],
+          targetNodes: [migratedCustomGroupName, "⚡ 自定义自动", "Fresh", "Stale", "Relay Target"],
         },
       ],
     });
@@ -537,7 +560,7 @@ describe("createSourceActions", () => {
     expect(getState().nodes.map((item: ParsedNode) => item.name)).toEqual(["Fresh", "Relay Target"]);
     expect(getState().listenerPorts).toEqual({ Fresh: 41000 });
     expect(getState().dialerProxyGroups[0]).toMatchObject({
-      relayNodes: ["DIRECT", "Fresh", "Relay Target"],
+      relayNodes: [migratedCustomGroupName, "⚡ 自定义自动", "DIRECT", "Fresh", "Relay Target"],
       targetNodes: ["Fresh", "Relay Target"],
     });
     expect(getState().sources[0]).toMatchObject({

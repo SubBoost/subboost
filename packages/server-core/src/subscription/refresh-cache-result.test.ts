@@ -244,6 +244,60 @@ describe("prepareRefreshCacheResult", () => {
     expect(result.generatedYaml).toContain("dialer-proxy: Chain");
   });
 
+  it("preserves a migrated custom proxy group relay through refresh and YAML generation", () => {
+    const migratedCustomGroupName = "🧩 筛选组  美国";
+    const result = prepareRefreshCacheResult({
+      config: {
+        enabledGroups: ["select", "auto", "final"],
+        customProxyGroups: [
+          {
+            id: "legacy-us",
+            name: migratedCustomGroupName,
+            emoji: "🧩",
+            enabled: true,
+            groupType: "select",
+          },
+        ],
+        dialerProxyGroups: [
+          {
+            id: "group-relay",
+            name: "Group Relay",
+            type: "select",
+            relayNodes: [migratedCustomGroupName],
+            targetNodes: ["node-a"],
+          },
+        ],
+      },
+      snapshot: snapshot(),
+      maxNodesPerSubscription: 10,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.refreshedConfig).toMatchObject({
+      dialerProxyGroups: [
+        expect.objectContaining({ relayNodes: [migratedCustomGroupName], targetNodes: ["node-a"] }),
+      ],
+    });
+    expect(result.generatedYaml).toContain('dialer-proxy: "Group Relay"');
+    expect(result.generatedYaml).toContain(migratedCustomGroupName);
+  });
+
+  it.each([[], "auto"])(
+    "does not restore template proxy groups for explicit enabledGroups=%j",
+    (enabledGroups) => {
+      const result = prepareRefreshCacheResult({
+        config: { enabledGroups },
+        snapshot: snapshot(),
+        maxNodesPerSubscription: 10,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.generatedYaml).not.toContain("⚡ 自动选择");
+    }
+  );
+
   it("rejects invalid persisted filters before publishing refresh output", () => {
     expect(() =>
       prepareRefreshCacheResult({

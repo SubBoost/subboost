@@ -21,6 +21,7 @@ import {
   type SubscriptionImportErrorInfo,
 } from "@subboost/core/subscription/import-error";
 import { stripImportedNodeControlFieldsFromList } from "@subboost/core/subscription/imported-node-controls";
+import { getValidDialerRelayGroupNames } from "@subboost/core/subscription/dialer-relay-group-names";
 import { reconcileNodeNameReferences } from "@subboost/core/subscription/node-name-references";
 import { tryNormalizeSubscriptionUrlInput } from "@subboost/core/subscription/url-input";
 import type { ConfigActions, SubscriptionSource } from "./definitions";
@@ -65,14 +66,30 @@ function mergeNodeSourceIds(existing: ParsedNode, sourceIds: Set<string>): Parse
   return { ...existingRecord, [SOURCE_IDS_KEY]: Array.from(sourceIds) } as unknown as ParsedNode;
 }
 
+function filterAvailableNames(names: string[], availableNames: ReadonlySet<string>): string[] {
+  const seen = new Set<string>();
+  return names.map((name) => name.trim()).filter((name) => {
+    if (!name || seen.has(name)) return false;
+    seen.add(name);
+    return availableNames.has(name);
+  });
+}
+
 function filterDialerProxyGroupsByAvailableNames(
   dialerProxyGroups: StoreState["dialerProxyGroups"],
-  availableNames: Set<string>
+  availableNames: Set<string>,
+  config: Pick<StoreState, "customProxyGroups" | "enabledProxyGroups" | "proxyGroupNameOverrides">
 ): StoreState["dialerProxyGroups"] {
+  const availableGroupNames = getValidDialerRelayGroupNames({
+    customProxyGroups: config.customProxyGroups,
+    enabledGroups: config.enabledProxyGroups,
+    proxyGroupNameOverrides: config.proxyGroupNameOverrides,
+  });
+  const availableRelayNames = new Set(["DIRECT", ...availableNames, ...availableGroupNames]);
   return dialerProxyGroups.map((group) => ({
     ...group,
-    relayNodes: group.relayNodes.filter((name) => name === "DIRECT" || availableNames.has(name)),
-    targetNodes: group.targetNodes.filter((name) => availableNames.has(name)),
+    relayNodes: filterAvailableNames(group.relayNodes, availableRelayNames),
+    targetNodes: filterAvailableNames(group.targetNodes, availableNames),
   }));
 }
 
@@ -117,7 +134,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           nextListenerPorts[name] = port;
         }
 
-        const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(state.dialerProxyGroups, availableNames);
+        const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(state.dialerProxyGroups, availableNames, state);
 
         return {
           sources,
@@ -237,7 +254,9 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
               nextListenerPorts[name] = port;
             }
 
-            const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(state.dialerProxyGroups, availableNames);
+            const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(
+              state.dialerProxyGroups, availableNames, state
+            );
 
             return {
               nodes: baseNodes,
@@ -322,6 +341,9 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
               listenerPorts: state.listenerPorts,
               dialerProxyGroups: state.dialerProxyGroups,
               proxyGroupAdvanced: state.proxyGroupAdvanced,
+              customProxyGroups: state.customProxyGroups,
+              enabledGroups: state.enabledProxyGroups,
+              proxyGroupNameOverrides: state.proxyGroupNameOverrides,
             },
             { nodes: nextNodes, renameMap: merged.renameMap }
           );
@@ -635,7 +657,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           if (typeof port !== "number" || !Number.isInteger(port)) continue;
           nextListenerPorts[name] = port;
         }
-        const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(state.dialerProxyGroups, availableNames);
+        const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(state.dialerProxyGroups, availableNames, state);
 
         return {
           nodes: normalized,

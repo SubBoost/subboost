@@ -123,12 +123,13 @@ vi.mock("@subboost/ui/components/ui/toaster", () => ({ toast: mocks.toast }));
 vi.mock("@subboost/ui/components/ui/confirm-dialog", () => ({ confirmDialog: mocks.confirmDialog }));
 vi.mock("@subboost/core/generator/proxy-groups", () => ({
   PROXY_GROUP_MODULES: [
-    { id: "auto", name: "Auto" },
-    { id: "fallback", name: "Fallback" },
+    { id: "auto", name: "⚡ 自动选择", emoji: "⚡" },
+    { id: "adult", name: "🔞 成人内容", emoji: "🔞" },
   ],
 }));
 vi.mock("@subboost/core/proxy-group-name", () => ({
-  resolveProxyGroupModuleName: (module: { name: string }, override?: string) => override || module.name,
+  resolveProxyGroupModuleName: (module: { emoji: string; name: string }, override?: string) =>
+    override ? `${module.emoji} ${override}` : module.name,
   splitLeadingEmoji: (name: string) => {
     const match = name.trim().match(/^(\S+)\s+(.+)$/);
     if (!match || /[A-Za-z0-9\u4e00-\u9fff]/.test(match[1])) {
@@ -231,6 +232,7 @@ describe("DialerProxyGroupsSection", () => {
       nodes,
       dialerProxyGroups: [groupA, groupB],
       customProxyGroups: [{ name: "Custom" }],
+      enabledProxyGroups: ["auto"],
       proxyGroupNameOverrides: { auto: "Auto Override" },
       addDialerProxyGroup: vi.fn(),
       removeDialerProxyGroup: vi.fn(),
@@ -290,6 +292,27 @@ describe("DialerProxyGroupsSection", () => {
       relayNodes: ["Alpha", "DIRECT"],
       targetNodes: ["Alpha"],
     });
+  });
+
+  it("offers only enabled custom and effective built-in groups as new relays", () => {
+    mocks.store.customProxyGroups = [
+      { name: "Migrated  Custom" },
+      { name: "Disabled Custom", enabled: false },
+      { name: "⚡ Auto Override", enabled: false },
+    ];
+    mocks.store.enabledProxyGroups = ["auto"];
+    mocks.store.proxyGroupNameOverrides = {
+      auto: "Auto Override",
+      adult: "Disabled Adult Override",
+    };
+
+    const { html } = renderSection({ 0: new Set(["g-a"]) });
+
+    expect(html).toContain("Migrated  Custom");
+    expect(html).toContain("Auto Override");
+    expect(html).not.toContain("Disabled Custom");
+    expect(html).not.toContain("Disabled Adult Override");
+    expect(html.match(/⚡ Auto Override/g)).toHaveLength(1);
   });
 
   it("adds custom groups, rejects duplicates, and records interactions", () => {
