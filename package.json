@@ -70,7 +70,7 @@
     "prisma": "^7.9.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
