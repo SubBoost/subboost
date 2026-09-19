@@ -100,14 +100,24 @@ describe("user store", () => {
     expect(useUserStore.getState()).toEqual(expect.objectContaining({ user: null, error: null }));
   });
 
-  it("keeps logout failures contained and leaves missing users unchanged for local flag updates", async () => {
-    vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("logout failed")));
+  it("keeps the authenticated user when logout persistence fails", async () => {
+    const currentUser = user();
+    useUserStore.setState({ user: currentUser, error: null });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: vi.fn(async () => ({ error: "Session service unavailable." })),
+      })
+    );
 
-    await useUserStore.getState().logout();
-    expect(useUserStore.getState().user).toBeNull();
+    await expect(useUserStore.getState().logout()).rejects.toThrow("Session service unavailable.");
+    expect(useUserStore.getState()).toEqual(
+      expect.objectContaining({ user: currentUser, error: "Session service unavailable." })
+    );
 
     useUserStore.getState().updateAiAssistantEnabled(true);
-    expect(useUserStore.getState().user).toBeNull();
+    expect(useUserStore.getState().user?.aiAssistantEnabled).toBe(true);
   });
 });

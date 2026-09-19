@@ -86,3 +86,11 @@ model JobLeaseLock {
 
   @@index([expiresAt])
 }
+
+model RevokedSession {
+  revocationKey String   @id
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([expiresAt])
+}

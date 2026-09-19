@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   refContains: vi.fn(() => false),
   stateSetter: vi.fn(),
   stateOverride: undefined as boolean | undefined,
+  toast: vi.fn(),
   useConfigStore: Object.assign(vi.fn(), { getState: vi.fn(() => ({ sources: [] })) }),
   userState: {
     fetchUser: vi.fn(),
@@ -96,6 +97,8 @@ vi.mock("@subboost/ui/components/ui/dropdown-menu", () => ({
 vi.mock("@subboost/ui/components/ui/safe-image", () => ({
   SafeImage: (props: any) => React.createElement("span", null, props.alt, props.fallback),
 }));
+
+vi.mock("@subboost/ui/components/ui/toaster", () => ({ toast: mocks.toast }));
 
 vi.mock("@subboost/ui/store/config-store/auth-handoff", () => ({
   captureAuthConfigHandoff: mocks.captureAuthConfigHandoff,
@@ -231,5 +234,34 @@ describe("UserMenu", () => {
     expect(mocks.logout).toHaveBeenCalled();
     expect(mocks.stateSetter).toHaveBeenCalledWith(false);
     expect(window.location.href).toBe("/");
+  });
+
+  it("keeps the current page and shows an error when logout fails", async () => {
+    mocks.stateOverride = true;
+    mocks.logout.mockRejectedValueOnce(new Error("Session service unavailable."));
+    mocks.userState = {
+      fetchUser: mocks.fetchUser,
+      isLoading: false,
+      logout: mocks.logout,
+      user: {
+        avatarUrl: null,
+        isAdmin: false,
+        isBanned: false,
+        name: "Alice",
+        username: "alice",
+        trustLevel: 1,
+        subscriptionCount: 1,
+        quota: { maxSubscriptions: 5 },
+      },
+    };
+
+    renderToStaticMarkup(React.createElement(UserMenu));
+    const logoutItem = mocks.dropdownItems.find((item) => textOf(item.children).includes("退出登录"));
+    await logoutItem.onSelect();
+
+    expect(window.location.href).toBe("");
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "退出登录失败", variant: "destructive" })
+    );
   });
 });
