@@ -121,6 +121,8 @@ describe("local session helpers", () => {
   it("revokes the current session idempotently and cleans expired rows in a bounded batch", async () => {
     mocks.cookieValue = "header.payload.signature";
     await expect(revokeCurrentSession()).resolves.toBe(true);
+    await expect(revokeCurrentSession()).resolves.toBe(true);
+    expect(mocks.prisma.revokedSession.upsert).toHaveBeenCalledTimes(2);
     expect(mocks.prisma.revokedSession.upsert).toHaveBeenCalledWith({
       where: { revocationKey: expect.any(String) },
       create: { revocationKey: expect.any(String), expiresAt: expect.any(Date) },
