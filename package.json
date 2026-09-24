@@ -75,9 +75,10 @@
   "overrides": {
     "deepmerge-ts": "8.0.0",
     "find-my-way": "9.7.0",
+    "mysql2": "3.23.1",
     "nanoid": "3.3.18",
     "postcss": "8.5.23",
-    "sharp": "0.35.3",
+    "sharp": "0.35.4",
     "valibot": "1.4.2"
   }
 }
