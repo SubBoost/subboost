@@ -47,9 +47,9 @@
     "clsx": "^2.1.0",
     "dotenv": "^17.4.2",
     "jose": "^6.2.3",
-    "js-yaml": "^4.3.1",
+    "js-yaml": "^4.3.2",
     "lucide-react": "^1.17.0",
-    "next": "^16.2.12",
+    "next": "^16.3.4",
     "peggy": "^5.1.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -70,14 +70,15 @@
     "prisma": "^7.9.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
     "find-my-way": "9.7.0",
+    "mysql2": "3.23.1",
     "nanoid": "3.3.18",
     "postcss": "8.5.23",
-    "sharp": "0.35.3",
+    "sharp": "0.35.4",
     "valibot": "1.4.2"
   }
 }
