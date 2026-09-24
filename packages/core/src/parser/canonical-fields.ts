@@ -1,4 +1,5 @@
 import type { ParsedNode } from "@subboost/core/types/node";
+import { normalizeCertificateFingerprint } from "@subboost/core/mihomo/certificate-fingerprint";
 
 type FieldPath = readonly string[];
 
@@ -187,13 +188,18 @@ export function canonicalizeParsedNode<T extends ParsedNode | Record<string, unk
   if (!isRecord(node)) return node;
   const type = typeof node.type === "string" ? node.type.trim().toLowerCase() : "";
   const out: Record<string, unknown> = { ...node };
+  const hasCertificateFingerprint = normalizeCertificateFingerprint(out.fingerprint) !== null;
 
   for (const rule of PROTOCOL_FIELD_ALIAS_RULES) {
     if (!ruleApplies(rule, type)) continue;
-    const value = pickAliasValue(out, [rule.canonical, ...rule.aliases]);
+    // A certificate hash is an independent TLS field, not a client fingerprint alias.
+    const aliases = hasCertificateFingerprint
+      ? rule.aliases.filter((alias) => !pathEquals(alias, ["fingerprint"]))
+      : rule.aliases;
+    const value = pickAliasValue(out, [rule.canonical, ...aliases]);
     if (!hasValue(value)) continue;
     setPath(out, rule.canonical, value);
-    for (const alias of rule.aliases) {
+    for (const alias of aliases) {
       if (!pathEquals(alias, rule.canonical)) deletePath(out, alias);
     }
   }

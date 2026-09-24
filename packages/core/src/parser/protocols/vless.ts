@@ -330,6 +330,8 @@ export function parseVLESS(uri: string): VLESSNode {
   }
 
   if (allowInsecure) node["skip-cert-verify"] = true;
+  const tfo = parseBoolish(pickQueryValue(params, ["tfo", "fast-open", "fast_open", "fastOpen"]));
+  if (tfo !== undefined) node.tfo = tfo;
   if (sni) node.servername = sni;
   if (flow) node.flow = flow;
   if (encryption) node.encryption = encryption;

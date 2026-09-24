@@ -54,6 +54,12 @@ interface UserState {
 
 // 防止并发请求的单例 Promise
 let fetchUserPromise: Promise<void> | null = null;
+let userRequestGeneration = 0;
+
+function invalidateUserRequest() {
+  userRequestGeneration += 1;
+  fetchUserPromise = null;
+}
 
 export const useUserStore = create<UserState>((set) => ({
   user: null,
@@ -63,26 +69,30 @@ export const useUserStore = create<UserState>((set) => ({
   fetchUser: async () => {
     // 防止并发请求
     if (fetchUserPromise) return fetchUserPromise;
+    const generation = userRequestGeneration;
 
     set({ isLoading: true, error: null });
 
     fetchUserPromise = (async () => {
       try {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
+        if (generation !== userRequestGeneration) return;
         if (!response.ok) {
           set({ user: null, error: `请求失败 (HTTP ${response.status})`, isLoading: false });
           return;
         }
         const data = (await response.json().catch(() => ({}))) as { user?: User | null };
+        if (generation !== userRequestGeneration) return;
         set({ user: data?.user ?? null, isLoading: false });
       } catch (error) {
+        if (generation !== userRequestGeneration) return;
         set({
           user: null,
           error: error instanceof Error ? error.message : "获取用户信息失败",
           isLoading: false,
         });
       } finally {
-        fetchUserPromise = null;
+        if (generation === userRequestGeneration) fetchUserPromise = null;
       }
     })();
 
@@ -100,7 +110,8 @@ export const useUserStore = create<UserState>((set) => ({
             : `退出登录失败 (HTTP ${response.status})`;
         throw new Error(message);
       }
-      set({ user: null, error: null });
+      invalidateUserRequest();
+      set({ user: null, error: null, isLoading: false });
     } catch (error) {
       const message = error instanceof Error ? error.message : "退出登录失败";
       set({ error: message });
@@ -109,7 +120,8 @@ export const useUserStore = create<UserState>((set) => ({
   },
 
   clearUser: () => {
-    set({ user: null, error: null });
+    invalidateUserRequest();
+    set({ user: null, error: null, isLoading: false });
   },
 
   updateAiAssistantEnabled: (enabled: boolean) => {

@@ -30,13 +30,65 @@ function user(overrides: Partial<User> = {}): User {
 }
 
 function resetStore() {
+  useUserStore.getState().clearUser();
   useUserStore.setState({ user: null, isLoading: false, error: null });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
 }
 
 describe("user store", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     resetStore();
+  });
+
+  it("ignores an older user response after successful logout", async () => {
+    const pending = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce({ ok: true }));
+    useUserStore.setState({ user: user() });
+    const request = useUserStore.getState().fetchUser();
+    await useUserStore.getState().logout();
+    pending.resolve(Response.json({ user: user() }));
+    await request;
+    expect(useUserStore.getState()).toMatchObject({ user: null, error: null, isLoading: false });
+  });
+
+  it("ignores a response whose body finishes after clearUser", async () => {
+    const body = deferred<{ user: User }>();
+    const json = vi.fn(() => body.promise);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json }));
+    const request = useUserStore.getState().fetchUser();
+    await vi.waitFor(() => expect(json).toHaveBeenCalled());
+    useUserStore.getState().clearUser();
+    body.resolve({ user: user() });
+    await request;
+    expect(useUserStore.getState()).toMatchObject({ user: null, error: null, isLoading: false });
+  });
+
+  it.each(["http", "network"])("an old %s failure cannot clear a newer request", async (failure) => {
+    const older = deferred<Response>();
+    const newer = deferred<Response>();
+    const fetchMock = vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const first = useUserStore.getState().fetchUser();
+    useUserStore.getState().clearUser();
+    const second = useUserStore.getState().fetchUser();
+    if (failure === "http") older.resolve(new Response(null, { status: 401 }));
+    else older.reject(new Error("old network failure"));
+    await first;
+    expect(useUserStore.getState()).toMatchObject({ isLoading: true, error: null });
+    const third = useUserStore.getState().fetchUser();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    newer.resolve(Response.json({ user: user({ id: "new-user" }) }));
+    await Promise.all([second, third]);
+    expect(useUserStore.getState()).toMatchObject({ user: { id: "new-user" }, isLoading: false, error: null });
   });
 
   it("fetches the authenticated user and deduplicates concurrent requests", async () => {

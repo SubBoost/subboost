@@ -2,10 +2,10 @@ import type { ParsedNode } from "@subboost/core/types/node";
 import { splitWsPathEarlyData } from "@subboost/core/parser/ws-early-data";
 import { isMihomoEchQueryServerName, isStandardBase64String } from "./ech";
 import { normalizeRealityShortId } from "./reality";
+import { normalizeCertificateFingerprint } from "./certificate-fingerprint";
 
 const REALITY_PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const WIREGUARD_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
-const CERTIFICATE_FINGERPRINT_HEX_PATTERN = /^[A-Fa-f0-9]{64}$/;
 const SSH_SERVER_FINGERPRINT_PATTERN = /^SHA256:[A-Za-z0-9+/]{43}=?$/;
 const VLESS_ENCRYPTION_PATTERN =
   /^mlkem768x25519plus\.(?:native|xorpub|random)\.(?:1rtt|0rtt)\.[A-Za-z0-9+/=_-]+(?:\.[A-Za-z0-9+/=_-]+)*$/;
@@ -70,16 +70,6 @@ function normalizeClientFingerprintAlias(value: unknown): string | null {
   const normalized = normalizeString(value)?.toLowerCase();
   if (!normalized || !CLIENT_FINGERPRINT_ALIASES.has(normalized)) return null;
   return normalized;
-}
-
-function normalizeCertificateFingerprint(value: unknown): string | null {
-  const raw = normalizeString(value);
-  if (!raw) return null;
-  const withoutPrefix = raw
-    .replace(/^sha256\s+fingerprint\s*=\s*/i, "")
-    .replace(/^sha256[:=]\s*/i, "");
-  const compact = withoutPrefix.replace(/:/g, "").toLowerCase();
-  return CERTIFICATE_FINGERPRINT_HEX_PATTERN.test(compact) ? compact : null;
 }
 
 function normalizeWireGuardKey(value: unknown): string | null {
