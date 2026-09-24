@@ -90,7 +90,7 @@ export function getModuleRuleById(
 
 export function getEffectiveModuleRuleItems(
   module: ProxyGroupModule,
-  ruleSetsByTarget?: Record<string, ProxyGroupRule[]>,
+  ruleSetsByTarget?: Record<string, (ProxyGroupRule & { source?: EffectiveModuleRuleSource })[]>,
   hiddenPresetRuleIds?: HiddenPresetRuleIds
 ): EffectiveModuleRule[] {
   const excluded = getExcludedModuleRuleIds(module.id, hiddenPresetRuleIds);
@@ -107,7 +107,7 @@ export function getEffectiveModuleRuleItems(
   for (const rule of extraRules) {
     if (!rule?.id || seen.has(rule.id)) continue;
     seen.add(rule.id);
-    out.push({ ...rule, source: "custom" });
+    out.push({ ...rule, source: rule.source ?? "custom" });
   }
 
   return out;

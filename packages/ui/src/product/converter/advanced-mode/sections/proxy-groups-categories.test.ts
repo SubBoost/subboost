@@ -96,6 +96,9 @@ vi.mock("@subboost/core/generator/proxy-groups", () => ({
 	      { id: "moved-rule", name: "Moved Rule", behavior: "domain", path: "geosite/moved-rule.mrs" },
 	    ] },
 	    { id: "fallback", name: "Fallback", category: "core", rules: [] },
+	    { id: "cn", name: "CN", category: "service", rules: [
+	      { id: "cn-ip", name: "CN IP", behavior: "ipcidr", path: "geoip/cn.mrs", noResolve: true },
+	    ] },
 	  ],
   generateProxyGroups: vi.fn(() => []),
 }));
@@ -142,6 +145,7 @@ vi.mock("./group-advanced-settings-dialog", () => ({
 
 import { ProxyGroupsCategories } from "./proxy-groups-categories";
 import { generateProxyGroups } from "@subboost/core/generator/proxy-groups";
+import { getEffectiveModuleRuleItems, isModuleRuleMovedFrom } from "@subboost/core/generator/module-rules";
 
 function renderCategories(overrides: Record<number, unknown> = {}) {
   stateMock.enabled = true;
@@ -462,6 +466,63 @@ describe("ProxyGroupsCategories", () => {
     expect(mocks.store.updateProxyGroupAdvanced).toHaveBeenCalledWith("auto", { sourceIds: ["source-a"] });
   });
 
+  it.each(["module", "custom"])("distinguishes moved and removed rules targeting a %s group", (kind) => {
+    mocks.store.hiddenProxyGroups = [];
+    const targetId = kind === "module" ? "fallback" : "custom-1";
+    mocks.store.customProxyGroups = [{ id: "custom-1", name: "Custom", groupType: "select" }];
+    mocks.store.builtinRuleEdits = {
+      "module:auto:moved-rule": { target: { kind, id: targetId } },
+    };
+    renderCategories({ 0: new Set(["core"]) });
+    let card = mocks.captures.moduleCards[0];
+    expect(isModuleRuleMovedFrom("auto", "moved-rule", card.ruleSetsByTarget)).toBe(true);
+    expect(card.ruleSetsByTarget[targetId].map((rule: any) => rule.id)).toContain("moved-rule");
+    if (kind === "module") {
+      const targetCard = mocks.captures.moduleCards.find((item: any) => item.module.id === targetId);
+      expect(getEffectiveModuleRuleItems(targetCard.module, card.ruleSetsByTarget, card.hiddenPresetRuleIds)
+        .find((rule) => rule.id === "moved-rule")?.source).toBe("preset");
+    }
+
+    mocks.store.builtinRuleEdits["module:auto:moved-rule"].enabled = false;
+    renderCategories({ 0: new Set(["core"]) });
+    card = mocks.captures.moduleCards[0];
+    expect(card.hiddenPresetRuleIds.auto).toContain("moved-rule");
+    expect(card.ruleSetsByTarget[targetId] ?? []).toEqual([]);
+    expect(isModuleRuleMovedFrom("auto", "moved-rule", card.ruleSetsByTarget)).toBe(false);
+
+    mocks.store.builtinRuleEdits = {};
+    renderCategories({ 0: new Set(["core"]) });
+    card = mocks.captures.moduleCards[0];
+    expect(getEffectiveModuleRuleItems(card.module, card.ruleSetsByTarget, card.hiddenPresetRuleIds)
+      .map((rule) => rule.id)).toContain("moved-rule");
+    expect(card.ruleSetsByTarget[targetId] ?? []).toEqual([]);
+  });
+
+  it.each([true, false])("projects moved CN IP no-resolve=%s into the target group", (noResolve) => {
+    mocks.store.customRuleSets = [];
+    mocks.store.cnIpNoResolve = noResolve;
+    mocks.store.builtinRuleEdits = {
+      "module:cn:cn-ip": { target: { kind: "module", id: "auto" } },
+    };
+    renderCategories({ 0: new Set(["core"]) });
+    expect(mocks.captures.moduleCards[0].ruleSetsByTarget.auto).toEqual([
+      expect.objectContaining({ id: "cn-ip", noResolve }),
+    ]);
+  });
+
+  it.each([{ kind: "module", id: "auto" }, { kind: "custom", id: "missing" }])(
+    "keeps the source active when the saved target resolves to its default: %j", (target) => {
+      mocks.store.customRuleSets = [];
+      mocks.store.builtinRuleEdits = { "module:auto:moved-rule": { target } };
+      renderCategories({ 0: new Set(["core"]) });
+      const card = mocks.captures.moduleCards[0];
+      expect(card.hiddenPresetRuleIds.auto ?? []).toEqual([]);
+      expect(isModuleRuleMovedFrom("auto", "moved-rule", card.ruleSetsByTarget)).toBe(false);
+      expect(getEffectiveModuleRuleItems(card.module, card.ruleSetsByTarget, card.hiddenPresetRuleIds)
+        .filter((rule) => rule.id === "moved-rule")).toHaveLength(1);
+    },
+  );
+
   it("builds proxy-group previews from effective nodes", () => {
     mocks.store.nodes = [
       {
@@ -541,7 +602,7 @@ describe("ProxyGroupsCategories", () => {
     expect(setters[0]).toHaveBeenCalledWith(expect.any(Function));
     expect((setters[0] as any).lastValue.has("core")).toBe(false);
 
-    categoryButtons[1].props.onClick();
+    categoryButtons[2].props.onClick();
     expect((setters[0] as any).lastValue.has("custom")).toBe(true);
   });
 });

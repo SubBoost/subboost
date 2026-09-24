@@ -23,7 +23,7 @@ import {
   PROXY_GROUP_MODULES,
   generateProxyGroups,
 } from "@subboost/core/generator/proxy-groups";
-import type { HiddenPresetRuleIds } from "@subboost/core/generator/module-rules";
+import type { EffectiveModuleRuleSource, HiddenPresetRuleIds } from "@subboost/core/generator/module-rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
@@ -227,7 +227,7 @@ export function ProxyGroupsCategories() {
       moduleNames[proxyModule.id] = name;
     }
 
-    const pushRuleSetForTarget = (moduleId: string, rule: RuleSetDraft) => {
+    const pushRuleSetForTarget = (moduleId: string, rule: RuleSetDraft & { source?: EffectiveModuleRuleSource }) => {
       ruleSetsByTarget[moduleId] = [...(ruleSetsByTarget[moduleId] || []), rule];
     };
     const hidePresetRule = (moduleId: string, ruleId: string) => {
@@ -242,13 +242,8 @@ export function ProxyGroupsCategories() {
       });
       const moduleId = moduleNameToId.get(targetName);
       if (!moduleId) continue;
-      pushRuleSetForTarget(moduleId, {
-        id: ruleSet.id,
-        name: ruleSet.name,
-        behavior: ruleSet.behavior,
-        path: ruleSet.path,
-        ...(ruleSet.noResolve ? { noResolve: true } : {}),
-      });
+      const { target: _target, ...rule } = ruleSet;
+      pushRuleSetForTarget(moduleId, rule);
     }
 
     for (const [key, edit] of Object.entries(builtinRuleEdits || {})) {
@@ -267,17 +262,20 @@ export function ProxyGroupsCategories() {
           })
         : "";
 
-      if (edit.enabled === false) hidePresetRule(sourceModuleId, ruleId);
+      if (edit.enabled === false) {
+        hidePresetRule(sourceModuleId, ruleId);
+        continue;
+      }
       if (editTarget && editTarget !== defaultTarget) {
         hidePresetRule(sourceModuleId, ruleId);
-        const targetModuleId = moduleNameToId.get(editTarget);
+        const targetModuleId = moduleNameToId.get(editTarget)
+          || customProxyGroups.find((group) => group.name === editTarget)?.id;
         if (targetModuleId) {
           pushRuleSetForTarget(targetModuleId, {
-            id: sourceRule.id,
-            name: sourceRule.name,
-            behavior: sourceRule.behavior,
-            path: sourceRule.path,
-            ...(sourceRule.noResolve ? { noResolve: true } : {}),
+            ...sourceRule,
+            source: "preset",
+            noResolve: sourceModuleId === "cn" && ruleId === "cn-ip"
+              ? cnIpNoResolve : sourceRule.noResolve,
           });
         }
       }
@@ -286,6 +284,7 @@ export function ProxyGroupsCategories() {
     return { ruleSetsByTarget, hiddenPresetRuleIds };
   }, [
     builtinRuleEdits,
+    cnIpNoResolve,
     customRuleSets,
     customProxyGroups,
     resolveModuleDisplayName,

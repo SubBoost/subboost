@@ -79,10 +79,23 @@ describe("module rule helpers", () => {
   });
 
   it("detects rules moved to another module", () => {
+    expect(isModuleRuleMovedFrom("media", "youtube")).toBe(false);
+    expect(isModuleRuleMovedFrom("media", "youtube", { other: [null as never, { id: "hulu" }] })).toBe(false);
     expect(isModuleRuleMovedFrom("media", "youtube", { other: [{ id: "youtube" }] })).toBe(true);
     expect(isModuleRuleMovedFrom("media", "youtube", { media: [{ id: "youtube" }] })).toBe(false);
     expect(isModuleRuleMovedFrom("", "youtube", { other: [{ id: "youtube" }] })).toBe(false);
     expect(isModuleRuleMovedFrom("media", " ", { other: [{ id: "youtube" }] })).toBe(false);
     expect(isModuleRuleMovedFrom("media", "youtube", { other: "bad" as never })).toBe(false);
+  });
+
+  it("preserves the preset label for incoming rules and keeps user additions custom", () => {
+    const incoming = { ...customRules[1], source: "preset" as const };
+    const target = { ...proxyModule, rules: [] };
+    expect(getEffectiveModuleRuleItems(target, { media: [incoming, customRules[0]] })
+      .map(({ id, source }) => ({ id, source }))).toEqual([
+      { id: "hulu", source: "preset" },
+      { id: "netflix", source: "custom" },
+    ]);
+    expect(getEffectiveModuleRules(target, { media: [incoming] })).toEqual([customRules[1]]);
   });
 });

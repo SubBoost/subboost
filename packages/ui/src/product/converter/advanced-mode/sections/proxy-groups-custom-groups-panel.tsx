@@ -52,6 +52,7 @@ export function ProxyGroupsCustomGroupsPanel({
     customRules = [],
     customRuleSets = [],
     builtinRuleEdits = {},
+    cnIpNoResolve,
     customProxyGroups = [],
     addCustomProxyGroup,
     removeCustomProxyGroup,
@@ -361,8 +362,8 @@ export function ProxyGroupsCustomGroupsPanel({
                       path={rule.path}
                       source="preset"
                       behavior={rule.behavior}
-                      noResolve={rule.noResolve}
-                      state="moved"
+                      noResolve={sourceModule.id === "cn" && rule.id === "cn-ip" ? cnIpNoResolve : rule.noResolve}
+                      state="active"
                       actions={
                         <>
                           <ProxyGroupRuleMoveMenu
@@ -373,7 +374,7 @@ export function ProxyGroupsCustomGroupsPanel({
                             currentTarget={{ kind: "custom", id: group.id, name: group.name }}
                             onMove={(target) => {
                               if (isRuleSetMoveTarget(target)) {
-                                moveModuleRule(sourceModule.id, rule.id, target);
+                                moveModuleRule(group.id, rule.id, target);
                               }
                             }}
                           />
