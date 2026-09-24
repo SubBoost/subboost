@@ -120,4 +120,20 @@ describe("user store", () => {
     useUserStore.getState().updateAiAssistantEnabled(true);
     expect(useUserStore.getState().user?.aiAssistantEnabled).toBe(true);
   });
+
+  it("keeps the user and reports HTTP status when logout returns invalid JSON", async () => {
+    const currentUser = user();
+    useUserStore.setState({ user: currentUser, error: null });
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: vi.fn().mockRejectedValueOnce(new SyntaxError("Invalid JSON")),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(useUserStore.getState().logout()).rejects.toThrow("退出登录失败 (HTTP 503)");
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(useUserStore.getState().user).toBe(currentUser);
+    expect(useUserStore.getState().error).toBe("退出登录失败 (HTTP 503)");
+  });
 });

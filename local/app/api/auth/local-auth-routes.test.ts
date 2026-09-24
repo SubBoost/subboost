@@ -145,6 +145,30 @@ describe("local auth and health routes", () => {
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
+  it("preserves successful logout when expired-session cleanup fails", async () => {
+    const { POST } = await import("./logout/route");
+    const cause = new Error("cleanup unavailable");
+    mocks.cleanupExpiredSessionRevocations.mockRejectedValueOnce(cause);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await POST();
+      expect(await readJson(response)).toEqual({ status: 200, body: { success: true } });
+      expect(response.headers.get("set-cookie")).toContain("subboost-local-session=");
+      expect(log).toHaveBeenCalledWith("Local session revocation cleanup failed:", cause);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("propagates unexpected revocation errors without clearing the cookie", async () => {
+    const { POST } = await import("./logout/route");
+    const cause = new Error("unexpected failure");
+    mocks.revokeCurrentSession.mockRejectedValueOnce(cause);
+    await expect(POST()).rejects.toBe(cause);
+    expect(mocks.clearSessionCookieOptions).not.toHaveBeenCalled();
+    expect(mocks.cleanupExpiredSessionRevocations).not.toHaveBeenCalled();
+  });
+
   it("returns the current admin snapshot and anonymous setup state", async () => {
     const { GET } = await import("./me/route");
     mocks.isSetupRequired.mockResolvedValueOnce(false).mockResolvedValueOnce(true);

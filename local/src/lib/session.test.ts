@@ -118,6 +118,57 @@ describe("local session helpers", () => {
     await expect(readSession()).rejects.toBeInstanceOf(SessionRevocationStoreUnavailableError);
   });
 
+  it.each([
+    { exp: 4102444800, iss: "another-app", sub: "admin-1", username: "admin" },
+    { exp: 4102444800, sub: "admin-1", username: 123 },
+  ])("rejects invalid session claims without querying revocations", async (payload) => {
+    mocks.cookieValue = "header.payload.signature";
+    mocks.jwtVerify.mockResolvedValueOnce({ payload });
+
+    await expect(readSession()).resolves.toBeNull();
+    expect(mocks.prisma.revokedSession.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("does not persist revocations for missing or invalid sessions", async () => {
+    await expect(revokeCurrentSession()).resolves.toBe(false);
+    mocks.cookieValue = "invalid-token";
+    mocks.jwtVerify.mockRejectedValueOnce(new Error("invalid signature"));
+    await expect(revokeCurrentSession()).resolves.toBe(false);
+    expect(mocks.prisma.revokedSession.upsert).not.toHaveBeenCalled();
+  });
+
+  it("reports revocation write failures with their original cause", async () => {
+    mocks.cookieValue = "header.payload.signature";
+    const cause = new Error("database unavailable");
+    mocks.prisma.revokedSession.upsert.mockRejectedValueOnce(cause);
+
+    await expect(revokeCurrentSession()).rejects.toMatchObject({
+      name: "SessionRevocationStoreUnavailableError",
+      cause,
+    });
+  });
+
+  it.each([undefined, {}])("uses bounded cleanup defaults without deleting an empty batch", async (options) => {
+    const before = Date.now();
+    await expect(cleanupExpiredSessionRevocations(options)).resolves.toBe(0);
+    const query = mocks.prisma.revokedSession.findMany.mock.calls[0][0];
+    expect(query.take).toBe(100);
+    expect(query.where.expiresAt.lte.getTime()).toBeGreaterThanOrEqual(before);
+    expect(query.where.expiresAt.lte.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(mocks.prisma.revokedSession.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it.each([[0, 1], [3.9, 3], [2000, 1000]])("bounds cleanup limit %s to %s", async (limit, expected) => {
+    const now = new Date("2026-09-20T00:00:00.000Z");
+    await expect(cleanupExpiredSessionRevocations({ limit, now })).resolves.toBe(0);
+    expect(mocks.prisma.revokedSession.findMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lte: now } },
+      select: { revocationKey: true },
+      orderBy: { expiresAt: "asc" },
+      take: expected,
+    });
+  });
+
   it("revokes the current session idempotently and cleans expired rows in a bounded batch", async () => {
     mocks.cookieValue = "header.payload.signature";
     await expect(revokeCurrentSession()).resolves.toBe(true);

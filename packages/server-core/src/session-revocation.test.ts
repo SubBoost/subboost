@@ -62,6 +62,9 @@ describe("session revocation identity", () => {
 
   it("rejects malformed legacy tokens and sessions without a bounded expiration", () => {
     expect(() =>
+      deriveSessionRevocationIdentity({ namespace: " ", token: "header.payload.signature", claims: { exp: 100 } })
+    ).toThrow("namespace is required");
+    expect(() =>
       deriveSessionRevocationIdentity({ namespace: "service", token: "broken", claims: { exp: 100 } })
     ).toThrow("compact JWS");
     expect(() =>
@@ -71,5 +74,25 @@ describe("session revocation identity", () => {
         claims: { jti: "session" },
       })
     ).toThrow("expiration");
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid expiration %s", (exp) => {
+    expect(() => deriveSessionRevocationIdentity({
+      namespace: "local",
+      token: "header.payload.signature",
+      claims: { exp, jti: "session" },
+    })).toThrow("expiration");
+  });
+
+  it("uses legacy identity for blank jti and respects explicit clock tolerance", () => {
+    const token = tokenFor({ exp: 100 });
+    const identity = deriveSessionRevocationIdentity({
+      namespace: "local", token, claims: { exp: 100, jti: " " }, clockToleranceSeconds: 0,
+    });
+    expect(identity.kind).toBe("legacy");
+    expect(identity.expiresAt).toEqual(new Date(100000));
+    expect(() => deriveSessionRevocationIdentity({
+      namespace: "local", token: "header..signature", claims: { exp: 100 },
+    })).toThrow("compact JWS");
   });
 });
