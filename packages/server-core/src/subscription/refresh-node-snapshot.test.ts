@@ -51,6 +51,31 @@ describe("refreshNodeSnapshot", () => {
     expect(result.usedUrlFetch).toBe(true);
   });
 
+  it("returns the smart-match rename needed by relationship reconciliation", async () => {
+    const result = await refreshNodeSnapshot({
+      config: {
+        sources: [{ id: "source", type: "url", content: "https://example.com/sub" }],
+      },
+      urls: [],
+      storedNodes: [
+        {
+          ...node,
+          name: "Old Node",
+          _originName: "Old Node",
+          _sourceIds: ["source"],
+        } as ParsedNode,
+      ],
+      fetchUrlNodes: vi.fn(async () => ({
+        ok: true,
+        nodes: [{ ...node, name: "New Node" }],
+        headers: {},
+      })),
+    });
+
+    expect(result.nodes).toEqual([expect.objectContaining({ name: "New Node", _originName: "New Node" })]);
+    expect(Array.from(result.renameMap ?? [])).toEqual([["Old Node", "New Node"]]);
+  });
+
   it("detaches proxy-provider source nodes and still collects supplemental userinfo", async () => {
     const fetchUrlNodes = vi.fn();
     const fetchUrlUserInfo = vi.fn(async () => ({

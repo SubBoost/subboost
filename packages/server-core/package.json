@@ -11,6 +11,7 @@
     "./crypto": "./src/crypto/index.ts",
     "./crypto/*": "./src/crypto/*.ts",
     "./http": "./src/http.ts",
+    "./session-revocation": "./src/session-revocation.ts",
     "./rules": "./src/rules/index.ts",
     "./rules/*": "./src/rules/*.ts",
     "./templates": "./src/templates/index.ts",

@@ -91,10 +91,20 @@ export const useUserStore = create<UserState>((set) => ({
 
   logout: async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      set({ user: null });
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: unknown };
+        const message =
+          typeof payload.error === "string" && payload.error.trim()
+            ? payload.error
+            : `退出登录失败 (HTTP ${response.status})`;
+        throw new Error(message);
+      }
+      set({ user: null, error: null });
     } catch (error) {
-      console.error("Logout error:", error);
+      const message = error instanceof Error ? error.message : "退出登录失败";
+      set({ error: message });
+      throw error instanceof Error ? error : new Error(message);
     }
   },
 

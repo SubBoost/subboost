@@ -435,6 +435,42 @@ describe("generateClashConfig", () => {
     });
   });
 
+  it("keeps only enabled proxy groups as dialer relays and targets concrete nodes", () => {
+    const config = generateClashConfig({
+      nodes: [ssNode({ name: "Relay" }), ssNode({ name: "Target", server: "target.example.com" })],
+      customProxyGroups: [
+        { id: "custom", name: "🧩 筛选组  美国", emoji: "🧩", groupType: "select" },
+        { id: "disabled", name: "🧩 已停用", emoji: "🧩", enabled: false, groupType: "select" },
+      ],
+      proxyGroupNameOverrides: { auto: "自定义自动", select: "自定义选择" },
+      dialerProxyGroups: [
+        {
+          id: "chain",
+          name: "Chain",
+          type: "select",
+          relayNodes: [
+            "🧩 筛选组  美国",
+            "🧩 已停用",
+            "⚡ 自定义自动",
+            "🚀 自定义选择",
+            "DIRECT",
+            "Relay",
+            "Missing",
+          ],
+          targetNodes: ["🧩 筛选组  美国", "⚡ 自定义自动", "Target", "Missing"],
+        },
+      ],
+      userConfig: { dnsYaml: "", enabledGroups: ["auto", "final"] },
+    });
+
+    expect(config["proxy-groups"]?.find((group) => group.name === "Chain")).toMatchObject({
+      proxies: ["🧩 筛选组  美国", "⚡ 自定义自动", "DIRECT", "Relay"],
+    });
+    expect(config.proxies?.find((proxy) => proxy.name === "Target")).toMatchObject({
+      "dialer-proxy": "Chain",
+    });
+  });
+
   it("uses default base config when base YAML is omitted and skips malformed ordered group names", () => {
     const config = generateClashConfig({
       nodes: [ssNode()],

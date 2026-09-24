@@ -5,6 +5,7 @@ import {
 } from "@subboost/core/subscription/config-utils";
 import { buildProxyProvidersFromConfig } from "@subboost/core/subscription/proxy-providers";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
+import { reconcileNodeNameReferences } from "@subboost/core/subscription/node-name-references";
 import type { ParsedNode } from "@subboost/core/types/node";
 import type { SubscriptionResponseInfo } from "@subboost/core/subscription/subscription-response-info";
 import type { RefreshNodeSnapshotResult } from "./refresh-node-snapshot";
@@ -24,6 +25,7 @@ export type PreparedRefreshCacheResult =
   | {
       ok: true;
       cacheEntry: RefreshCacheEntry;
+      refreshedConfig: Record<string, unknown>;
       generatedYaml: string;
       nodeCount: number;
       proxyProviders?: Record<string, unknown>;
@@ -86,8 +88,19 @@ export function prepareRefreshCacheResult(params: {
     };
   }
 
+  const refreshedConfig = reconcileNodeNameReferences(
+    {
+      ...params.config,
+      sources: params.snapshot.savedSources,
+    },
+    {
+      nodes: params.snapshot.nodes,
+      renameMap: params.snapshot.renameMap,
+    }
+  );
+
   const generatedYaml = generateClashYaml(
-    buildGenerateOptionsFromConfig(params.config, {
+    buildGenerateOptionsFromConfig(refreshedConfig, {
       nodes: params.snapshot.nodes,
       proxyProviders,
     })
@@ -96,6 +109,7 @@ export function prepareRefreshCacheResult(params: {
   return {
     ok: true,
     ...common,
+    refreshedConfig,
     generatedYaml,
     cacheEntry: {
       nodes: params.snapshot.nodes,

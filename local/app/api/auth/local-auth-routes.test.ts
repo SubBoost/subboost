@@ -3,6 +3,7 @@ import { clearLocalRateLimitsForTests } from "@local/lib/rate-limit";
 
 const mocks = vi.hoisted(() => ({
   bcryptCompare: vi.fn(),
+  cleanupExpiredSessionRevocations: vi.fn(async () => 0),
   clearSessionCookieOptions: vi.fn(() => ({ maxAge: 0, path: "/" })),
   getCurrentAdmin: vi.fn(),
   isSetupRequired: vi.fn(),
@@ -20,6 +21,8 @@ const mocks = vi.hoisted(() => ({
     },
   },
   sessionCookieOptions: vi.fn(() => ({ httpOnly: true, path: "/" })),
+  revokeCurrentSession: vi.fn(async () => true),
+  SessionRevocationStoreUnavailableError: class SessionRevocationStoreUnavailableError extends Error {},
   signSession: vi.fn(async () => "signed-session"),
 }));
 
@@ -37,7 +40,10 @@ vi.mock("@local/lib/prisma", () => ({
 }));
 
 vi.mock("@local/lib/session", () => ({
+  cleanupExpiredSessionRevocations: mocks.cleanupExpiredSessionRevocations,
   clearSessionCookieOptions: mocks.clearSessionCookieOptions,
+  revokeCurrentSession: mocks.revokeCurrentSession,
+  SessionRevocationStoreUnavailableError: mocks.SessionRevocationStoreUnavailableError,
   SESSION_COOKIE: "subboost-local-session",
   sessionCookieOptions: mocks.sessionCookieOptions,
   signSession: mocks.signSession,
@@ -114,13 +120,53 @@ describe("local auth and health routes", () => {
     });
   });
 
-  it("logs out by clearing the session cookie", async () => {
+  it("persists logout revocation before clearing the session cookie", async () => {
     const { POST } = await import("./logout/route");
 
     const response = await POST();
 
     expect(await readJson(response)).toEqual({ status: 200, body: { success: true } });
+    expect(mocks.revokeCurrentSession).toHaveBeenCalledTimes(1);
     expect(response.headers.get("set-cookie")).toContain("subboost-local-session=");
+  });
+
+  it("does not clear the cookie or report success when revocation storage fails", async () => {
+    const { POST } = await import("./logout/route");
+    mocks.revokeCurrentSession.mockRejectedValueOnce(
+      new mocks.SessionRevocationStoreUnavailableError("db down")
+    );
+
+    const response = await POST();
+
+    expect(await readJson(response)).toEqual({
+      status: 503,
+      body: { error: "Session service unavailable.", code: "SESSION_STORE_UNAVAILABLE" },
+    });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("preserves successful logout when expired-session cleanup fails", async () => {
+    const { POST } = await import("./logout/route");
+    const cause = new Error("cleanup unavailable");
+    mocks.cleanupExpiredSessionRevocations.mockRejectedValueOnce(cause);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await POST();
+      expect(await readJson(response)).toEqual({ status: 200, body: { success: true } });
+      expect(response.headers.get("set-cookie")).toContain("subboost-local-session=");
+      expect(log).toHaveBeenCalledWith("Local session revocation cleanup failed:", cause);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("propagates unexpected revocation errors without clearing the cookie", async () => {
+    const { POST } = await import("./logout/route");
+    const cause = new Error("unexpected failure");
+    mocks.revokeCurrentSession.mockRejectedValueOnce(cause);
+    await expect(POST()).rejects.toBe(cause);
+    expect(mocks.clearSessionCookieOptions).not.toHaveBeenCalled();
+    expect(mocks.cleanupExpiredSessionRevocations).not.toHaveBeenCalled();
   });
 
   it("returns the current admin snapshot and anonymous setup state", async () => {

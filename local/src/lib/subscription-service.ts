@@ -358,7 +358,7 @@ async function persistRefreshSuccess(params: {
       where: { id: params.subscriptionId, updatedAt: params.expectedUpdatedAt },
       data: {
         encryptedNodes: encryptJson(params.snapshot.nodes),
-        encryptedConfig: encryptJson({ ...params.config, sources: params.snapshot.savedSources }),
+        encryptedConfig: encryptJson(params.config),
         encryptedSubscriptionInfo: encryptJson(params.snapshot.subscriptionInfo),
         lastUpdatedAt: params.cachedAt,
         cacheExpiresAt: buildSubscriptionCacheExpiry(params.cachedAt),
@@ -407,7 +407,7 @@ export async function refreshSubscription(ownerId: string, id: string) {
     subscriptionId: row.id,
     expectedUpdatedAt: row.updatedAt,
     snapshot,
-    config: secrets.config,
+    config: refreshResult.refreshedConfig,
     cachedAt,
   });
   if (!persisted) {

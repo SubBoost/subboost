@@ -257,6 +257,7 @@ describe("createSourceActions parseMultipleSources", () => {
   });
 
   it("merges duplicate parsed nodes and prunes stale listener ports and dialer nodes", async () => {
+    const migratedCustomGroupName = "🧩 筛选组  美国";
     const duplicate = node("Duplicate", {
       server: "same.example.com",
       _originName: "Duplicate",
@@ -270,6 +271,12 @@ describe("createSourceActions parseMultipleSources", () => {
     ];
     const { actions, getState } = createHarness({
       sources,
+      enabledProxyGroups: ["auto"],
+      customProxyGroups: [
+        { id: "legacy-us", name: migratedCustomGroupName, emoji: "🧩", enabled: true, groupType: "select" },
+        { id: "disabled", name: "🧩 已停用", emoji: "🧩", enabled: false, groupType: "select" },
+      ],
+      proxyGroupNameOverrides: { auto: "自定义自动" },
       listenerPorts: {
         Duplicate: 41000,
         Stale: 41001,
@@ -279,8 +286,15 @@ describe("createSourceActions parseMultipleSources", () => {
           id: "dialer-1",
           name: "Relay",
           type: "select",
-          relayNodes: ["Duplicate", "DIRECT", "Stale"],
-          targetNodes: ["Duplicate", "Stale"],
+          relayNodes: [
+            `  ${migratedCustomGroupName}  `,
+            "⚡ 自定义自动",
+            "Duplicate",
+            "DIRECT",
+            "Stale",
+            "🧩 已停用",
+          ],
+          targetNodes: [migratedCustomGroupName, "⚡ 自定义自动", "Duplicate", "Stale"],
         },
       ],
     });
@@ -295,7 +309,7 @@ describe("createSourceActions parseMultipleSources", () => {
     });
     expect(getState().listenerPorts).toEqual({ Duplicate: 41000 });
     expect(getState().dialerProxyGroups[0]).toMatchObject({
-      relayNodes: ["Duplicate", "DIRECT"],
+      relayNodes: [migratedCustomGroupName, "⚡ 自定义自动", "Duplicate", "DIRECT"],
       targetNodes: ["Duplicate"],
     });
     expect(getState().parseErrors).toEqual(["源 #1: first warning"]);

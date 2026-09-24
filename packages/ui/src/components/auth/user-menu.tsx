@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@subboost/ui/components/ui/dropdown-menu";
 import { SafeImage } from "@subboost/ui/components/ui/safe-image";
+import { toast } from "@subboost/ui/components/ui/toaster";
 import { captureAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
 import { useConfigStore } from "@subboost/ui/store/config-store";
 import { useUserStore } from "@subboost/ui/store/user-store";
@@ -39,9 +40,17 @@ export function UserMenu({ privilegedMenuItem }: { privilegedMenuItem?: AccountM
   }, [fetchUser]);
 
   const handleLogout = async () => {
-    if (user) await userLogout();
-    setIsOpen(false);
-    window.location.href = "/";
+    try {
+      if (user) await userLogout();
+      setIsOpen(false);
+      window.location.href = "/";
+    } catch (error) {
+      toast({
+        title: "退出登录失败",
+        description: error instanceof Error ? error.message : "会话服务暂时不可用，请稍后重试。",
+        variant: "destructive",
+      });
+    }
   };
 
   const isLoading = userLoading && !user;

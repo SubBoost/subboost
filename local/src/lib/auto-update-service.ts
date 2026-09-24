@@ -187,15 +187,13 @@ async function completeSuccess(params: {
     maxNodesPerSubscription: MAX_NODES_PER_SUBSCRIPTION,
   });
   if (decision.kind !== "success") throw new Error(`Unexpected refresh completion decision: ${decision.kind}`);
-  const config = { ...params.prepared.config, sources: params.prepared.snapshot.savedSources };
-
   const persisted = await writeAutoUpdateState(
     params.subscription.id,
     params.subscription.updatedAt,
     decision.nextAutoUpdateState.state,
     {
       encryptedNodes: encryptJson(refreshResult.cacheEntry.nodes),
-      encryptedConfig: encryptJson(config),
+      encryptedConfig: encryptJson(refreshResult.refreshedConfig),
       encryptedSubscriptionInfo: encryptJson(refreshResult.cacheEntry.subscriptionInfo),
       lastUpdatedAt: cachedAt,
       cacheExpiresAt: buildSubscriptionCacheExpiry(cachedAt),

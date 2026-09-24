@@ -202,6 +202,102 @@ describe("prepareRefreshCacheResult", () => {
     });
   });
 
+  it("generates and persists from reconciled node relationships", () => {
+    const renamedNode = { ...node, name: "New Node" };
+    const result = prepareRefreshCacheResult({
+      config: {
+        listenerPorts: { "Old Node": 12000 },
+        dialerProxyGroups: [
+          {
+            id: "chain",
+            name: "Chain",
+            type: "select",
+            relayNodes: ["DIRECT", "Old Node"],
+            targetNodes: ["Old Node"],
+          },
+        ],
+        proxyGroupAdvanced: {
+          auto: { memberOrder: [{ kind: "node", name: "Old Node" }] },
+        },
+      },
+      snapshot: snapshot({
+        nodes: [renamedNode],
+        savedSources: [{ id: "source", type: "url", content: "https://example.com/sub" }],
+        renameMap: new Map([["Old Node", "New Node"]]),
+      }),
+      maxNodesPerSubscription: 10,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.refreshedConfig).toMatchObject({
+      listenerPorts: { "New Node": 12000 },
+      dialerProxyGroups: [
+        expect.objectContaining({ relayNodes: ["DIRECT", "New Node"], targetNodes: ["New Node"] }),
+      ],
+      proxyGroupAdvanced: {
+        auto: { memberOrder: [{ kind: "node", name: "New Node" }] },
+      },
+      sources: [{ id: "source", type: "url", content: "https://example.com/sub" }],
+    });
+    expect(result.generatedYaml).toContain('port: 12000, proxy: "New Node"');
+    expect(result.generatedYaml).toContain("dialer-proxy: Chain");
+  });
+
+  it("preserves a migrated custom proxy group relay through refresh and YAML generation", () => {
+    const migratedCustomGroupName = "🧩 筛选组  美国";
+    const result = prepareRefreshCacheResult({
+      config: {
+        enabledGroups: ["select", "auto", "final"],
+        customProxyGroups: [
+          {
+            id: "legacy-us",
+            name: migratedCustomGroupName,
+            emoji: "🧩",
+            enabled: true,
+            groupType: "select",
+          },
+        ],
+        dialerProxyGroups: [
+          {
+            id: "group-relay",
+            name: "Group Relay",
+            type: "select",
+            relayNodes: [migratedCustomGroupName],
+            targetNodes: ["node-a"],
+          },
+        ],
+      },
+      snapshot: snapshot(),
+      maxNodesPerSubscription: 10,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.refreshedConfig).toMatchObject({
+      dialerProxyGroups: [
+        expect.objectContaining({ relayNodes: [migratedCustomGroupName], targetNodes: ["node-a"] }),
+      ],
+    });
+    expect(result.generatedYaml).toContain('dialer-proxy: "Group Relay"');
+    expect(result.generatedYaml).toContain(migratedCustomGroupName);
+  });
+
+  it.each([[], "auto"])(
+    "keeps legacy template fallback for empty or malformed enabledGroups=%j",
+    (enabledGroups) => {
+      const result = prepareRefreshCacheResult({
+        config: { enabledGroups },
+        snapshot: snapshot(),
+        maxNodesPerSubscription: 10,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.generatedYaml).toContain("⚡ 自动选择");
+    }
+  );
+
   it("rejects invalid persisted filters before publishing refresh output", () => {
     expect(() =>
       prepareRefreshCacheResult({

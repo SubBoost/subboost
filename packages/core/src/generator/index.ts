@@ -35,6 +35,7 @@ import type {
 import type { DialerProxyGroup } from "@subboost/core/types/template-config";
 import { collectDnsPolicyEntries, configToYaml } from "./yaml";
 import { isMihomoSupportedProxyNode, normalizeMihomoVlessForGeneration } from "../mihomo/proxy-sanitizer";
+import { getValidDialerRelayGroupNames } from "../subscription/dialer-relay-group-names";
 import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-targets";
 import { resolveGroupListenerEntries, type GroupListenerTargetResolution } from "./group-listeners";
 
@@ -287,18 +288,17 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
 
   const nodeNameSet = new Set(uniqueNodes.map((n) => n.name));
   const activeCustomProxyGroups = customProxyGroups.filter((g) => g && g.enabled !== false);
-  const customGroupNameSet = new Set<string>(
-    activeCustomProxyGroups.filter((g) => g && typeof g.name === "string" && g.name.trim()).map((g) => g.name.trim())
-  );
-  const moduleGroupNameSet = new Set<string>(
-    PROXY_GROUP_MODULES.map((mod) => resolveProxyGroupModuleName(mod, proxyGroupNameOverrides?.[mod.id]))
-  );
+  const validRelayGroupNames = getValidDialerRelayGroupNames({
+    customProxyGroups,
+    enabledGroups: config.enabledGroups,
+    proxyGroupNameOverrides,
+  });
   const enabledDialerProxyGroups = dialerProxyGroups.filter((g) => g && g.enabled !== false);
   const sanitizedDialerProxyGroups = enabledDialerProxyGroups.length > 0
     ? sanitizeDialerProxyGroups(
         enabledDialerProxyGroups,
         nodeNameSet,
-        new Set([...moduleGroupNameSet, ...customGroupNameSet])
+        validRelayGroupNames
       )
     : [];
 
@@ -310,8 +310,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     "DIRECT",
     ...nodeNameSet,
     ...proxyProviderNames,
-    ...moduleGroupNameSet,
-    ...customGroupNameSet,
+    ...validRelayGroupNames,
     ...sanitizedDialerProxyGroups.map((g) => g.name.trim()).filter(Boolean),
   ]);
   const outputNodes = allNodes.map((node) => {

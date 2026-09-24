@@ -170,6 +170,7 @@ describe("automatic refresh completion helpers", () => {
       currentAutoUpdateState,
       prepared: makePrepared({
         ok: true,
+        refreshedConfig: {},
         cacheEntry: { nodes: [], subscriptionInfo: {}, generatedYaml: "yaml" },
         generatedYaml: "yaml",
         nodeCount: 3,
@@ -219,6 +220,7 @@ describe("automatic refresh completion helpers", () => {
       currentAutoUpdateState,
       prepared: makePrepared({
         ok: true,
+        refreshedConfig: {},
         cacheEntry: { nodes: [], subscriptionInfo: {}, generatedYaml: "yaml" },
         generatedYaml: "yaml",
         nodeCount: undefined as never,

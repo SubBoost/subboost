@@ -100,14 +100,40 @@ describe("user store", () => {
     expect(useUserStore.getState()).toEqual(expect.objectContaining({ user: null, error: null }));
   });
 
-  it("keeps logout failures contained and leaves missing users unchanged for local flag updates", async () => {
-    vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("logout failed")));
+  it("keeps the authenticated user when logout persistence fails", async () => {
+    const currentUser = user();
+    useUserStore.setState({ user: currentUser, error: null });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: vi.fn(async () => ({ error: "Session service unavailable." })),
+      })
+    );
 
-    await useUserStore.getState().logout();
-    expect(useUserStore.getState().user).toBeNull();
+    await expect(useUserStore.getState().logout()).rejects.toThrow("Session service unavailable.");
+    expect(useUserStore.getState()).toEqual(
+      expect.objectContaining({ user: currentUser, error: "Session service unavailable." })
+    );
 
     useUserStore.getState().updateAiAssistantEnabled(true);
-    expect(useUserStore.getState().user).toBeNull();
+    expect(useUserStore.getState().user?.aiAssistantEnabled).toBe(true);
+  });
+
+  it("keeps the user and reports HTTP status when logout returns invalid JSON", async () => {
+    const currentUser = user();
+    useUserStore.setState({ user: currentUser, error: null });
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: vi.fn().mockRejectedValueOnce(new SyntaxError("Invalid JSON")),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(useUserStore.getState().logout()).rejects.toThrow("退出登录失败 (HTTP 503)");
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(useUserStore.getState().user).toBe(currentUser);
+    expect(useUserStore.getState().error).toBe("退出登录失败 (HTTP 503)");
   });
 });

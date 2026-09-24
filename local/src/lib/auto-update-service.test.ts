@@ -104,6 +104,7 @@ describe("local subscription auto update service", () => {
     });
     mocks.prepareRefreshCacheResult.mockReturnValue({
       ok: true,
+      refreshedConfig: { rules: [], sources: [{ url: "https://airport.example/sub" }] },
       cacheEntry: { nodes: [{ name: "A" }], subscriptionInfo: { upload: 1 } },
       nodeCount: 1,
     });
