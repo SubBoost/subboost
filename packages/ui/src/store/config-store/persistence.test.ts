@@ -35,7 +35,7 @@ describe("config store persistence", () => {
   });
 
   it("defaults missing or malformed node-name filter data without a storage-version bump", () => {
-    expect(CONFIG_DRAFT_STORAGE_VERSION).toBe(10);
+    expect(CONFIG_DRAFT_STORAGE_VERSION).toBe(11);
     expect(normalizePersistedConfigState({}).nodeNameFilter).toEqual(
       DEFAULT_NODE_NAME_FILTER_CONFIG
     );

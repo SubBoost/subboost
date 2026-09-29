@@ -34,13 +34,17 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("react", () => ({
+vi.mock("react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react")>(),
   useState: mocks.useState,
+  useRef: () => ({ current: null }),
   useEffect: mocks.useEffect,
 }));
 
-vi.mock("../../../node_modules/react/index.js", () => ({
+vi.mock("../../../node_modules/react/index.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react")>(),
   useState: mocks.useState,
+  useRef: () => ({ current: null }),
   useEffect: mocks.useEffect,
 }));
 
@@ -152,7 +156,7 @@ describe("editing subscription loader state normalization", () => {
     });
   });
 
-  it("normalizes advanced groups and rejects malformed listener entries while preserving current mixed sources", async () => {
+  it("normalizes saved configuration without borrowing current mixed sources", async () => {
     const setStoreSources = vi.fn();
     const setEditingSubscription = vi.fn();
     const options = {
@@ -205,19 +209,15 @@ describe("editing subscription loader state normalization", () => {
 
     expect(setStoreSources).toHaveBeenCalledWith([
       expect.objectContaining({
-        id: "current-1",
+        id: "sub-url-1",
         content: "invalid first url",
-        lastParsedContent: "invalid previous url",
-        userinfoUrl: "invalid userinfo url",
-        nodeCount: 1,
+        lastParsedContent: "invalid first url",
       }),
       expect.objectContaining({
-        id: "current-2",
+        id: "sub-url-2",
         content: "invalid second url",
         lastParsedContent: "invalid second url",
-        nodeCount: 1,
       }),
-      expect.objectContaining({ id: "current-yaml", type: "yaml" }),
     ]);
     expect(mocks.bag.storeState.proxyGroupAdvanced).toEqual({
       group: { includeRegex: "Alpha" },
@@ -239,6 +239,6 @@ describe("editing subscription loader state normalization", () => {
     expect(setEditingSubscription).toHaveBeenCalledWith(
       expect.objectContaining({ id: "sub-1", token: "token-1" })
     );
-    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "节点来源信息缺失", variant: "warning" }));
   });
 });

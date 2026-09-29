@@ -165,6 +165,8 @@ export async function fetchUrlContentInBrowser(
 }
 
 export interface ConfigState {
+  /** Changes when a new editor session replaces the current draft; never persisted. */
+  draftRevision: number;
   // 节点相关
   nodes: ParsedNode[];
   deletedNodeNames: string[];
@@ -348,6 +350,7 @@ export interface ConfigActions {
 }
 
 export const initialState: ConfigState = {
+  draftRevision: 0,
   nodes: [],
   deletedNodeNames: [],
   deletedNodes: [],

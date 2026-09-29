@@ -99,6 +99,6 @@ export function setConfigDraftUserScope(userId: string | null | undefined) {
 
   activeConfigDraftStorageName = storageName;
   useConfigStore.persist.setOptions({ name: storageName });
-  useConfigStore.setState({ ...initialState, ...state });
+  useConfigStore.setState((current) => ({ ...initialState, ...state, draftRevision: current.draftRevision + 1 }));
   useConfigStore.getState().generateConfig();
 }

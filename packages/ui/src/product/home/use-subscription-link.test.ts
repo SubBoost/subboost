@@ -275,6 +275,24 @@ describe("useSubscriptionLink", () => {
     );
   });
 
+  it.each(["success", "unauthorized", "rejected"])("ignores a late %s save after the draft is reset", async (kind) => {
+    const clearUser = vi.fn();
+    const adapter = makeAdapter({ saveSubscription: vi.fn(async () => {
+      mocks.bag.storeState.draftRevision = 1;
+      if (kind === "rejected") throw new Error("late request");
+      return response(kind === "unauthorized" ? 401 : 200, { subscription: { token: "late", subscriptionUrl: "https://local.subboost.test/s/late" } });
+    }) });
+    let hook = useRenderedHook({ subscriptionAdapter: adapter, clearUser });
+    hook.setSubscriptionName("Saved draft");
+    hook = useRenderedHook({ subscriptionAdapter: adapter, clearUser });
+    await hook.handleCreateSubscription();
+    hook = useRenderedHook({ subscriptionAdapter: adapter, clearUser });
+    expect(hook.subscriptionUrl).toBe("");
+    expect(clearUser).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(mocks.bag.interactions.subscriptionLinkSaved).not.toHaveBeenCalled();
+  });
+
   it("allows adapter-specific decimal auto-update intervals", async () => {
     const adapter = makeAdapter({
       autoUpdateIntervalPolicy: {

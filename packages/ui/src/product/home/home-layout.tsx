@@ -336,7 +336,7 @@ export function HomeLayout({
                   <Button
                     className="h-10 border-rose-500/50 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 hover:border-rose-400/70"
                     variant="outline"
-                    onClick={() => (window.location.href = "/")}
+                    onClick={() => (window.location.href = "/?newSubscription=1")}
                     title="退出编辑模式"
                   >
                     退出编辑

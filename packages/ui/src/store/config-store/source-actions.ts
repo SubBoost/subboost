@@ -94,7 +94,7 @@ function filterDialerProxyGroupsByAvailableNames(
 }
 
 export function createSourceActions(set: SetState, get: GetState, setAndGenerateConfig: SetAndGenerateConfig): SourceActions {
-  const importOperations = new SourceImportOperationGuard();
+  const importOperations = new SourceImportOperationGuard(() => get().draftRevision ?? 0);
   const discardStaleSingle = (operation: SingleSourceImportOperation): boolean => {
     if (importOperations.isSingleCurrent(get().sources, operation)) return false;
     if (importOperations.ownsSingle(operation)) {
