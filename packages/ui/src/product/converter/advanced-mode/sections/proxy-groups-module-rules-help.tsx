@@ -36,7 +36,6 @@ export function CnIpNoResolveHelpButton() {
       side="bottom"
       align="end"
       contentClassName="w-[360px] bg-black/90 p-3"
-      className="text-amber-300/70"
     >
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2">

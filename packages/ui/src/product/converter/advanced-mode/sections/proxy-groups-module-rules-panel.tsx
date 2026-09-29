@@ -403,7 +403,7 @@ export function ProxyGroupsModuleRulesPanel({
         <div>
           <div
             className={cn(
-              "proxy-group-rule-row grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 rounded border border-white/10 bg-white/[0.04] px-2 py-2",
+              "proxy-group-rule-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded border border-white/10 bg-white/[0.04] px-2 py-2",
               !experimentalCnUseCnRuleSet && "border-red-500/20 bg-red-500/10"
             )}
           >
@@ -518,7 +518,7 @@ export function ProxyGroupsModuleRulesPanel({
             {availableCnCandidateRules.map((rule) => (
               <div
                 key={rule.id}
-                className="proxy-group-rule-row grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 rounded border border-white/10 bg-white/[0.03] px-2 py-2"
+                className="proxy-group-rule-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded border border-white/10 bg-white/[0.03] px-2 py-2"
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">

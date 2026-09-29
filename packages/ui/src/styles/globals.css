@@ -295,6 +295,24 @@
     }
   }
 
+  @container (max-width: 18rem) {
+    .proxy-group-custom-rule-editor-trailing {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .proxy-group-custom-rule-editor-target {
+      grid-column: 1 / -1;
+    }
+
+    .proxy-group-custom-rule-editor-trailing > :last-child {
+      justify-self: end;
+    }
+
+    .proxy-group-custom-rule-editor-trailing .proxy-group-rule-no-resolve-label {
+      display: inline;
+    }
+  }
+
   .proxy-group-summary-text {
     font-size: var(--proxy-group-summary-font-size, 0.75rem);
   }

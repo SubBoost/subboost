@@ -9,6 +9,7 @@ import { Input } from "@subboost/ui/components/ui/input";
 import { Switch } from "@subboost/ui/components/ui/switch";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { SmartNodeMatchingHelp } from "@subboost/ui/components/subscription/smart-node-matching-help";
+import { SubscriptionQrCode } from "@subboost/ui/product/subscription/subscription-qr-code";
 import {
   Dialog,
   DialogContent,
@@ -154,6 +155,7 @@ export function SubscriptionLinkDialog({
           </div>
         ) : (
           <div className="space-y-4 py-4">
+            <SubscriptionQrCode url={subscriptionUrl} />
             <div className="space-y-2">
               <p className="text-sm font-medium">订阅链接</p>
               <div className="flex gap-2">

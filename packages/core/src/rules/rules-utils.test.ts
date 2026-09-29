@@ -124,11 +124,11 @@ describe("custom rule helpers", () => {
     });
 
     expect(result.skippedCount).toBe(2);
-    expect(result.errorCount).toBe(5);
+    expect(result.errorCount).toBe(4);
     expect(result.canImport).toBe(false);
     expect(result.items.map((item) => item.message)).toContain("规则列数过多");
     expect(result.items.map((item) => item.message)).toContain("规则值不能为空");
-    expect(result.items.map((item) => item.message)).toContain("目标不能为空");
+    expect(result.rules[0]).toMatchObject({ target: "DIRECT", value: "example.com" });
     expect(result.items.map((item) => item.message)).toContain("未知目标：Unknown");
     expect(result.items.map((item) => item.message)).toContain("不支持的尾列：bad-tail");
   });
@@ -154,9 +154,9 @@ describe("custom rule helpers", () => {
     expect(result.canImport).toBe(false);
     expect(result.items[0]).toMatchObject({ status: "skipped", message: "rules 块标记" });
     expect(result.items.slice(1).map((item) => item.message)).toEqual([
-      "未知规则类型：RULE-SET",
-      "未知规则类型：RULE-SET",
-      "未知规则类型：RULE-SET",
+      "请输入有效的规则集 HTTP/HTTPS 链接",
+      "请输入有效的规则集 HTTP/HTTPS 链接",
+      "请输入有效的规则集 HTTP/HTTPS 链接",
     ]);
     expect(result.rules).toEqual([]);
   });

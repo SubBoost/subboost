@@ -1,4 +1,5 @@
 "use client";
+import { SubscriptionQrButton } from "@subboost/ui/product/subscription/subscription-qr-code";
 
 import * as React from "react";
 import Link from "next/link";
@@ -521,6 +522,7 @@ function SubscriptionRow({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+        <SubscriptionQrButton url={sub.subscriptionUrl} />
         <Button asChild variant="ghost" size="sm" className="gap-0 sm:gap-2" title="回到首页编辑该订阅（更新后链接不变）">
           <Link href={editHref}>
             <Settings className="h-4 w-4" />

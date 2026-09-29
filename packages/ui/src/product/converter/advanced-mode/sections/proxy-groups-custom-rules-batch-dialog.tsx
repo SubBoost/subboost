@@ -14,9 +14,10 @@ import { toast } from "@subboost/ui/components/ui/toaster";
 import {
   parseCustomRuleBatchImport,
   type CustomRuleBatchImportPreviewItem,
+  type ParseCustomRuleBatchImportOptions,
 } from "@subboost/core/rules/custom-rule-batch-import";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
-import type { CustomRule } from "@subboost/core/types/config";
+import type { CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 
 function getStatusClass(item: CustomRuleBatchImportPreviewItem): string {
   if (item.status === "ready") {
@@ -46,17 +47,25 @@ export function ProxyGroupsCustomRulesBatchDialog({
   defaultTarget,
   defaultNoResolve,
   targetOptions,
+  ruleSetTargetOptions,
   existingRules,
+  existingRuleSets,
+  reservedRuleSetIds,
   onImport,
+  onImportRuleSets,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultType: CustomRule["type"];
+  defaultType: ParseCustomRuleBatchImportOptions["defaultType"];
   defaultTarget: string;
   defaultNoResolve: boolean;
   targetOptions: string[];
+  ruleSetTargetOptions?: string[];
   existingRules: CustomRule[];
+  existingRuleSets?: CustomRuleSet[];
+  reservedRuleSetIds?: string[];
   onImport: (rules: CustomRule[]) => void;
+  onImportRuleSets?: (rules: CustomRuleSet[]) => void;
 }) {
   const [rawText, setRawText] = React.useState("");
   const interactions = useProductInteractionAdapter();
@@ -69,15 +78,21 @@ export function ProxyGroupsCustomRulesBatchDialog({
         defaultTarget,
         defaultNoResolve,
         targetOptions,
+        ruleSetTargetOptions,
         existingRules,
+        existingRuleSets,
+        reservedRuleSetIds,
       }),
     [
       defaultNoResolve,
       defaultTarget,
       defaultType,
       existingRules,
+      existingRuleSets,
+      reservedRuleSetIds,
       rawText,
       targetOptions,
+      ruleSetTargetOptions,
     ],
   );
 
@@ -120,7 +135,8 @@ export function ProxyGroupsCustomRulesBatchDialog({
       return;
     }
 
-    onImport(importPlan.rules);
+    if (importPlan.rules.length > 0) onImport(importPlan.rules);
+    if (importPlan.ruleSets.length > 0) onImportRuleSets?.(importPlan.ruleSets);
     interactions.customRuleBatchImported?.({
       result: "success",
       ruleCount: importPlan.readyCount,
@@ -162,7 +178,7 @@ export function ProxyGroupsCustomRulesBatchDialog({
             <Textarea
               value={rawText}
               onChange={(event) => setRawText(event.target.value)}
-              placeholder={[
+              placeholder={defaultType === "RULE-SET" ? "https://example.com/geosite/udemy.mrs" : [
                 "DOMAIN-SUFFIX,example.com,🚀 节点选择",
                 "IP-CIDR,1.1.1.0/24,DIRECT,no-resolve",
                 "GEOSITE,google",

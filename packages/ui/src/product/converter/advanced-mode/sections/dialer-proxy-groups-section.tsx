@@ -675,20 +675,19 @@ export function DialerProxyGroupsSection({
             groupName={settingsGroup.name}
             groupType={settingsGroup.type}
             strategy={settingsGroup.strategy}
+            testUrl={settingsGroup.testUrl}
             listenerTarget={target}
             listenerBinding={findGroupListenerBinding(groupListeners, target)}
             conflictState={listenerConflictState}
-            onSave={({ groupType, strategy, listener }) => {
+            onSave={({ groupType, strategy, listener, testUrl }) => {
               updateDialerProxyGroup(settingsGroup.id, {
+                testUrl,
                 type: groupType,
                 ...(groupType === "load-balance"
                   ? { strategy: strategy ?? settingsGroup.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY }
                   : { strategy: undefined }),
               });
-              setGroupListener(
-                target,
-                listener ? { port: listener.port, enabled: listener.enabled, allowLan: listener.allowLan } : null
-              );
+              setGroupListener(target, listener);
             }}
           />
         );

@@ -166,6 +166,17 @@ function normalizeMemberList(value: unknown): ProxyGroupMemberRef[] {
   return out;
 }
 
+export function normalizeGroupTestUrl(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  try {
+    const url = new URL(value.trim());
+    return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password
+      ? value.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function normalizeProxyGroupAdvancedConfig(value: unknown): ProxyGroupAdvancedConfig {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const item = value as Record<string, unknown>;
@@ -182,7 +193,9 @@ export function normalizeProxyGroupAdvancedConfig(value: unknown): ProxyGroupAdv
   const extraMembers = normalizeMemberList(item.extraMembers);
   const excludedMembers = normalizeMemberList(item.excludedMembers);
   const memberOrder = normalizeMemberList(item.memberOrder);
+  const testUrl = normalizeGroupTestUrl(item.testUrl);
   return {
+    ...(testUrl ? { testUrl } : {}),
     ...(sourceIds.length > 0 ? { sourceIds } : {}),
     ...(regions.length > 0 ? { regions } : {}),
     ...(includeRegex ? { includeRegex } : {}),

@@ -541,11 +541,13 @@ export function ProxyGroupsCustomGroupsPanel({
             groupName={settingsGroup.name}
             groupType={settingsGroup.groupType}
             strategy={settingsGroup.strategy}
+            testUrl={settingsGroup.advanced?.testUrl}
             listenerTarget={target}
             listenerBinding={findGroupListenerBinding(groupListeners, target)}
             conflictState={listenerConflictState}
-            onSave={({ groupType, strategy, listener }) => {
+            onSave={({ groupType, strategy, listener, testUrl }) => {
               updateCustomProxyGroup(settingsGroup.id, {
+                ...(testUrl !== settingsGroup.advanced?.testUrl ? { advanced: { ...settingsGroup.advanced, testUrl } } : {}),
                 groupType: groupType as ProxyGroupGroupType,
                 ...(groupType === "load-balance"
                   ? { strategy: strategy ?? settingsGroup.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY }

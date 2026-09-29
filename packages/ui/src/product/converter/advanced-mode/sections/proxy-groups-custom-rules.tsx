@@ -21,6 +21,8 @@ import {
   CUSTOM_RULE_TYPES,
 } from "@subboost/core/rules/custom-rule-utils";
 import { useConfigStore } from "@subboost/ui/store/config-store";
+import { allocateRuleSetId, parseManualRuleSetUrl } from "@subboost/core/rules/rule-model";
+import { toast } from "@subboost/ui/components/ui/toaster";
 import type { CustomProxyGroup, CustomRule, ProxyGroupRuleTarget } from "@subboost/core/types/config";
 import {
   useProductInteractionAdapter,
@@ -107,7 +109,9 @@ function toStableRuleTarget(
 export function ProxyGroupsCustomRules() {
   const {
     customRules,
+    customRuleSets = [],
     addCustomRule,
+    addModuleRules,
     addCustomRules,
     updateCustomRule,
     removeCustomRule,
@@ -117,7 +121,7 @@ export function ProxyGroupsCustomRules() {
   } = useConfigStore();
 
   const [newRuleType, setNewRuleType] =
-    React.useState<CustomRule["type"]>("DOMAIN");
+    React.useState<CustomRule["type"] | "RULE-SET">("DOMAIN");
   const [newRuleValue, setNewRuleValue] = React.useState("");
   const [newRuleTarget, setNewRuleTarget] = React.useState("🚀 节点选择");
   const [newRuleNoResolve, setNewRuleNoResolve] = React.useState(false);
@@ -186,6 +190,26 @@ export function ProxyGroupsCustomRules() {
     if (!value || !newRuleTarget) return;
     const addedRuleType = newRuleType;
 
+    if (addedRuleType === "RULE-SET") {
+      const target = toStableRuleTarget(newRuleTarget, moduleNames, customProxyGroups);
+      if (typeof target === "string") {
+        toast({ title: "请选择规则集使用的代理组", variant: "warning" });
+        return;
+      }
+      try {
+        const ruleSet = parseManualRuleSetUrl(value);
+        const id = allocateRuleSetId(ruleSet.name, [
+          ...PROXY_GROUP_MODULES.flatMap((module) => module.rules.map((rule) => rule.id)),
+          ...customRuleSets.map((rule) => rule.id),
+        ]);
+        addModuleRules(target.id, [{ ...ruleSet, id, name: id, noResolve: newRuleNoResolve }]);
+        setNewRuleValue("");
+      } catch (error) {
+        toast({ title: error instanceof Error ? error.message : "规则集链接无效", variant: "warning" });
+      }
+      return;
+    }
+
     addCustomRule({
       id: createCustomRuleId(),
       type: addedRuleType,
@@ -202,9 +226,12 @@ export function ProxyGroupsCustomRules() {
   };
 
   const handleNewRuleTypeChange = (value: string) => {
-    const nextType = value as CustomRule["type"];
+    const nextType = value as CustomRule["type"] | "RULE-SET";
     setNewRuleType(nextType);
-    setNewRuleNoResolve(isIpCidrRuleType(nextType));
+    setNewRuleNoResolve(nextType !== "RULE-SET" && isIpCidrRuleType(nextType));
+    if (nextType === "RULE-SET" && ["DIRECT", "REJECT"].includes(newRuleTarget)) {
+      setNewRuleTarget(enabledGroupNames[0] ?? "");
+    }
   };
 
   const startEditingRule = (rule: CustomRule) => {
@@ -260,7 +287,16 @@ export function ProxyGroupsCustomRules() {
         defaultTarget={newRuleTarget}
         defaultNoResolve={newRuleNoResolve}
         targetOptions={batchTargetOptions}
-        existingRules={customRules}
+        ruleSetTargetOptions={enabledGroupNames}
+        existingRules={customRules.map((rule) => ({ ...rule, target: resolveTargetName(rule.target) }))}
+        existingRuleSets={customRuleSets.map((rule) => ({ ...rule, target: resolveTargetName(rule.target) }))}
+        reservedRuleSetIds={PROXY_GROUP_MODULES.flatMap((module) => module.rules.map((rule) => rule.id))}
+        onImportRuleSets={(rules) => {
+          for (const rule of rules) {
+            const target = toStableRuleTarget(resolveTargetName(rule.target), moduleNames, customProxyGroups);
+            if (typeof target !== "string") addModuleRules(target.id, [rule]);
+          }
+        }}
         onImport={(rules) =>
           addCustomRules(
             rules.map((rule) => ({
@@ -280,10 +316,11 @@ export function ProxyGroupsCustomRules() {
             >
               <SelectTrigger className="h-7 w-[112px] max-w-full shrink-0 text-xs">
                 <span className="truncate">
-                  {CUSTOM_RULE_TYPE_SHORT_LABELS[newRuleType]}
+                  {newRuleType === "RULE-SET" ? "规则集" : CUSTOM_RULE_TYPE_SHORT_LABELS[newRuleType]}
                 </span>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="RULE-SET" className="text-xs">规则集 (RULE-SET)</SelectItem>
                 {CUSTOM_RULE_TYPE_OPTIONS.map((option) => (
                   <SelectItem
                     key={option.value}
@@ -298,7 +335,7 @@ export function ProxyGroupsCustomRules() {
             <Input
               value={newRuleValue}
               onChange={(e) => setNewRuleValue(e.target.value)}
-              placeholder="值 (如: google.com)"
+              placeholder={newRuleType === "RULE-SET" ? "规则集链接 (https://…/geosite/udemy.mrs)" : "值 (如: google.com)"}
               className="h-7 min-w-0 flex-[1_1_4.5rem] text-xs"
             />
           </div>
@@ -308,7 +345,7 @@ export function ProxyGroupsCustomRules() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {targetOptions.map((target) => (
+                {targetOptions.filter((target) => newRuleType !== "RULE-SET" || !["DIRECT", "REJECT"].includes(target)).map((target) => (
                   <SelectItem key={target} value={target} className="text-xs">
                     {target}
                   </SelectItem>

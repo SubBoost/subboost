@@ -175,7 +175,7 @@ describe("core subscription and helper edge regressions", () => {
       "ready",
       "ready",
       "duplicate",
-      "error",
+      "ready",
     ]);
   });
 

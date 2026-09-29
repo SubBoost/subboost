@@ -165,7 +165,7 @@ describe("public rule and SSRF edge branch coverage", () => {
       "error:引号未闭合",
       "error:未知规则类型：UNKNOWN",
       "error:规则值不能为空",
-      "error:目标不能为空",
+      "ready:可导入",
       "error:未知目标：UNKNOWN",
       "error:不支持的尾列：bad-tail",
       "ready:可导入",
@@ -173,9 +173,9 @@ describe("public rule and SSRF edge branch coverage", () => {
       "duplicate:与现有规则重复",
     ]);
     expect(result).toMatchObject({
-      readyCount: 1,
+      readyCount: 2,
       skippedCount: 2,
-      errorCount: 6,
+      errorCount: 5,
       duplicateCount: 2,
       canImport: false,
     });

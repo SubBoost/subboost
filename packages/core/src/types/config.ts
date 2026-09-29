@@ -262,6 +262,7 @@ export function isProxyGroupGroupType(value: unknown): value is ProxyGroupGroupT
 }
 
 export interface ProxyGroupAdvancedConfig {
+  testUrl?: string;
   sourceIds?: string[];
   regions?: NodeRegion[];
   includeRegex?: string;

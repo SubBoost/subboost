@@ -79,6 +79,10 @@ export function NodeManagementSection({
   } = useConfigStore();
 
   const normalizedNodeNameFilter = nodeNameFilter ?? DEFAULT_NODE_NAME_FILTER_CONFIG;
+  const activeFilterCount = normalizedNodeNameFilter.enabled
+    ? (normalizedNodeNameFilter.includeEnabled !== false ? normalizedNodeNameFilter.includeRegexes?.length ?? 0 : 0) +
+      (normalizedNodeNameFilter.excludeEnabled !== false ? normalizedNodeNameFilter.excludeRegexes.length : 0)
+    : 0;
   const nodeNameFilterResult = React.useMemo(
     () => resolveNodeNameFilter(nodes, normalizedNodeNameFilter),
     [nodes, normalizedNodeNameFilter]
@@ -523,13 +527,12 @@ export function NodeManagementSection({
                 className="h-7 shrink-0 gap-1.5 px-2 text-xs"
               >
                 自动处理
-                {normalizedNodeNameFilter.enabled &&
-                normalizedNodeNameFilter.excludeRegexes.length > 0 ? (
+                {activeFilterCount > 0 ? (
                   <Badge
                     variant="outline"
                     className="h-4 min-w-4 border-indigo-400/40 bg-indigo-400/10 px-1 text-[10px] leading-none text-indigo-200"
                   >
-                    {normalizedNodeNameFilter.excludeRegexes.length}
+                    {activeFilterCount}
                   </Badge>
                 ) : null}
               </Button>

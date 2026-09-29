@@ -7,6 +7,9 @@ export const NODE_NAME_FILTER_MAX_REGEX_LENGTH = 200;
 
 export type NodeNameFilterConfig = {
   enabled: boolean;
+  includeEnabled?: boolean;
+  excludeEnabled?: boolean;
+  includeRegexes?: string[];
   excludeRegexes: string[];
 };
 
@@ -27,6 +30,7 @@ export type NodeNameFilterValidationError = {
   code: NodeNameFilterValidationErrorCode;
   message: string;
   line?: number;
+  field?: "includeRegexes" | "excludeRegexes";
 };
 
 export type NodeNameFilterValidationResult =
@@ -51,6 +55,7 @@ export type NodeNameFilterResult = {
 type ParsedNodeNameFilterConfig = {
   config: NodeNameFilterConfig;
   compiledRegexes: RegExp[];
+  compiledIncludes: RegExp[];
 };
 
 export class NodeNameFilterConfigError extends Error {
@@ -89,6 +94,7 @@ function inspectNodeNameFilterConfig(
       parsed: {
         config: defaultConfig(),
         compiledRegexes: [],
+        compiledIncludes: [],
       },
     };
   }
@@ -101,7 +107,19 @@ function inspectNodeNameFilterConfig(
   }
 
   const errors: NodeNameFilterValidationError[] = [];
+  const includes = value.includeRegexes === undefined
+    ? undefined
+    : inspectNodeNameFilterConfig({ enabled: true, excludeRegexes: value.includeRegexes });
+  if (includes && !includes.ok) {
+    return { ok: false, errors: includes.errors.map((error) => ({ ...error, field: "includeRegexes" })) };
+  }
+  const includeRegexes = includes?.ok ? includes.parsed.config.excludeRegexes : [];
   const enabled = value.enabled === true;
+  for (const field of ["includeEnabled", "excludeEnabled"] as const) {
+    if (value[field] !== undefined && typeof value[field] !== "boolean") {
+      errors.push({ code: "invalid_config", message: `${field} 必须是布尔值` });
+    }
+  }
   if (typeof value.enabled !== "boolean") {
     errors.push({ code: "invalid_config", message: "enabled 必须是布尔值" });
   }
@@ -185,10 +203,14 @@ function inspectNodeNameFilterConfig(
     ok: true,
     parsed: {
       config: {
-        enabled: enabled && excludeRegexes.length > 0,
+        enabled: enabled && (excludeRegexes.length > 0 || includeRegexes.length > 0),
+        ...(value.includeEnabled !== undefined ? { includeEnabled: value.includeEnabled === true } : {}),
+        ...(value.excludeEnabled !== undefined ? { excludeEnabled: value.excludeEnabled === true } : {}),
+        ...(includeRegexes.length > 0 ? { includeRegexes } : {}),
         excludeRegexes,
       },
-      compiledRegexes,
+      compiledRegexes: value.excludeEnabled === false ? [] : compiledRegexes,
+      compiledIncludes: value.includeEnabled !== false && includes?.ok ? includes.parsed.compiledRegexes : [],
     },
   };
 }
@@ -233,7 +255,9 @@ export function resolveNodeNameFilter(
   const excludedNodes: ParsedNode[] = [];
   for (const node of rawNodes) {
     const originName = getNodeOriginName(node);
-    if (parsed.parsed.compiledRegexes.some((regex) => regex.test(originName))) {
+    const { compiledIncludes, compiledRegexes } = parsed.parsed;
+    if ((compiledIncludes.length > 0 && !compiledIncludes.some((regex) => regex.test(originName))) ||
+        compiledRegexes.some((regex) => regex.test(originName))) {
       excludedNodes.push(node);
     } else {
       effectiveNodes.push(node);

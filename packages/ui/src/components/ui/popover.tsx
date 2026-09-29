@@ -71,6 +71,7 @@ function HelpPopover({
         <IconButton
           label={label}
           variant="ghost"
+          onClick={(event) => event.stopPropagation()}
           className={cn("h-6 w-6 rounded-md text-white/40 hover:text-white/80", className)}
         >
           <CircleHelp aria-hidden="true" />

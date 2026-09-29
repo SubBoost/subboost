@@ -54,6 +54,31 @@ export function buildRuleSetUrlFromPath(path: string, baseUrl: string): string {
   return `${trimTrailingSlashes(baseUrl)}/${normalizedPath}`;
 }
 
+export function allocateRuleSetId(name: string, usedIds: Iterable<string>): string {
+  const used = new Set(usedIds);
+  const base = name.replace(/[^\p{L}\p{N}_.@-]/gu, "-").replace(/^\.+/, "") || "ruleset";
+  let id = base;
+  for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+  return id;
+}
+
+/** Metadata for the existing MRS provider model, without changing the supplied URL. */
+export function parseManualRuleSetUrl(input: string): Pick<CustomRuleSet, "name" | "path" | "behavior"> {
+  const path = input.trim();
+  let url: URL;
+  try { url = new URL(path); } catch { throw new Error("请输入有效的规则集 HTTP/HTTPS 链接"); }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new Error("请输入有效的规则集 HTTP/HTTPS 链接");
+  }
+  let pathname: string;
+  try { pathname = decodeURIComponent(url.pathname); } catch { throw new Error("规则集链接的文件名编码无效"); }
+  const filename = pathname.split("/").pop() ?? "";
+  if (!/^.+\.mrs$/i.test(filename)) throw new Error("目前支持 .mrs 格式的规则集链接");
+  const behavior = /\/geoip\//i.test(pathname) ? "ipcidr" : /\/geosite\//i.test(pathname) ? "domain" : null;
+  if (!behavior) throw new Error("链接需包含 geosite 或 geoip 路径，以便自动识别规则集类型");
+  return { name: filename.slice(0, -4), path, behavior };
+}
+
 function normalizeBehavior(value: unknown): RuleSetBehavior | null {
   if (value === "domain" || value === "ipcidr") return value;
   return null;

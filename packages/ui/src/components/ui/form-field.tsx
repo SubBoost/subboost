@@ -14,6 +14,7 @@ type FormFieldControlProps = {
 export interface FormFieldProps {
   id?: string;
   label: React.ReactNode;
+  labelAction?: React.ReactNode;
   description?: React.ReactNode;
   descriptionPlacement?: "before-control" | "after-control";
   error?: React.ReactNode;
@@ -29,6 +30,7 @@ function mergeIds(...values: Array<string | undefined>) {
 function FormField({
   id,
   label,
+  labelAction,
   description,
   descriptionPlacement = "after-control",
   error,
@@ -53,12 +55,15 @@ function FormField({
     "aria-invalid": error ? true : controlChild.props["aria-invalid"],
     "aria-required": required || controlChild.props["aria-required"] || undefined,
   });
-  const labelElement = (
+  const labelContent = (
     <Label htmlFor={controlChild.props.id ?? controlId}>
       {label}
       {required ? <span aria-hidden="true" className="ml-1 text-red-400">*</span> : null}
     </Label>
   );
+  const labelElement = labelAction ? (
+    <div className="flex items-center justify-between gap-4">{labelContent}{labelAction}</div>
+  ) : labelContent;
   const descriptionElement = description ? (
     <p id={descriptionId} className="text-xs leading-relaxed text-white/45">
       {description}

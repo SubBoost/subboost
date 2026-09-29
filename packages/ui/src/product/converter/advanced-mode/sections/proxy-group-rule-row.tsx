@@ -62,7 +62,7 @@ export function ProxyGroupRuleRow({
   return (
     <div
       className={cn(
-        "proxy-group-rule-row grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 rounded border border-white/10 bg-white/[0.04] px-2 py-2",
+        "proxy-group-rule-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded border border-white/10 bg-white/[0.04] px-2 py-2",
         isInactive &&
           (isMoved
             ? "border-orange-500/25 bg-orange-500/10"

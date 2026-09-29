@@ -84,7 +84,7 @@ const CONFLICT_STATE = {
   groupListeners: [{ id: "gl-other", target: { kind: "custom" as const, id: "c1" }, port: 9300 }],
 };
 
-// state 索引：0=draftType 1=draftStrategy 2=listenerOn 3=portInput 4=allowLan
+// state 索引：0=draftType 1=draftStrategy 2=listenerOn 3=portInput 4=allowLan 5=draftTestUrl
 function renderDialog(overrides: Record<number, unknown> = {}, props: Record<string, unknown> = {}) {
   stateMock.enabled = true;
   stateMock.callIndex = 0;
@@ -118,6 +118,19 @@ function renderDialog(overrides: Record<number, unknown> = {}, props: Record<str
 }
 
 describe("GroupAdvancedSettingsDialog", () => {
+  it("saves the group's test URL and rejects invalid input", () => {
+    const onSave = vi.fn();
+    renderDialog({ 0: "url-test", 5: " https://local.subboost.test/204 " }, { onSave });
+    expect(mocks.captures.formFields.some((field) => field.label === "测速地址")).toBe(true);
+    mocks.captures.buttons.find((button) => button.children === "保存").onClick();
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ testUrl: "https://local.subboost.test/204" }));
+    renderDialog({ 0: "url-test", 5: "ftp://local.subboost.test/204" });
+    expect(mocks.captures.buttons.find((button) => button.children === "保存").disabled).toBe(true);
+    renderDialog({ 0: "select" }, { testUrl: "https://local.subboost.test/204", onSave });
+    expect(mocks.captures.formFields.some((field) => field.label === "测速地址")).toBe(false);
+    mocks.captures.buttons.find((button) => button.children === "保存").onClick();
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ testUrl: "https://local.subboost.test/204" }));
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });
