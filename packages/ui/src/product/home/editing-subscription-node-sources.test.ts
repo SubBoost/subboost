@@ -116,6 +116,19 @@ describe("editing subscription node source helpers", () => {
     expect(result[0]).toBe(original);
   });
 
+  it("keeps peers-only nodes from different endpoints attached to their own source", () => {
+    const make = (port: number) => node("Same", { type: "wireguard", server: undefined, port: undefined,
+      peers: [{ server: "local.subboost.test", port, "public-key": "A".repeat(43) + "=" }] });
+    mocks.parseSubscription.mockReturnValueOnce({ nodes: [make(443)], errors: [] });
+    mocks.parseSubscription.mockReturnValueOnce({ nodes: [make(8443)], errors: [] });
+    const result = ensureNodesHaveValidSourceIds([make(443), make(8443)], [
+      source({ id: "first", type: "manual", content: "first" }),
+      source({ id: "second", type: "manual", content: "second" }),
+    ]);
+    expect(getNodeSourceIds(result[0])).toEqual(["first"]);
+    expect(getNodeSourceIds(result[1])).toEqual(["second"]);
+  });
+
   it("falls back to the only url source when a node has no source id", () => {
     const result = ensureNodesHaveValidSourceIds([node("Remote")], [
       source({ id: " url-source ", type: "url" }),

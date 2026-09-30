@@ -15,6 +15,7 @@
     "./mihomo/*": "./src/mihomo/*.ts",
     "./node-name-template": "./src/node-name-template.ts",
     "./node-identity": "./src/node-identity.ts",
+    "./node-endpoint": "./src/node-endpoint.ts",
     "./parser": "./src/parser/index.ts",
     "./parser/*": "./src/parser/*.ts",
     "./proxy-group-advanced": "./src/proxy-group-advanced.ts",

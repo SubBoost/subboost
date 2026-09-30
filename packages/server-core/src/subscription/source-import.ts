@@ -11,7 +11,8 @@ import {
 } from "@subboost/core/subscription/import-error";
 import { tryNormalizeSubscriptionUrlInput } from "@subboost/core/subscription/url-input";
 import type { ParseResult, ParsedNode } from "@subboost/core/types/node";
-import { shouldTryClashMetaForV2raynPayload } from "./fetch-profile-heuristics";
+import { compareSubscriptionSnapshots, createSubscriptionRequestBudget, hasUsableSubscriptionSnapshot, SUBSCRIPTION_MAX_PROFILE_REQUESTS,
+  type SubscriptionSnapshotComparison } from "./snapshot-comparison";
 import { SUBSCRIPTION_IMPORT_USER_AGENTS } from "./user-agents";
 
 export type SourceImportPurpose = "content" | "userinfo";
@@ -46,6 +47,7 @@ export type SourceImportSuccess = {
   headers: Record<string, string>;
   parsedNodes: ParsedNode[];
   parseErrors: string[];
+  diagnostics?: SubscriptionSnapshotComparison[];
 };
 
 export type SourceImportFailure = {
@@ -98,23 +100,7 @@ function createErrorInfo(message: string, httpStatus?: number): SubscriptionImpo
 }
 
 function isUsableParsedAttempt(attempt: ParsedAttempt): attempt is Extract<ParsedAttempt, { ok: true }> {
-  return attempt.ok && attempt.parsed.nodes.length > 0 && !looksLikeClientUpdatePlaceholderNodes(attempt.parsed.nodes);
-}
-
-function shouldContinueAfterCleanAttempt(params: {
-  attempt: ParsedAttempt;
-  currentUserAgent: string;
-  nextUserAgent?: string;
-}): boolean {
-  const { attempt, currentUserAgent, nextUserAgent } = params;
-  if (!isUsableParsedAttempt(attempt) || attempt.parsed.errors.length > 0) return true;
-  if (
-    currentUserAgent === SUBSCRIPTION_IMPORT_USER_AGENTS[0] &&
-    nextUserAgent === SUBSCRIPTION_IMPORT_USER_AGENTS[1]
-  ) {
-    return shouldTryClashMetaForV2raynPayload(attempt.content, attempt.parsed);
-  }
-  return false;
+  return attempt.ok && hasUsableSubscriptionSnapshot(attempt.parsed);
 }
 
 function toFailure(attempt: ParsedAttempt | null, fallback = "获取 url 失败"): SourceImportFailure {
@@ -153,20 +139,16 @@ function toFailure(attempt: ParsedAttempt | null, fallback = "获取 url 失败"
   };
 }
 
-function pickBetterAttempt(current: ParsedAttempt | null, next: ParsedAttempt): ParsedAttempt {
+function pickBetterAttempt(current: ParsedAttempt | null, next: ParsedAttempt, diagnostics: SubscriptionSnapshotComparison[]): ParsedAttempt {
   if (!current) return next;
+  const comparison = current.ok && next.ok ? compareSubscriptionSnapshots(current.parsed, next.parsed) : null;
+  if (comparison) diagnostics.push(comparison);
   const currentUsable = isUsableParsedAttempt(current);
   const nextUsable = isUsableParsedAttempt(next);
   if (currentUsable !== nextUsable) return nextUsable ? next : current;
   if (current.ok !== next.ok) return next.ok ? next : current;
   if (!current.ok || !next.ok) return current;
-  if (current.parsed.nodes.length !== next.parsed.nodes.length) {
-    return next.parsed.nodes.length > current.parsed.nodes.length ? next : current;
-  }
-  if (current.parsed.errors.length !== next.parsed.errors.length) {
-    return next.parsed.errors.length < current.parsed.errors.length ? next : current;
-  }
-  return current;
+  return comparison?.selected === "next" ? next : current;
 }
 
 function normalizeHeaders(headers: Record<string, string> | undefined): Record<string, string> {
@@ -188,13 +170,18 @@ async function fetchAndParseWithUserAgent(
     fetchText: (request: SourceImportTransportRequest) => Promise<SourceImportTransportResult>;
   }
 ): Promise<ParsedAttempt> {
-  const response = await options.fetchText({
-    url,
-    userAgent,
-    purpose: "content",
-    timeoutMs: options.timeoutMs,
-    maxBytes: options.maxBytes,
-  });
+  let response: SourceImportTransportResult;
+  try {
+    response = await options.fetchText({
+      url,
+      userAgent,
+      purpose: "content",
+      timeoutMs: options.timeoutMs,
+      maxBytes: options.maxBytes,
+    });
+  } catch {
+    response = { ok: false, error: "订阅请求失败" };
+  }
   if (!response.ok || typeof response.content !== "string") {
     const message = sanitizePublicErrorText(response.error) || "获取 url 失败";
     return {
@@ -273,37 +260,32 @@ export async function importSubscriptionFromUrl(
 
   const timeoutMs = options.timeoutMs ?? 15000;
   const maxBytes = options.maxBytes ?? 10 * 1024 * 1024;
-  const userAgents = options.userAgents?.length ? options.userAgents : SUBSCRIPTION_IMPORT_USER_AGENTS;
+  const userAgents = [...new Set(options.userAgents?.length ? options.userAgents : SUBSCRIPTION_IMPORT_USER_AGENTS)].slice(0, SUBSCRIPTION_MAX_PROFILE_REQUESTS);
+  const budget = createSubscriptionRequestBudget(timeoutMs);
+  const diagnostics: SubscriptionSnapshotComparison[] = [];
   let best: ParsedAttempt | null = null;
 
   for (let index = 0; index < userAgents.length; index += 1) {
     const userAgent = userAgents[index];
+    const remainingTimeout = budget.remainingTimeout();
+    if (remainingTimeout === 0) break;
     const attempt = await fetchAndParseWithUserAgent(url, userAgent, {
-      timeoutMs,
+      timeoutMs: remainingTimeout,
       maxBytes,
       fetchText: options.fetchText,
     });
-    best = pickBetterAttempt(best, attempt);
-    if (
-      !shouldContinueAfterCleanAttempt({
-        attempt,
-        currentUserAgent: userAgent,
-        nextUserAgent: userAgents[index + 1],
-      })
-    ) {
-      break;
-    }
+    best = pickBetterAttempt(best, attempt, diagnostics);
   }
 
   if (!best || !best.ok || !isUsableParsedAttempt(best)) {
     return toFailure(best);
   }
 
-  const supplementalHeaders = await fetchSupplementalUserInfoHeaders(request, {
-    timeoutMs,
+  const supplementalHeaders = budget.remainingTimeout() === 0 ? {} : await fetchSupplementalUserInfoHeaders(request, {
+    timeoutMs: budget.remainingTimeout(),
     maxBytes,
     fetchText: options.fetchText,
-  }, url);
+  }, url).catch(() => ({}));
 
   return {
     ok: true,
@@ -311,5 +293,6 @@ export async function importSubscriptionFromUrl(
     headers: { ...best.headers, ...supplementalHeaders },
     parsedNodes: best.parsed.nodes,
     parseErrors: best.parsed.errors,
+    diagnostics,
   };
 }

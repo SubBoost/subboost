@@ -144,7 +144,7 @@ proxies:
       type: "trojan",
     });
     expect(parseClashYaml("").errors).toEqual(["空的配置文件"]);
-    expect(parseClashYaml("proxies:\n  - name: Bad\n    type: ss\n    port: bad").errors[0]).toContain("缺少服务器地址");
+    expect(parseClashYaml("proxies:\n  - name: Bad\n    type: ss\n    port: bad").errors[0]).toContain("缺少有效服务器地址");
     expect(parseClashYaml("proxies: [").errors[0]).toContain("YAML 解析错误");
     expect(parseClashYaml("just text").errors[0]).toContain("无法识别为 Clash YAML");
   });

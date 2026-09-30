@@ -1,5 +1,7 @@
 import { decodeBase64, encodeBase64 } from "./base64";
 import { tryParseJson } from "../json";
+import { looksLikePlatformConfigContent } from "./platform/parse-platform-config";
+import { isClashYamlContent } from "./content-parsers";
 
 export interface PreprocessSubscriptionContentResult {
   content: string;
@@ -241,7 +243,7 @@ const SUBSCRIPTION_PREPROCESSORS: SubscriptionPreprocessor[] = [
   },
   {
     name: "full-config",
-    test: (content) => /^\[\s*(?:server_local|server_remote|proxy|wireguard\s+)\s*.*\]/im.test(content),
+    test: (content) => !isClashYamlContent(content) && looksLikePlatformConfigContent(content),
     parse: (content) => extractFullConfigProxySection(content),
   },
 ];

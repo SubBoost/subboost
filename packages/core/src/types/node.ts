@@ -20,10 +20,12 @@ export type KnownNodeType =
   | "https"
   | "ssh"
   | "direct"
+  | "reject"
   | "dns"
   | "mieru"
   | "masque"
   | "sudoku"
+  | "trusttunnel"
   | "relay";
 
 // 支持上游 Clash/Mihomo 新增的代理类型：例如 wireguard / snell / mieru ...
@@ -280,7 +282,7 @@ export interface SshNode extends BaseNode {
   "host-key"?: string[];
 }
 
-export interface WireGuardNode extends BaseNode {
+export interface WireGuardNode extends EndpointOptionalNode {
   type: "wireguard";
   "private-key": string;
   "public-key"?: string;
@@ -324,12 +326,29 @@ export interface DnsNode extends EndpointOptionalNode {
   udp?: boolean;
 }
 
-export interface MieruNode extends BaseNode {
+export interface RejectNode extends EndpointOptionalNode {
+  type: "reject";
+}
+
+export interface MieruNode extends EndpointOptionalNode {
   type: "mieru";
+  server: string;
   username?: string;
   password?: string;
   transport?: string;
   "port-range"?: string;
+}
+
+export interface TrustTunnelNode extends BaseNode {
+  type: "trusttunnel";
+  username?: string;
+  password?: string;
+  sni?: string;
+  alpn?: string[];
+  "client-fingerprint"?: string;
+  "skip-cert-verify"?: boolean;
+  "health-check"?: boolean;
+  quic?: boolean;
 }
 
 export interface MasqueNode extends BaseNode {
@@ -365,9 +384,11 @@ export type ParsedNode =
   | SnellNode
   | DirectNode
   | DnsNode
+  | RejectNode
   | MieruNode
   | MasqueNode
   | SudokuNode
+  | TrustTunnelNode
   | SocksNode
   | HttpNode
   | SshNode

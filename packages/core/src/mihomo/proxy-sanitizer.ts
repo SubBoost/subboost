@@ -3,6 +3,8 @@ import { splitWsPathEarlyData } from "@subboost/core/parser/ws-early-data";
 import { isMihomoEchQueryServerName, isStandardBase64String } from "./ech";
 import { normalizeRealityShortId } from "./reality";
 import { normalizeCertificateFingerprint } from "./certificate-fingerprint";
+import { getNodeEndpointError } from "../node-endpoint";
+import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "./string-scalar";
 
 const REALITY_PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const WIREGUARD_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
@@ -22,9 +24,9 @@ const BOOLEAN_PROXY_FIELDS = new Set([
   "global-padding",
   "udp-over-tcp",
 ]);
-const CLIENT_FINGERPRINT_PROXY_TYPES = new Set(["vmess", "vless", "trojan", "anytls"]);
+const CLIENT_FINGERPRINT_PROXY_TYPES = new Set(["vmess", "vless", "trojan", "anytls", "trusttunnel"]);
 const CLIENT_FINGERPRINT_ALIASES = new Set(["chrome", "firefox", "safari", "ios", "android", "edge", "random", "none"]);
-const UNSUPPORTED_MIHOMO_PROXY_TYPES = new Set(["socks4", "h2-connect", "trust-tunnel", "trusttunnel", "external"]);
+const UNSUPPORTED_MIHOMO_PROXY_TYPES = new Set(["socks4", "h2-connect", "trust-tunnel", "external"]);
 const INVALID_MIHOMO_NODE_FLAG = "_subboost-invalid-mihomo-node";
 const REQUIRED_STRING_FIELDS_BY_TYPE: Record<string, string[]> = {
   ss: ["cipher", "password"],
@@ -161,10 +163,11 @@ export function isMihomoSupportedProxyNode(node: unknown): boolean {
   const type = typeof node.type === "string" ? node.type : "";
   if (node[INVALID_MIHOMO_NODE_FLAG]) return false;
   if (!type || UNSUPPORTED_MIHOMO_PROXY_TYPES.has(type)) return false;
+  if (getNodeEndpointError(node)) return false;
 
   const requiredFields = REQUIRED_STRING_FIELDS_BY_TYPE[type] || [];
   for (const field of requiredFields) {
-    if (!normalizeString(node[field])) return false;
+    if (!normalizeString(normalizeMihomoStringScalar(node[field]))) return false;
   }
 
   if (type === "wireguard") {
@@ -174,9 +177,12 @@ export function isMihomoSupportedProxyNode(node: unknown): boolean {
         return false;
       }
     }
+    if (Array.isArray(node.peers) && node.peers.some((peer) => !isPlainObject(peer) ||
+      !normalizeWireGuardKey(peer["public-key"]) ||
+      (peer["pre-shared-key"] !== undefined && !normalizeWireGuardKey(peer["pre-shared-key"])))) return false;
   }
 
-  if (type === "ssh" && !normalizeString(node.password) && !normalizePemPrivateKey(node["private-key"])) {
+  if (type === "ssh" && !normalizeString(normalizeMihomoStringScalar(node.password)) && !normalizePemPrivateKey(node["private-key"])) {
     return false;
   }
 
@@ -425,6 +431,13 @@ export function sanitizeMihomoProxyNode(node: ParsedNode | Record<string, unknow
   if (!isPlainObject(node)) return node as Record<string, unknown>;
 
   const copy: Record<string, unknown> = { ...node };
+
+  for (const field of MIHOMO_STRING_SCALAR_FIELDS) {
+    if (copy[field] === undefined || copy[field] === null) continue;
+    const value = normalizeMihomoStringScalar(copy[field]);
+    if (value === undefined) copy[INVALID_MIHOMO_NODE_FLAG] = true;
+    else copy[field] = value;
+  }
 
   for (const key of BOOLEAN_PROXY_FIELDS) {
     if (!Object.prototype.hasOwnProperty.call(copy, key)) continue;

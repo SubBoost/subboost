@@ -227,7 +227,7 @@ describe("importSubscriptionFromUrl", () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(fetchText).toHaveBeenCalledTimes(1);
+    expect(fetchText).toHaveBeenCalledTimes(4);
   });
 
   it("prefers later usable attempts over failed transport attempts", async () => {

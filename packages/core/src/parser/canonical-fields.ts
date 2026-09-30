@@ -9,7 +9,7 @@ interface AliasRule {
   aliases: readonly FieldPath[];
 }
 
-const CLIENT_FINGERPRINT_TYPES = ["vmess", "vless", "trojan", "anytls"] as const;
+const CLIENT_FINGERPRINT_TYPES = ["vmess", "vless", "trojan", "anytls", "trusttunnel"] as const;
 const PACKET_ENCODING_TYPES = ["vmess", "vless"] as const;
 const GRPC_SERVICE_NAME_TYPES = ["vmess", "vless", "trojan"] as const;
 
