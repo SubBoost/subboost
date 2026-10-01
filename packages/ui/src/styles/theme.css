@@ -20,10 +20,14 @@
   [data-theme="dark"] {
     /* page and surfaces */
     --page: #0a0a0a;
+    --page-alt: #0a0a0f;
     --foreground: #ededed;
+    --solid-label-fg: initial;
+    --solid-label-bg: var(--color-blue-500);
     --page-glow: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.15) 0%, transparent 50%);
     --page-pattern: none;
     --surface: #141414;
+    --surface-subtle: #151515;
     --surface-raised: #1a1a1a;
     --surface-popover: color-mix(in oklab, oklch(14.1% 0.005 285.823) 95%, transparent);
     --surface-shadow: 0 0 #0000;
@@ -43,6 +47,11 @@
     --warning-muted-fg: color-mix(in oklab, var(--color-amber-200) 70%, transparent);
     --warning-detail-fg: color-mix(in oklab, var(--color-amber-200) 80%, transparent);
     --warning-soft-fg: color-mix(in oklab, var(--color-amber-100) 80%, transparent);
+    --danger-note-fg: color-mix(in oklab, var(--color-red-200) 70%, transparent);
+    --danger-detail-fg: color-mix(in oklab, var(--color-red-300) 70%, transparent);
+    --danger-muted-fg: color-mix(in oklab, var(--color-red-400) 70%, transparent);
+    --warning-emphasis-fg: color-mix(in oklab, var(--color-amber-300) 80%, transparent);
+    --warning-strong-fg: color-mix(in oklab, var(--color-amber-300) 90%, transparent);
     --success-muted-fg: color-mix(in oklab, var(--color-green-200) 70%, transparent);
     --preview-node-count-fg: var(--color-primary-500);
     --preview-group-count-fg: var(--color-green-500);
@@ -69,6 +78,7 @@
     --fg-35: color-mix(in oklab, #fff 35%, transparent);
     --fg-30: color-mix(in oklab, #fff 30%, transparent);
     --fg-25: color-mix(in oklab, #fff 25%, transparent);
+    --fg-20: color-mix(in oklab, #fff 20%, transparent);
     --heading-from: #fff;
     --heading-to: color-mix(in oklab, #fff 60%, transparent);
     --border-default: rgba(255, 255, 255, 0.1);
@@ -81,6 +91,21 @@
     --code-panel-bg: color-mix(in oklab, #fff 5%, transparent);
     --code-panel-border: color-mix(in oklab, #fff 10%, transparent);
     --avatar-bg: linear-gradient(to bottom right in oklab, var(--color-indigo-500) 0%, var(--color-purple-600) 100%);
+    --chart-cyan: #22d3ee;
+    --chart-emerald: #34d399;
+    --chart-blue: #60a5fa;
+    --chart-amber: #f59e0b;
+    --chart-violet: #a78bfa;
+    --chart-rose: #f43f5e;
+    --chart-slate: #94a3b8;
+    --chart-red: #ef4444;
+    --chart-orange: #f97316;
+    --chart-teal: #14b8a6;
+    --chart-pink: #ec4899;
+    --chart-purple: #8b5cf6;
+    --chart-sky: #3b82f6;
+    --chart-yellow: #eab308;
+    --chart-gray: #9ca3af;
 
     /* shared component tokens */
     --btn-primary-bg: color-mix(in oklab, var(--color-primary-500) 20%, transparent);
@@ -252,11 +277,15 @@
 
   [data-theme="light"] {
     --page: #f6f8fc;
+    --page-alt: #f6f8fc;
     --foreground: #0f172a;
+    --solid-label-fg: #fff;
+    --solid-label-bg: #2563eb;
     --page-glow: radial-gradient(640px 240px at 46% 0%, rgba(37, 99, 235, 0.14), transparent 72%),
       radial-gradient(460px 220px at 62% 6%, rgba(16, 185, 129, 0.1), transparent 70%);
     --page-pattern: radial-gradient(rgba(37, 99, 235, 0.14) 1px, transparent 1.3px);
     --surface: #fff;
+    --surface-subtle: #fff;
     --surface-raised: #fff;
     --surface-popover: rgba(255, 255, 255, 0.98);
     --surface-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -20px rgba(37, 99, 235, 0.22);
@@ -276,6 +305,11 @@
     --warning-muted-fg: oklch(47.3% 0.137 46.201);
     --warning-detail-fg: oklch(47.3% 0.137 46.201);
     --warning-soft-fg: oklch(47.3% 0.137 46.201);
+    --danger-note-fg: #991b1b;
+    --danger-detail-fg: #991b1b;
+    --danger-muted-fg: #991b1b;
+    --warning-emphasis-fg: #92400e;
+    --warning-strong-fg: #92400e;
     --success-muted-fg: oklch(44.8% 0.119 151.328);
     --preview-node-count-fg: #1d4ed8;
     --preview-group-count-fg: oklch(44.8% 0.119 151.328);
@@ -301,6 +335,7 @@
     --fg-35: #536379;
     --fg-30: #5f6f86;
     --fg-25: #5f6f86;
+    --fg-20: var(--fg-25);
     --heading-from: #0f172a;
     --heading-to: #0f172a;
     --border-default: color-mix(in oklab, #1e3a6e 10%, transparent);
@@ -313,14 +348,29 @@
     --code-panel-bg: #0b1220;
     --code-panel-border: #1e293b;
     --avatar-bg: #2563eb;
+    --chart-cyan: #0e7490;
+    --chart-emerald: #047857;
+    --chart-blue: #1d4ed8;
+    --chart-amber: #b45309;
+    --chart-violet: #6d28d9;
+    --chart-rose: #be123c;
+    --chart-slate: #475569;
+    --chart-red: #b91c1c;
+    --chart-orange: #c2410c;
+    --chart-teal: #0f766e;
+    --chart-pink: #be185d;
+    --chart-purple: #6d28d9;
+    --chart-sky: #1d4ed8;
+    --chart-yellow: #a16207;
+    --chart-gray: #4b5563;
 
-    --btn-primary-bg: #2563eb;
-    --btn-primary-bg-hover: #1d4ed8;
-    --btn-primary-border: transparent;
-    --btn-primary-border-hover: transparent;
-    --btn-primary-fg: #fff;
-    --btn-primary-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 6px 16px -8px rgba(37, 99, 235, 0.55);
-    --btn-primary-shadow-hover: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 20px -8px rgba(37, 99, 235, 0.6);
+    --btn-primary-bg: var(--btn-outline-bg);
+    --btn-primary-bg-hover: var(--btn-outline-bg-hover);
+    --btn-primary-border: #2563eb;
+    --btn-primary-border-hover: #1d4ed8;
+    --btn-primary-fg: #2563eb;
+    --btn-primary-shadow: var(--btn-outline-shadow);
+    --btn-primary-shadow-hover: var(--btn-outline-shadow);
     --btn-danger-bg: #fef2f2;
     --btn-danger-bg-hover: #fee2e2;
     --btn-danger-border: #fca5a5;
@@ -515,7 +565,9 @@
 
 @theme inline {
   --color-page: var(--page);
+  --color-page-alt: var(--page-alt);
   --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
   --color-surface-raised: var(--surface-raised);
   --color-surface-popover: var(--surface-popover);
   --color-header: var(--header-bg);
@@ -531,12 +583,19 @@
   --color-warning-muted-fg: var(--warning-muted-fg);
   --color-warning-detail-fg: var(--warning-detail-fg);
   --color-warning-soft-fg: var(--warning-soft-fg);
+  --color-danger-note-fg: var(--danger-note-fg);
+  --color-danger-detail-fg: var(--danger-detail-fg);
+  --color-danger-muted-fg: var(--danger-muted-fg);
+  --color-warning-emphasis-fg: var(--warning-emphasis-fg);
+  --color-warning-strong-fg: var(--warning-strong-fg);
   --color-success-muted-fg: var(--success-muted-fg);
   --color-preview-node-count-fg: var(--preview-node-count-fg);
   --color-preview-group-count-fg: var(--preview-group-count-fg);
   --color-ink: var(--ink);
   --color-shade: var(--shade);
   --color-fg: var(--fg);
+  --color-solid-label-fg: var(--solid-label-fg, inherit);
+  --color-solid-label: var(--solid-label-bg);
   --color-fg-90: var(--fg-90);
   --color-fg-85: var(--fg-85);
   --color-fg-80: var(--fg-80);
@@ -551,6 +610,7 @@
   --color-fg-35: var(--fg-35);
   --color-fg-30: var(--fg-30);
   --color-fg-25: var(--fg-25);
+  --color-fg-20: var(--fg-20);
   --color-heading-from: var(--heading-from);
   --color-heading-to: var(--heading-to);
   --color-code-panel: var(--code-panel-bg);
