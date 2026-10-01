@@ -205,6 +205,30 @@ describe("UserMenu", () => {
     expect(mocks.dropdownRoots[0].open).toBe(true);
   });
 
+  it.each([
+    [undefined, false],
+    [false, false],
+    [true, true],
+  ])("only compacts the tablet username when requested (%s)", (compactAtTablet, expectedCompact) => {
+    mocks.userState.user = {
+      avatarUrl: null,
+      isAdmin: false,
+      isBanned: false,
+      name: "Alice",
+      username: "alice",
+      trustLevel: 1,
+      subscriptionCount: 1,
+      quota: { maxSubscriptions: 5 },
+    };
+
+    renderToStaticMarkup(React.createElement(UserMenu, { compactAtTablet }));
+
+    const username = findIntrinsic("span", (props) => props.children === "Alice");
+    expect(username.className).toContain("sm:block");
+    expect(username.className.includes("md:hidden")).toBe(expectedCompact);
+    expect(username.className.includes("lg:block")).toBe(expectedCompact);
+  });
+
   it("delegates close behavior to DropdownMenu and logs out", async () => {
     mocks.stateOverride = true;
     mocks.userState = {

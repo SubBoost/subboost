@@ -120,7 +120,7 @@ function getGroupColor(category: string) {
     case "dialer":
       return "border-amber-500/50 bg-amber-500/10";
     default:
-      return "border-white/20 bg-white/5";
+      return "border-ink/20 bg-ink/5";
   }
 }
 
@@ -270,10 +270,10 @@ export function ProxyGroupsPreview({
                   clone.style.top = "-1000px";
                   clone.style.left = "-1000px";
                   clone.style.opacity = "1";
-                  clone.style.backgroundColor = "rgba(15, 23, 42, 0.98)";
-                  clone.style.border = "1px solid rgba(99, 102, 241, 0.55)";
+                  clone.style.backgroundColor = "var(--drag-clone-bg)";
+                  clone.style.border = "1px solid var(--drag-clone-border)";
                   clone.style.transform = "scale(1.03)";
-                  clone.style.boxShadow = "0 18px 55px rgba(0,0,0,0.55)";
+                  clone.style.boxShadow = "var(--drag-clone-shadow)";
                   clone.style.filter = "saturate(1.2) contrast(1.05)";
                   document.body.appendChild(clone);
                   try {
@@ -300,7 +300,7 @@ export function ProxyGroupsPreview({
                   onSetProxyGroupOrder(nextOrder);
                 }}
                 className={cn(
-                  "ml-2 flex h-6 w-6 flex-none items-center justify-center text-white/40 hover:text-white/70 disabled:opacity-30",
+                  "ml-2 flex h-6 w-6 flex-none items-center justify-center text-fg-40 hover:text-fg-70 disabled:opacity-30",
                   canReorderGroups
                     ? "cursor-grab active:cursor-grabbing"
                     : "cursor-default opacity-30",
@@ -328,19 +328,19 @@ export function ProxyGroupsPreview({
 
               {hasRules ? (
                 isExpanded ? (
-                  <ChevronDown className="h-3.5 w-3.5 text-white/60" />
+                  <ChevronDown className="h-3.5 w-3.5 text-fg-60" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5 text-white/60" />
+                  <ChevronRight className="h-3.5 w-3.5 text-fg-60" />
                 )
               ) : (
-                <Box className="h-3.5 w-3.5 text-white/50" />
+                <Box className="h-3.5 w-3.5 text-fg-50" />
               )}
 
               <span className="text-sm">{group.emoji}</span>
               <span className="text-xs font-medium flex-1 min-w-0 flex flex-wrap items-center gap-x-2">
                 <span className="truncate">{getDisplayName(group.name)}</span>
                 {isDialerGroup && (
-                  <span className="text-[10px] text-amber-200/80">
+                  <span className="text-[10px] text-warning-detail-fg">
                     中转节点: {relayNodes.length} · 落地节点:{" "}
                     {targetNodes.length}
                   </span>
@@ -349,16 +349,16 @@ export function ProxyGroupsPreview({
 
               <div className="flex items-center gap-1.5">
                 {getGroupIcon(group.groupType)}
-                <span className="text-[10px] text-white/60">
+                <span className="text-[10px] text-fg-60">
                   {getGroupTypeLabel(group.groupType)}
                 </span>
                 {group.groupType === "load-balance" && getStrategyLabel(group.strategy) && (
-                  <span className="text-[10px] text-white/50">
+                  <span className="text-[10px] text-fg-50">
                     策略：{getStrategyLabel(group.strategy)}
                   </span>
                 )}
                 {getDefaultLabelForGroup(group.name) && (
-                  <span className="text-[10px] text-white/50">
+                  <span className="text-[10px] text-fg-50">
                     默认：{getDefaultLabelForGroup(group.name)}
                   </span>
                 )}
@@ -367,7 +367,7 @@ export function ProxyGroupsPreview({
             </div>
 
             {isDialerGroup && (
-              <div className="border-t border-white/10 p-2">
+              <div className="border-t border-ink/10 p-2">
                 <div
                   className={cn(
                     "flex items-center gap-2",
@@ -375,7 +375,7 @@ export function ProxyGroupsPreview({
                   )}
                 >
                   <DialerStep preferVertical={preferVerticalDialerLayout}>
-                    <span className="px-2 py-1 rounded bg-white/5 text-white/70 text-[10px] whitespace-nowrap">
+                    <span className="px-2 py-1 rounded bg-ink/5 text-fg-70 text-[10px] whitespace-nowrap">
                       我的流量
                     </span>
                   </DialerStep>
@@ -397,7 +397,7 @@ export function ProxyGroupsPreview({
                   />
                   <DialerArrow preferVertical={preferVerticalDialerLayout} />
                   <DialerStep preferVertical={preferVerticalDialerLayout}>
-                    <span className="px-2 py-1 rounded bg-white/5 text-white/70 text-[10px] whitespace-nowrap">
+                    <span className="px-2 py-1 rounded bg-ink/5 text-fg-70 text-[10px] whitespace-nowrap">
                       谷歌服务
                     </span>
                   </DialerStep>
@@ -406,11 +406,11 @@ export function ProxyGroupsPreview({
             )}
 
             {isExpanded && hasRules && (
-              <div className="border-t border-white/10 p-2 space-y-1">
+              <div className="border-t border-ink/10 p-2 space-y-1">
                 {group.rules.map((rule) => (
                   <div
                     key={rule.id}
-                    className="flex items-center gap-2 text-[10px] text-white/60 pl-5"
+                    className="flex items-center gap-2 text-[10px] text-fg-60 pl-5"
                   >
                     <div
                       className={cn(
@@ -421,7 +421,7 @@ export function ProxyGroupsPreview({
                       )}
                     />
                     <span className="flex-1">{rule.name}</span>
-                    <span className="px-1 py-0.5 rounded bg-white/5">
+                    <span className="px-1 py-0.5 rounded bg-ink/5">
                       {rule.behavior}
                     </span>
                   </div>
@@ -459,7 +459,7 @@ function DialerArrow({ preferVertical }: { preferVertical: boolean }) {
     <DialerStep preferVertical={preferVertical}>
       <ArrowRight
         className={cn(
-          "h-3 w-3 text-white/40",
+          "h-3 w-3 text-fg-40",
           preferVertical ? "rotate-90" : "rotate-0",
         )}
       />
@@ -495,7 +495,7 @@ function DialerNodeList({
     >
       <div className="text-[10px] text-center mb-1">{title}</div>
       {nodes.length === 0 ? (
-        <div className="text-[10px] text-white/50 text-center">
+        <div className="text-[10px] text-fg-50 text-center">
           {emptyText}
         </div>
       ) : (

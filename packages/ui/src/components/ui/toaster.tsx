@@ -54,7 +54,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:pointer-events-none disabled:opacity-50",
+      "inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-ink/10 bg-ink/5 px-3 text-sm font-medium text-fg-80 transition-colors hover:bg-ink/10 hover:text-fg focus:outline-none focus:ring-2 focus:ring-focus-ring disabled:pointer-events-none disabled:opacity-50",
       className
     )}
     {...props}
@@ -69,7 +69,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2 top-2 rounded-lg p-1 text-white/50 opacity-0 transition-opacity hover:bg-white/5 hover:text-white focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 group-hover:opacity-100",
+      "absolute right-2 top-2 rounded-lg p-1 text-fg-50 opacity-0 transition-opacity hover:bg-ink/5 hover:text-fg focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-focus-ring group-hover:opacity-100",
       className
     )}
     toast-close=""
@@ -86,7 +86,7 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-semibold text-white", className)}
+    className={cn("text-sm font-semibold text-fg", className)}
     {...props}
   />
 ));
@@ -98,7 +98,7 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn("text-sm text-white/60 whitespace-pre-wrap", className)}
+    className={cn("text-sm text-fg-60 whitespace-pre-wrap", className)}
     {...props}
   />
 ));

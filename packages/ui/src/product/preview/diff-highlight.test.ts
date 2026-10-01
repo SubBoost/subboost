@@ -75,7 +75,7 @@ describe("YamlHighlight", () => {
     });
 
     const html = collectHtml(rendered).join("\n");
-    expect(html).toContain("text-white/50");
+    expect(html).toContain("text-fg-50");
     expect(html).toContain("text-green-400");
     expect(html).toContain("text-orange-400");
     expect(html).toContain("text-emerald-400");

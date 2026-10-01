@@ -111,7 +111,7 @@ export function GroupAdvancedSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="break-words pr-6 text-white">{groupName} · 高级设置</DialogTitle>
+          <DialogTitle className="break-words pr-6 text-fg">{groupName} · 高级设置</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -144,13 +144,13 @@ export function GroupAdvancedSettingsDialog({
             />
 
             {(listenerOn || portInput.trim() !== "") && (
-              <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+              <div className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.025] p-3">
                 <FormField label="端口" error={portError}>
                   <Input
                     value={portInput}
                     inputMode="numeric"
                     placeholder="例如 7891"
-                    className="h-8 border-white/10 bg-white/5 text-xs"
+                    className="h-8 border-ink/10 bg-ink/5 text-xs"
                     onChange={(event) => setPortInput(event.target.value)}
                   />
                 </FormField>
@@ -176,7 +176,7 @@ export function GroupAdvancedSettingsDialog({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-3 text-xs text-white/65 hover:text-white"
+            className="h-8 px-3 text-xs text-fg-65 hover:text-fg"
             onClick={() => onOpenChange(false)}
           >
             取消

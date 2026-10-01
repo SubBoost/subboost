@@ -65,7 +65,7 @@ function FormField({
     <div className="flex items-center justify-between gap-4">{labelContent}{labelAction}</div>
   ) : labelContent;
   const descriptionElement = description ? (
-    <p id={descriptionId} className="text-xs leading-relaxed text-white/45">
+    <p id={descriptionId} className="text-xs leading-relaxed text-fg-45">
       {description}
     </p>
   ) : null;

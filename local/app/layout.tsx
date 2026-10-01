@@ -5,6 +5,7 @@ import { MobileNav } from "@subboost/ui/components/layout/mobile-nav";
 import { ScrollLockStabilizer } from "@subboost/ui/components/layout/scroll-lock-stabilizer";
 import { ConfirmDialogHost } from "@subboost/ui/components/ui/confirm-dialog";
 import { Toaster } from "@subboost/ui/components/ui/toaster";
+import { THEME_INIT_SCRIPT } from "@subboost/ui/theme/theme-init-script";
 import { LocalHeader } from "@local/components/local-header";
 import { resolveAppVersionInfo } from "@subboost/server-core/app-version";
 import {
@@ -42,7 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const { buildVersion } = resolveAppVersionInfo({ env: process.env, cwd: process.cwd() });
 
   return (
-    <html lang="zh-CN" className="dark">
+    <html lang="zh-CN" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="font-sans">
         <ScrollLockStabilizer />
         <div className="min-h-screen bg-gradient-radial flex flex-col">

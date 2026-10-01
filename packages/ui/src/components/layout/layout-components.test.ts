@@ -34,8 +34,10 @@ vi.mock("lucide-react", () => ({
   Library: () => React.createElement("span", null, "Library"),
   LogIn: () => React.createElement("span", null, "LogIn"),
   Menu: () => React.createElement("span", null, "Menu"),
+  Moon: () => React.createElement("span", null, "Moon"),
   Settings2: () => React.createElement("span", null, "Settings2"),
   Shield: () => React.createElement("span", null, "Shield"),
+  Sun: () => React.createElement("span", null, "Sun"),
   User: () => React.createElement("span", null, "User"),
   X: () => React.createElement("span", null, "X"),
 }));
@@ -83,6 +85,9 @@ describe("shared layout components", () => {
     expect(html).toContain('aria-label="打开导航菜单"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-controls="subboost-mobile-navigation"');
+    expect(html).toContain('aria-label="浅色主题"');
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain('title="切换到浅色"');
   });
 
   it("renders local mode header links and privileged menu item", () => {

@@ -29,7 +29,7 @@ export function PagePager({ page, totalPages, onPageChange, className, disabled 
       <IconButton
         label="上一页"
         variant="outline"
-        className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10"
+        className="h-10 w-10 rounded-xl bg-ink/5 hover:bg-ink/10"
         onClick={() => goToPage(page - 1)}
         disabled={disabled || page <= 1 || isSinglePage}
       >
@@ -54,13 +54,13 @@ export function PagePager({ page, totalPages, onPageChange, className, disabled 
           aria-label="页码"
           disabled={disabled || isSinglePage}
         />
-        <span className="text-sm text-white/60 whitespace-nowrap">/ {safeTotalPages}</span>
+        <span className="text-sm text-fg-60 whitespace-nowrap">/ {safeTotalPages}</span>
       </div>
 
       <IconButton
         label="下一页"
         variant="outline"
-        className="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10"
+        className="h-10 w-10 rounded-xl bg-ink/5 hover:bg-ink/10"
         onClick={() => goToPage(page + 1)}
         disabled={disabled || page >= safeTotalPages || isSinglePage}
       >

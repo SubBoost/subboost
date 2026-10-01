@@ -11,7 +11,7 @@ export function SubscriptionQrCode({ url }: { url: string }) {
     <div className="flex flex-col items-center gap-3">
       <QRCodeSVG value={url} size={240} marginSize={4} level="M" title="订阅链接二维码"
         className="h-auto max-w-full rounded-lg bg-white" />
-      <p className="text-center text-xs text-white/60">使用其他设备的代理客户端扫码导入订阅</p>
+      <p className="text-center text-xs text-fg-60">使用其他设备的代理客户端扫码导入订阅</p>
     </div>
   );
 }

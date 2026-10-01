@@ -1,0 +1,590 @@
+/*
+ * SubBoost theme tokens: the single source of truth for colors that change between themes.
+ *
+ * - The dark block reproduces the original dark UI exactly; do not tweak dark values.
+ * - The light block holds the light theme. Add a new color here (both blocks) before using it.
+ * - Components use the generated utilities: text-fg, text-fg-60, bg-ink/5, border-ink/10,
+ *   bg-surface, bg-surface-raised, bg-header, bg-overlay, bg-shade/90, etc.
+ * - Any element with data-theme="dark" restores the dark values for its subtree
+ *   (used by code panels that stay dark in the light theme).
+ *
+ * Palette remap rule (light only, regenerated from tailwindcss/theme.css when Tailwind upgrades):
+ * shade 50 -> the same hue's 900 (only used as text); shades 100-200 -> 800; shades 300-400 -> 700;
+ * green, blue and purple 500 -> 700 (they are used as text/icon colors on white);
+ * indigo and the project primary scale map to the brand blue.
+ * The dark block writes every remapped variable back to its Tailwind value.
+ */
+
+@layer base {
+  :root,
+  [data-theme="dark"] {
+    /* page and surfaces */
+    --page: #0a0a0a;
+    --foreground: #ededed;
+    --page-glow: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.15) 0%, transparent 50%);
+    --page-pattern: none;
+    --surface: #141414;
+    --surface-raised: #1a1a1a;
+    --surface-popover: color-mix(in oklab, oklch(14.1% 0.005 285.823) 95%, transparent);
+    --surface-shadow: 0 0 #0000;
+    --glass-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --popover-shadow: 0 25px 50px -12px color-mix(in oklab, #000 40%, transparent);
+    --header-bg: color-mix(in oklab, #000 50%, transparent);
+    --overlay: color-mix(in oklab, #000 70%, transparent);
+    --popover-arrow: oklch(14.1% 0.005 285.823);
+    --date-input-scheme: dark;
+    --badge-mode-fg: color-mix(in oklab, var(--color-sky-100) 80%, transparent);
+    --badge-new-fg: color-mix(in oklab, var(--color-emerald-100) 90%, transparent);
+    --focus-ring: color-mix(in oklab, var(--color-indigo-500) 50%, transparent);
+    --focus-ring-inset: color-mix(in oklab, var(--color-indigo-500) 60%, transparent);
+    --privileged-nav-fg: color-mix(in oklab, var(--color-indigo-300) 75%, transparent);
+    --privileged-nav-mobile-fg: color-mix(in oklab, var(--color-indigo-400) 70%, transparent);
+    --privileged-menu-fg: color-mix(in oklab, var(--color-indigo-400) 80%, transparent);
+    --warning-muted-fg: color-mix(in oklab, var(--color-amber-200) 70%, transparent);
+    --warning-detail-fg: color-mix(in oklab, var(--color-amber-200) 80%, transparent);
+    --warning-soft-fg: color-mix(in oklab, var(--color-amber-100) 80%, transparent);
+    --success-muted-fg: color-mix(in oklab, var(--color-green-200) 70%, transparent);
+    --preview-node-count-fg: var(--color-primary-500);
+    --preview-group-count-fg: var(--color-green-500);
+    --divider-label-bg: rgb(17 17 17);
+    --drag-clone-bg: rgba(15, 23, 42, 0.98);
+    --drag-clone-border: rgba(99, 102, 241, 0.55);
+    --drag-clone-shadow: 0 18px 55px rgba(0, 0, 0, 0.55);
+
+    /* foreground ink: ink is for translucent fills/borders, shade replaces translucent black */
+    --ink: #fff;
+    --shade: #000;
+    --fg: #fff;
+    --fg-90: color-mix(in oklab, #fff 90%, transparent);
+    --fg-85: color-mix(in oklab, #fff 85%, transparent);
+    --fg-80: color-mix(in oklab, #fff 80%, transparent);
+    --fg-75: color-mix(in oklab, #fff 75%, transparent);
+    --fg-70: color-mix(in oklab, #fff 70%, transparent);
+    --fg-65: color-mix(in oklab, #fff 65%, transparent);
+    --fg-60: color-mix(in oklab, #fff 60%, transparent);
+    --fg-55: color-mix(in oklab, #fff 55%, transparent);
+    --fg-50: color-mix(in oklab, #fff 50%, transparent);
+    --fg-45: color-mix(in oklab, #fff 45%, transparent);
+    --fg-40: color-mix(in oklab, #fff 40%, transparent);
+    --fg-35: color-mix(in oklab, #fff 35%, transparent);
+    --fg-30: color-mix(in oklab, #fff 30%, transparent);
+    --fg-25: color-mix(in oklab, #fff 25%, transparent);
+    --heading-from: #fff;
+    --heading-to: color-mix(in oklab, #fff 60%, transparent);
+    --border-default: rgba(255, 255, 255, 0.1);
+    --selection-bg: color-mix(in oklab, var(--color-indigo-500) 30%, transparent);
+    --scrollbar-track: #0a0a0a;
+    --scrollbar-thumb: #262626;
+    --scrollbar-thumb-hover: #737373;
+    --custom-scrollbar-thumb: rgba(99, 102, 241, 0.3);
+    --custom-scrollbar-thumb-hover: rgba(99, 102, 241, 0.5);
+    --code-panel-bg: color-mix(in oklab, #fff 5%, transparent);
+    --code-panel-border: color-mix(in oklab, #fff 10%, transparent);
+    --avatar-bg: linear-gradient(to bottom right in oklab, var(--color-indigo-500) 0%, var(--color-purple-600) 100%);
+
+    /* shared component tokens */
+    --btn-primary-bg: color-mix(in oklab, var(--color-primary-500) 20%, transparent);
+    --btn-primary-bg-hover: color-mix(in oklab, var(--color-primary-500) 30%, transparent);
+    --btn-primary-border: color-mix(in oklab, var(--color-primary-500) 50%, transparent);
+    --btn-primary-border-hover: color-mix(in oklab, var(--color-primary-400) 70%, transparent);
+    --btn-primary-fg: #fff;
+    --btn-primary-shadow: 0 10px 15px -3px color-mix(in oklab, var(--color-primary-500) 10%, transparent), 0 4px 6px -4px color-mix(in oklab, var(--color-primary-500) 10%, transparent);
+    --btn-primary-shadow-hover: 0 10px 15px -3px color-mix(in oklab, var(--color-primary-500) 20%, transparent), 0 4px 6px -4px color-mix(in oklab, var(--color-primary-500) 20%, transparent);
+    --btn-danger-bg: color-mix(in oklab, var(--color-red-500) 20%, transparent);
+    --btn-danger-bg-hover: color-mix(in oklab, var(--color-red-500) 30%, transparent);
+    --btn-danger-border: color-mix(in oklab, var(--color-red-500) 50%, transparent);
+    --btn-danger-border-hover: color-mix(in oklab, var(--color-red-400) 70%, transparent);
+    --btn-danger-fg: #fff;
+    --btn-danger-shadow: 0 10px 15px -3px color-mix(in oklab, var(--color-red-500) 10%, transparent), 0 4px 6px -4px color-mix(in oklab, var(--color-red-500) 10%, transparent);
+    --btn-danger-shadow-hover: 0 10px 15px -3px color-mix(in oklab, var(--color-red-500) 20%, transparent), 0 4px 6px -4px color-mix(in oklab, var(--color-red-500) 20%, transparent);
+    --btn-outline-bg: color-mix(in oklab, #fff 5%, transparent);
+    --btn-outline-bg-hover: color-mix(in oklab, #fff 10%, transparent);
+    --btn-outline-border: color-mix(in oklab, #fff 15%, transparent);
+    --btn-outline-fg: color-mix(in oklab, #fff 70%, transparent);
+    --btn-outline-fg-hover: #fff;
+    --btn-outline-shadow: 0 0 #0000;
+    --field-bg: color-mix(in oklab, #fff 5%, transparent);
+    --field-border: color-mix(in oklab, #fff 10%, transparent);
+    --selected-bg: color-mix(in oklab, var(--color-primary-500) 20%, transparent);
+    --selected-border: color-mix(in oklab, var(--color-primary-500) 50%, transparent);
+    --selected-fg: #fff;
+    --seg-track-bg: color-mix(in oklab, #fff 4%, transparent);
+    --seg-track-border: color-mix(in oklab, #fff 10%, transparent);
+    --seg-track-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --seg-active-bg: color-mix(in oklab, #fff 10%, transparent);
+    --seg-active-border: color-mix(in oklab, #fff 10%, transparent);
+    --seg-active-fg: #fff;
+    --seg-active-shadow: 0 10px 30px rgba(15, 23, 42, 0.22);
+    --tab-track-bg: color-mix(in oklab, #fff 5%, transparent);
+    --tab-active-bg: color-mix(in oklab, #fff 10%, transparent);
+    --tab-active-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --switch-on-bg: color-mix(in oklab, var(--color-primary-500) 60%, transparent);
+    --switch-on-border: color-mix(in oklab, var(--color-primary-500) 50%, transparent);
+    --switch-off-bg: color-mix(in oklab, #fff 20%, transparent);
+    --switch-off-border: color-mix(in oklab, #fff 20%, transparent);
+
+    /* project scales (dark = original values) */
+    --color-primary: #6366f1;
+    --color-primary-50: #eef2ff;
+    --color-primary-100: #e0e7ff;
+    --color-primary-200: #c7d2fe;
+    --color-primary-300: #a5b4fc;
+    --color-primary-400: #818cf8;
+    --color-primary-500: #6366f1;
+    --color-primary-600: #4f46e5;
+    --color-primary-700: #4338ca;
+    --color-primary-800: #3730a3;
+    --color-primary-900: #312e81;
+    --color-dark: #0a0a0a;
+    --color-dark-50: #141414;
+    --color-dark-100: #1a1a1a;
+    --color-dark-200: #262626;
+    --color-dark-300: #404040;
+    --color-dark-400: #525252;
+    --color-dark-500: #737373;
+    --color-dark-600: #a3a3a3;
+    --color-dark-700: #d4d4d4;
+    --color-dark-800: #e5e5e5;
+    --color-dark-900: #ededed;
+
+    /* Tailwind palette, written back for nested dark scopes */
+    --color-red-50: oklch(97.1% 0.013 17.38);
+    --color-rose-50: oklch(96.9% 0.015 12.422);
+    --color-orange-50: oklch(98% 0.016 73.684);
+    --color-amber-50: oklch(98.7% 0.022 95.277);
+    --color-yellow-50: oklch(98.7% 0.026 102.212);
+    --color-lime-50: oklch(98.6% 0.031 120.757);
+    --color-green-50: oklch(98.2% 0.018 155.826);
+    --color-emerald-50: oklch(97.9% 0.021 166.113);
+    --color-teal-50: oklch(98.4% 0.014 180.72);
+    --color-cyan-50: oklch(98.4% 0.019 200.873);
+    --color-sky-50: oklch(97.7% 0.013 236.62);
+    --color-blue-50: oklch(97% 0.014 254.604);
+    --color-violet-50: oklch(96.9% 0.016 293.756);
+    --color-purple-50: oklch(97.7% 0.014 308.299);
+    --color-fuchsia-50: oklch(97.7% 0.017 320.058);
+    --color-pink-50: oklch(97.1% 0.014 343.198);
+    --color-slate-50: oklch(98.4% 0.003 247.858);
+    --color-gray-50: oklch(98.5% 0.002 247.839);
+    --color-indigo-50: oklch(96.2% 0.018 272.314);
+    --color-red-100: oklch(93.6% 0.032 17.717);
+    --color-red-200: oklch(88.5% 0.062 18.334);
+    --color-red-300: oklch(80.8% 0.114 19.571);
+    --color-red-400: oklch(70.4% 0.191 22.216);
+    --color-rose-100: oklch(94.1% 0.03 12.58);
+    --color-rose-200: oklch(89.2% 0.058 10.001);
+    --color-rose-300: oklch(81% 0.117 11.638);
+    --color-rose-400: oklch(71.2% 0.194 13.428);
+    --color-orange-100: oklch(95.4% 0.038 75.164);
+    --color-orange-200: oklch(90.1% 0.076 70.697);
+    --color-orange-300: oklch(83.7% 0.128 66.29);
+    --color-orange-400: oklch(75% 0.183 55.934);
+    --color-amber-100: oklch(96.2% 0.059 95.617);
+    --color-amber-200: oklch(92.4% 0.12 95.746);
+    --color-amber-300: oklch(87.9% 0.169 91.605);
+    --color-amber-400: oklch(82.8% 0.189 84.429);
+    --color-yellow-100: oklch(97.3% 0.071 103.193);
+    --color-yellow-200: oklch(94.5% 0.129 101.54);
+    --color-yellow-300: oklch(90.5% 0.182 98.111);
+    --color-yellow-400: oklch(85.2% 0.199 91.936);
+    --color-lime-100: oklch(96.7% 0.067 122.328);
+    --color-lime-200: oklch(93.8% 0.127 124.321);
+    --color-lime-300: oklch(89.7% 0.196 126.665);
+    --color-lime-400: oklch(84.1% 0.238 128.85);
+    --color-green-100: oklch(96.2% 0.044 156.743);
+    --color-green-200: oklch(92.5% 0.084 155.995);
+    --color-green-300: oklch(87.1% 0.15 154.449);
+    --color-green-400: oklch(79.2% 0.209 151.711);
+    --color-green-500: oklch(72.3% 0.219 149.579);
+    --color-emerald-100: oklch(95% 0.052 163.051);
+    --color-emerald-200: oklch(90.5% 0.093 164.15);
+    --color-emerald-300: oklch(84.5% 0.143 164.978);
+    --color-emerald-400: oklch(76.5% 0.177 163.223);
+    --color-teal-100: oklch(95.3% 0.051 180.801);
+    --color-teal-200: oklch(91% 0.096 180.426);
+    --color-teal-300: oklch(85.5% 0.138 181.071);
+    --color-teal-400: oklch(77.7% 0.152 181.912);
+    --color-cyan-100: oklch(95.6% 0.045 203.388);
+    --color-cyan-200: oklch(91.7% 0.08 205.041);
+    --color-cyan-300: oklch(86.5% 0.127 207.078);
+    --color-cyan-400: oklch(78.9% 0.154 211.53);
+    --color-sky-100: oklch(95.1% 0.026 236.824);
+    --color-sky-200: oklch(90.1% 0.058 230.902);
+    --color-sky-300: oklch(82.8% 0.111 230.318);
+    --color-sky-400: oklch(74.6% 0.16 232.661);
+    --color-blue-100: oklch(93.2% 0.032 255.585);
+    --color-blue-200: oklch(88.2% 0.059 254.128);
+    --color-blue-300: oklch(80.9% 0.105 251.813);
+    --color-blue-400: oklch(70.7% 0.165 254.624);
+    --color-blue-500: oklch(62.3% 0.214 259.815);
+    --color-violet-100: oklch(94.3% 0.029 294.588);
+    --color-violet-200: oklch(89.4% 0.057 293.283);
+    --color-violet-300: oklch(81.1% 0.111 293.571);
+    --color-violet-400: oklch(70.2% 0.183 293.541);
+    --color-purple-100: oklch(94.6% 0.033 307.174);
+    --color-purple-200: oklch(90.2% 0.063 306.703);
+    --color-purple-300: oklch(82.7% 0.119 306.383);
+    --color-purple-400: oklch(71.4% 0.203 305.504);
+    --color-purple-500: oklch(62.7% 0.265 303.9);
+    --color-fuchsia-100: oklch(95.2% 0.037 318.852);
+    --color-fuchsia-200: oklch(90.3% 0.076 319.62);
+    --color-fuchsia-300: oklch(83.3% 0.145 321.434);
+    --color-fuchsia-400: oklch(74% 0.238 322.16);
+    --color-pink-100: oklch(94.8% 0.028 342.258);
+    --color-pink-200: oklch(89.9% 0.061 343.231);
+    --color-pink-300: oklch(82.3% 0.12 346.018);
+    --color-pink-400: oklch(71.8% 0.202 349.761);
+    --color-slate-100: oklch(96.8% 0.007 247.896);
+    --color-slate-200: oklch(92.9% 0.013 255.508);
+    --color-slate-300: oklch(86.9% 0.022 252.894);
+    --color-slate-400: oklch(70.4% 0.04 256.788);
+    --color-gray-100: oklch(96.7% 0.003 264.542);
+    --color-gray-200: oklch(92.8% 0.006 264.531);
+    --color-gray-300: oklch(87.2% 0.01 258.338);
+    --color-gray-400: oklch(70.7% 0.022 261.325);
+    --color-indigo-100: oklch(93% 0.034 272.788);
+    --color-indigo-200: oklch(87% 0.065 274.039);
+    --color-indigo-300: oklch(78.5% 0.115 274.713);
+    --color-indigo-400: oklch(67.3% 0.182 276.935);
+    --color-indigo-500: oklch(58.5% 0.233 277.117);
+    --color-indigo-600: oklch(51.1% 0.262 276.966);
+  }
+
+  [data-theme="light"] {
+    --page: #f6f8fc;
+    --foreground: #0f172a;
+    --page-glow: radial-gradient(640px 240px at 46% 0%, rgba(37, 99, 235, 0.14), transparent 72%),
+      radial-gradient(460px 220px at 62% 6%, rgba(16, 185, 129, 0.1), transparent 70%);
+    --page-pattern: radial-gradient(rgba(37, 99, 235, 0.14) 1px, transparent 1.3px);
+    --surface: #fff;
+    --surface-raised: #fff;
+    --surface-popover: rgba(255, 255, 255, 0.98);
+    --surface-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -20px rgba(37, 99, 235, 0.22);
+    --glass-shadow: var(--surface-shadow);
+    --popover-shadow: 0 20px 40px -16px rgba(15, 23, 42, 0.28);
+    --header-bg: rgba(255, 255, 255, 0.75);
+    --overlay: rgba(15, 23, 42, 0.35);
+    --popover-arrow: #fff;
+    --date-input-scheme: light;
+    --badge-mode-fg: oklch(44.3% 0.11 240.79);
+    --badge-new-fg: oklch(43.2% 0.095 166.913);
+    --focus-ring: #1d4ed8;
+    --focus-ring-inset: #1d4ed8;
+    --privileged-nav-fg: #1d4ed8;
+    --privileged-nav-mobile-fg: #1d4ed8;
+    --privileged-menu-fg: #1d4ed8;
+    --warning-muted-fg: oklch(47.3% 0.137 46.201);
+    --warning-detail-fg: oklch(47.3% 0.137 46.201);
+    --warning-soft-fg: oklch(47.3% 0.137 46.201);
+    --success-muted-fg: oklch(44.8% 0.119 151.328);
+    --preview-node-count-fg: #1d4ed8;
+    --preview-group-count-fg: oklch(44.8% 0.119 151.328);
+    --divider-label-bg: #ebeef5;
+    --drag-clone-bg: #fff;
+    --drag-clone-border: #2563eb;
+    --drag-clone-shadow: 0 20px 40px -16px rgba(15, 23, 42, 0.28);
+
+    --ink: #1e3a6e;
+    --shade: #fff;
+    --fg: #0f172a;
+    --fg-90: #0f172a;
+    --fg-85: #0f172a;
+    --fg-80: #1e293b;
+    --fg-75: #1e293b;
+    --fg-70: #334155;
+    --fg-65: #334155;
+    --fg-60: #475569;
+    --fg-55: #475569;
+    --fg-50: #536379;
+    --fg-45: #536379;
+    --fg-40: #536379;
+    --fg-35: #536379;
+    --fg-30: #5f6f86;
+    --fg-25: #5f6f86;
+    --heading-from: #0f172a;
+    --heading-to: #0f172a;
+    --border-default: color-mix(in oklab, #1e3a6e 10%, transparent);
+    --selection-bg: rgba(37, 99, 235, 0.18);
+    --scrollbar-track: #f6f8fc;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-thumb-hover: #94a3b8;
+    --custom-scrollbar-thumb: rgba(37, 99, 235, 0.3);
+    --custom-scrollbar-thumb-hover: rgba(37, 99, 235, 0.5);
+    --code-panel-bg: #0b1220;
+    --code-panel-border: #1e293b;
+    --avatar-bg: #2563eb;
+
+    --btn-primary-bg: #2563eb;
+    --btn-primary-bg-hover: #1d4ed8;
+    --btn-primary-border: transparent;
+    --btn-primary-border-hover: transparent;
+    --btn-primary-fg: #fff;
+    --btn-primary-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 6px 16px -8px rgba(37, 99, 235, 0.55);
+    --btn-primary-shadow-hover: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 20px -8px rgba(37, 99, 235, 0.6);
+    --btn-danger-bg: #fef2f2;
+    --btn-danger-bg-hover: #fee2e2;
+    --btn-danger-border: #fca5a5;
+    --btn-danger-border-hover: #f87171;
+    --btn-danger-fg: #b91c1c;
+    --btn-danger-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --btn-danger-shadow-hover: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --btn-outline-bg: #fff;
+    --btn-outline-bg-hover: #f4f6fa;
+    --btn-outline-border: #d5ddea;
+    --btn-outline-fg: #334155;
+    --btn-outline-fg-hover: #0f172a;
+    --btn-outline-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --field-bg: #fff;
+    --field-border: #d5ddea;
+    --selected-bg: rgba(37, 99, 235, 0.08);
+    --selected-border: #2563eb;
+    --selected-fg: #1d4ed8;
+    --seg-track-bg: #eef2f8;
+    --seg-track-border: #e3e8f2;
+    --seg-track-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    --seg-active-bg: #fff;
+    --seg-active-border: #e3e8f2;
+    --seg-active-fg: #0f172a;
+    --seg-active-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 6px 16px -8px rgba(37, 99, 235, 0.3);
+    --tab-track-bg: #eef2f8;
+    --tab-active-bg: #fff;
+    --tab-active-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 6px 16px -8px rgba(37, 99, 235, 0.3);
+    --switch-on-bg: #2563eb;
+    --switch-on-border: #2563eb;
+    --switch-off-bg: #7b8aa0;
+    --switch-off-border: #7b8aa0;
+
+    --color-primary: #2563eb;
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #1e40af;
+    --color-primary-200: #1e40af;
+    --color-primary-300: #1d4ed8;
+    --color-primary-400: #1d4ed8;
+    --color-primary-500: #2563eb;
+    --color-primary-600: #1d4ed8;
+    --color-primary-700: #1d4ed8;
+    --color-primary-800: #1e40af;
+    --color-primary-900: #1e3a8a;
+    --color-dark: #f6f8fc;
+    --color-dark-50: #fff;
+    --color-dark-100: #fff;
+    --color-dark-200: #eef2f8;
+    --color-dark-300: #d5ddea;
+    --color-dark-400: #b8c4d6;
+    --color-dark-500: #7b8aa0;
+    --color-dark-600: #5b6b80;
+    --color-dark-700: #334155;
+    --color-dark-800: #1e293b;
+    --color-dark-900: #0f172a;
+
+    --color-red-50: oklch(39.6% 0.141 25.723); /* red-900 */
+    --color-rose-50: oklch(41% 0.159 10.272); /* rose-900 */
+    --color-orange-50: oklch(40.8% 0.123 38.172); /* orange-900 */
+    --color-amber-50: oklch(41.4% 0.112 45.904); /* amber-900 */
+    --color-yellow-50: oklch(42.1% 0.095 57.708); /* yellow-900 */
+    --color-lime-50: oklch(40.5% 0.101 131.063); /* lime-900 */
+    --color-green-50: oklch(39.3% 0.095 152.535); /* green-900 */
+    --color-emerald-50: oklch(37.8% 0.077 168.94); /* emerald-900 */
+    --color-teal-50: oklch(38.6% 0.063 188.416); /* teal-900 */
+    --color-cyan-50: oklch(39.8% 0.07 227.392); /* cyan-900 */
+    --color-sky-50: oklch(39.1% 0.09 240.876); /* sky-900 */
+    --color-blue-50: oklch(37.9% 0.146 265.522); /* blue-900 */
+    --color-violet-50: oklch(38% 0.189 293.745); /* violet-900 */
+    --color-purple-50: oklch(38.1% 0.176 304.987); /* purple-900 */
+    --color-fuchsia-50: oklch(40.1% 0.17 325.612); /* fuchsia-900 */
+    --color-pink-50: oklch(40.8% 0.153 2.432); /* pink-900 */
+    --color-slate-50: oklch(20.8% 0.042 265.755); /* slate-900 */
+    --color-gray-50: oklch(21% 0.034 264.665); /* gray-900 */
+    --color-indigo-50: #1e3a8a;
+    --color-red-100: oklch(44.4% 0.177 26.899);
+    --color-red-200: oklch(44.4% 0.177 26.899);
+    --color-red-300: oklch(50.5% 0.213 27.518);
+    --color-red-400: oklch(50.5% 0.213 27.518);
+    --color-rose-100: oklch(45.5% 0.188 13.697);
+    --color-rose-200: oklch(45.5% 0.188 13.697);
+    --color-rose-300: oklch(51.4% 0.222 16.935);
+    --color-rose-400: oklch(51.4% 0.222 16.935);
+    --color-orange-100: oklch(47% 0.157 37.304);
+    --color-orange-200: oklch(47% 0.157 37.304);
+    --color-orange-300: oklch(55.3% 0.195 38.402);
+    --color-orange-400: oklch(55.3% 0.195 38.402);
+    --color-amber-100: oklch(47.3% 0.137 46.201);
+    --color-amber-200: oklch(47.3% 0.137 46.201);
+    --color-amber-300: oklch(55.5% 0.163 48.998);
+    --color-amber-400: oklch(55.5% 0.163 48.998);
+    --color-yellow-100: oklch(47.6% 0.114 61.907);
+    --color-yellow-200: oklch(47.6% 0.114 61.907);
+    --color-yellow-300: oklch(55.4% 0.135 66.442);
+    --color-yellow-400: oklch(55.4% 0.135 66.442);
+    --color-lime-100: oklch(45.3% 0.124 130.933);
+    --color-lime-200: oklch(45.3% 0.124 130.933);
+    --color-lime-300: oklch(53.2% 0.157 131.589);
+    --color-lime-400: oklch(53.2% 0.157 131.589);
+    --color-green-100: oklch(44.8% 0.119 151.328);
+    --color-green-200: oklch(44.8% 0.119 151.328);
+    --color-green-300: oklch(52.7% 0.154 150.069);
+    --color-green-400: oklch(52.7% 0.154 150.069);
+    --color-green-500: oklch(52.7% 0.154 150.069);
+    --color-emerald-100: oklch(43.2% 0.095 166.913);
+    --color-emerald-200: oklch(43.2% 0.095 166.913);
+    --color-emerald-300: oklch(50.8% 0.118 165.612);
+    --color-emerald-400: oklch(50.8% 0.118 165.612);
+    --color-teal-100: oklch(43.7% 0.078 188.216);
+    --color-teal-200: oklch(43.7% 0.078 188.216);
+    --color-teal-300: oklch(51.1% 0.096 186.391);
+    --color-teal-400: oklch(51.1% 0.096 186.391);
+    --color-cyan-100: oklch(45% 0.085 224.283);
+    --color-cyan-200: oklch(45% 0.085 224.283);
+    --color-cyan-300: oklch(52% 0.105 223.128);
+    --color-cyan-400: oklch(52% 0.105 223.128);
+    --color-sky-100: oklch(44.3% 0.11 240.79);
+    --color-sky-200: oklch(44.3% 0.11 240.79);
+    --color-sky-300: oklch(50% 0.134 242.749);
+    --color-sky-400: oklch(50% 0.134 242.749);
+    --color-blue-100: oklch(42.4% 0.199 265.638);
+    --color-blue-200: oklch(42.4% 0.199 265.638);
+    --color-blue-300: oklch(48.8% 0.243 264.376);
+    --color-blue-400: oklch(48.8% 0.243 264.376);
+    --color-blue-500: oklch(48.8% 0.243 264.376);
+    --color-violet-100: oklch(43.2% 0.232 292.759);
+    --color-violet-200: oklch(43.2% 0.232 292.759);
+    --color-violet-300: oklch(49.1% 0.27 292.581);
+    --color-violet-400: oklch(49.1% 0.27 292.581);
+    --color-purple-100: oklch(43.8% 0.218 303.724);
+    --color-purple-200: oklch(43.8% 0.218 303.724);
+    --color-purple-300: oklch(49.6% 0.265 301.924);
+    --color-purple-400: oklch(49.6% 0.265 301.924);
+    --color-purple-500: oklch(49.6% 0.265 301.924);
+    --color-fuchsia-100: oklch(45.2% 0.211 324.591);
+    --color-fuchsia-200: oklch(45.2% 0.211 324.591);
+    --color-fuchsia-300: oklch(51.8% 0.253 323.949);
+    --color-fuchsia-400: oklch(51.8% 0.253 323.949);
+    --color-pink-100: oklch(45.9% 0.187 3.815);
+    --color-pink-200: oklch(45.9% 0.187 3.815);
+    --color-pink-300: oklch(52.5% 0.223 3.958);
+    --color-pink-400: oklch(52.5% 0.223 3.958);
+    --color-slate-100: oklch(27.9% 0.041 260.031);
+    --color-slate-200: oklch(27.9% 0.041 260.031);
+    --color-slate-300: oklch(37.2% 0.044 257.287);
+    --color-slate-400: oklch(37.2% 0.044 257.287);
+    --color-gray-100: oklch(27.8% 0.033 256.848);
+    --color-gray-200: oklch(27.8% 0.033 256.848);
+    --color-gray-300: oklch(37.3% 0.034 259.733);
+    --color-gray-400: oklch(37.3% 0.034 259.733);
+    --color-indigo-100: #1e40af;
+    --color-indigo-200: #1e40af;
+    --color-indigo-300: #1d4ed8;
+    --color-indigo-400: #1d4ed8;
+    --color-indigo-500: #2563eb;
+    --color-indigo-600: #1d4ed8;
+  }
+
+  /* Theme toggle icons: both render on the server; CSS shows the one matching the theme. */
+  [data-theme="light"] .theme-when-dark,
+  [data-theme="dark"] .theme-when-light {
+    display: none;
+  }
+}
+
+/* Project scales: registered here so their utilities exist; the dark values match the block above. */
+@theme {
+  --color-primary: #6366f1;
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+
+  --color-dark: #0a0a0a;
+  --color-dark-50: #141414;
+  --color-dark-100: #1a1a1a;
+  --color-dark-200: #262626;
+  --color-dark-300: #404040;
+  --color-dark-400: #525252;
+  --color-dark-500: #737373;
+  --color-dark-600: #a3a3a3;
+  --color-dark-700: #d4d4d4;
+  --color-dark-800: #e5e5e5;
+  --color-dark-900: #ededed;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-popover: var(--surface-popover);
+  --color-header: var(--header-bg);
+  --color-overlay: var(--overlay);
+  --color-popover-arrow: var(--popover-arrow);
+  --color-badge-mode-fg: var(--badge-mode-fg);
+  --color-badge-new-fg: var(--badge-new-fg);
+  --color-focus-ring: var(--focus-ring);
+  --color-focus-ring-inset: var(--focus-ring-inset);
+  --color-privileged-nav-fg: var(--privileged-nav-fg);
+  --color-privileged-nav-mobile-fg: var(--privileged-nav-mobile-fg);
+  --color-privileged-menu-fg: var(--privileged-menu-fg);
+  --color-warning-muted-fg: var(--warning-muted-fg);
+  --color-warning-detail-fg: var(--warning-detail-fg);
+  --color-warning-soft-fg: var(--warning-soft-fg);
+  --color-success-muted-fg: var(--success-muted-fg);
+  --color-preview-node-count-fg: var(--preview-node-count-fg);
+  --color-preview-group-count-fg: var(--preview-group-count-fg);
+  --color-ink: var(--ink);
+  --color-shade: var(--shade);
+  --color-fg: var(--fg);
+  --color-fg-90: var(--fg-90);
+  --color-fg-85: var(--fg-85);
+  --color-fg-80: var(--fg-80);
+  --color-fg-75: var(--fg-75);
+  --color-fg-70: var(--fg-70);
+  --color-fg-65: var(--fg-65);
+  --color-fg-60: var(--fg-60);
+  --color-fg-55: var(--fg-55);
+  --color-fg-50: var(--fg-50);
+  --color-fg-45: var(--fg-45);
+  --color-fg-40: var(--fg-40);
+  --color-fg-35: var(--fg-35);
+  --color-fg-30: var(--fg-30);
+  --color-fg-25: var(--fg-25);
+  --color-heading-from: var(--heading-from);
+  --color-heading-to: var(--heading-to);
+  --color-code-panel: var(--code-panel-bg);
+  --color-code-panel-border: var(--code-panel-border);
+
+  --color-btn-primary: var(--btn-primary-bg);
+  --color-btn-primary-hover: var(--btn-primary-bg-hover);
+  --color-btn-primary-border: var(--btn-primary-border);
+  --color-btn-primary-border-hover: var(--btn-primary-border-hover);
+  --color-btn-primary-fg: var(--btn-primary-fg);
+  --color-btn-danger: var(--btn-danger-bg);
+  --color-btn-danger-hover: var(--btn-danger-bg-hover);
+  --color-btn-danger-border: var(--btn-danger-border);
+  --color-btn-danger-border-hover: var(--btn-danger-border-hover);
+  --color-btn-danger-fg: var(--btn-danger-fg);
+  --color-btn-outline: var(--btn-outline-bg);
+  --color-btn-outline-hover: var(--btn-outline-bg-hover);
+  --color-btn-outline-border: var(--btn-outline-border);
+  --color-btn-outline-fg: var(--btn-outline-fg);
+  --color-btn-outline-fg-hover: var(--btn-outline-fg-hover);
+  --color-field: var(--field-bg);
+  --color-field-border: var(--field-border);
+  --color-selected: var(--selected-bg);
+  --color-selected-border: var(--selected-border);
+  --color-selected-fg: var(--selected-fg);
+  --color-seg-track: var(--seg-track-bg);
+  --color-seg-track-border: var(--seg-track-border);
+  --color-seg-active: var(--seg-active-bg);
+  --color-seg-active-border: var(--seg-active-border);
+  --color-seg-active-fg: var(--seg-active-fg);
+  --color-tab-track: var(--tab-track-bg);
+  --color-tab-active: var(--tab-active-bg);
+  --color-switch-on: var(--switch-on-bg);
+  --color-switch-on-border: var(--switch-on-border);
+  --color-switch-off: var(--switch-off-bg);
+  --color-switch-off-border: var(--switch-off-border);
+}

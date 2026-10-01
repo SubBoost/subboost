@@ -53,10 +53,10 @@ describe("additional basic UI components", () => {
     expect(getProtocolBadgeClass(" vmess ")).toContain("purple");
     expect(getProtocolBadgeClass("unknown")).toContain("slate");
     expect(getArtisticNavButtonClassName({ active: true, size: "md", className: "extra" })).toContain("extra");
-    expect(getArtisticNavButtonClassName({ active: true, size: "md" })).toContain("text-white");
-    expect(getArtisticNavButtonClassName({ active: false })).toContain("hover:bg-white/5");
+    expect(getArtisticNavButtonClassName({ active: true, size: "md" })).toContain("text-seg-active-fg");
+    expect(getArtisticNavButtonClassName({ active: false })).toContain("hover:bg-ink/5");
     expect(getArtisticNavIconClassName(true, "icon-extra")).toContain("icon-extra");
-    expect(getArtisticNavIconClassName(false)).toContain("text-white/45");
+    expect(getArtisticNavIconClassName(false)).toContain("text-fg-45");
     expect(artisticNavContainerClassName).toContain("rounded-full");
     expect(artisticTabsListClassName).toContain("h-auto");
     expect(artisticTabsTriggerClassName).toContain("data-[state=active]");

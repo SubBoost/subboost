@@ -257,7 +257,7 @@ export function ProxyGroupsAddedRuleSets({
   if (visibleAddedRuleSets.length === 0) {
     if (!showSearchHint) return null;
     return (
-      <p className="py-2 text-center text-xs leading-5 text-white/60">
+      <p className="py-2 text-center text-xs leading-5 text-fg-60">
         {typeof totalRules === "number" ? (
           <>
             从
@@ -274,12 +274,12 @@ export function ProxyGroupsAddedRuleSets({
   }
 
   return (
-    <div className="space-y-1 border-t border-white/10 pt-2">
+    <div className="space-y-1 border-t border-ink/10 pt-2">
       <div className="flex min-h-5 items-center gap-2">
-        <span className="text-[11px] font-medium text-white/65">
+        <span className="text-[11px] font-medium text-fg-65">
           已添加规则集
         </span>
-        <span className="ml-auto text-[10px] text-white/40">
+        <span className="ml-auto text-[10px] text-fg-40">
           已添加 {visibleAddedRuleSets.length}
         </span>
       </div>
@@ -298,7 +298,7 @@ export function ProxyGroupsAddedRuleSets({
               >
                 <div className={RULE_EDIT_ROW_CLASS}>
                   <div
-                    className={`flex h-7 ${RULE_EDIT_PRIMARY_FIELD_CLASS} items-center truncate rounded-md border border-white/10 bg-white/5 px-2 font-mono text-xs text-white/75`}
+                    className={`flex h-7 ${RULE_EDIT_PRIMARY_FIELD_CLASS} items-center truncate rounded-md border border-ink/10 bg-ink/5 px-2 font-mono text-xs text-fg-75`}
                     title={displayPath}
                   >
                     {displayPath}
@@ -329,7 +329,7 @@ export function ProxyGroupsAddedRuleSets({
                         ))}
                       </SelectContent>
                     </Select>
-                    <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2">
+                    <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink/10 bg-ink/5 px-2">
                       <Switch
                         aria-label={`设置 ${item.name} no-resolve`}
                         checked={draft.noResolve}
@@ -339,7 +339,7 @@ export function ProxyGroupsAddedRuleSets({
                           )
                         }
                       />
-                      <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">
+                      <span className="proxy-group-rule-no-resolve-label text-[10px] text-fg-50">
                         no-resolve
                       </span>
                     </div>
@@ -370,7 +370,7 @@ export function ProxyGroupsAddedRuleSets({
                         variant="ghost"
                         size="sm"
                         onClick={() => removeRuleSet(item)}
-                        className="h-7 w-7 shrink-0 p-0 text-white/40 hover:text-red-300"
+                        className="h-7 w-7 shrink-0 p-0 text-fg-40 hover:text-red-300"
                         title="删除规则集"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -387,25 +387,25 @@ export function ProxyGroupsAddedRuleSets({
           return (
             <div
               key={item.key}
-              className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px]"
+              className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-ink/10 bg-ink/[0.04] px-2 py-1 text-[10px]"
             >
               <span className={RULE_TYPE_BADGE_CLASS}>
                 RULE-SET
               </span>
               <span
-                className="min-w-0 max-w-[16rem] truncate font-mono text-white/75"
+                className="min-w-0 max-w-[16rem] truncate font-mono text-fg-75"
                 title={displayPath}
               >
                 {displayPath}
               </span>
               {item.noResolve && (
-                <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/45">
+                <span className="rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-45">
                   no-resolve
                 </span>
               )}
-              <ArrowRight className="h-3 w-3 shrink-0 text-white/35" />
+              <ArrowRight className="h-3 w-3 shrink-0 text-fg-35" />
               <span
-                className="max-w-[11rem] truncate rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/70"
+                className="max-w-[11rem] truncate rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-70"
                 title={item.target.name}
               >
                 {item.target.name}
@@ -416,7 +416,7 @@ export function ProxyGroupsAddedRuleSets({
                   variant="ghost"
                   type="button"
                   onClick={() => startEditing(item)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/10 hover:text-white/80"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-md text-fg-35 transition-colors hover:bg-ink/10 hover:text-fg-80"
                 >
                   <Pencil className="h-3 w-3" />
                 </IconButton>
@@ -425,7 +425,7 @@ export function ProxyGroupsAddedRuleSets({
                   variant="ghost"
                   type="button"
                   onClick={() => removeRuleSet(item)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-md text-fg-30 transition-colors hover:bg-red-500/10 hover:text-red-300"
                 >
                   <Trash2 className="h-3 w-3" />
                 </IconButton>

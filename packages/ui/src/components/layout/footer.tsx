@@ -66,13 +66,13 @@ function filterLinks(links: FooterLink[], hasUser: boolean): FooterLink[] {
 function FooterTextLink({ link }: { link: FooterLink }) {
   if (link.disabled) {
     return (
-      <span title={link.title} className="text-sm text-white/35">
+      <span title={link.title} className="text-sm text-fg-35">
         {link.label}
       </span>
     );
   }
 
-  const className = "text-sm text-white/50 hover:text-white transition-colors";
+  const className = "text-sm text-fg-50 hover:text-fg transition-colors";
   if (link.external) {
     return (
       <a href={link.href} target="_blank" rel="noopener noreferrer" className={`${className} inline-flex items-center gap-1`}>
@@ -93,7 +93,7 @@ function FooterBrandIcon({ link }: { link: FooterLink }) {
     return (
       <svg
         aria-hidden="true"
-        className="h-6 w-6 fill-current text-white/65 transition-colors group-hover:text-white"
+        className="h-6 w-6 fill-current text-fg-65 transition-colors group-hover:text-fg"
         data-brand-icon="github"
         focusable="false"
         viewBox="0 0 24 24"
@@ -115,7 +115,7 @@ function FooterBrandIcon({ link }: { link: FooterLink }) {
     );
   }
 
-  return <ExternalLink className="h-5 w-5 text-white/50" />;
+  return <ExternalLink className="h-5 w-5 text-fg-50" />;
 }
 
 function buildDefaultHelpLinks(mode: FooterMode): FooterLink[] {
@@ -154,7 +154,7 @@ export function Footer({
   const visibleResourceLinks = filterLinks(resourceLinks, hasUser);
 
   return (
-    <footer className="hidden md:block border-t border-white/10 bg-dark-50/80 backdrop-blur-sm">
+    <footer className="hidden md:block border-t border-ink/10 bg-dark-50/80 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="space-y-4">
@@ -166,9 +166,9 @@ export function Footer({
                 height={32}
                 className="rounded-xl shadow-lg shadow-blue-500/25"
               />
-              <span className="font-semibold text-white">SubBoost</span>
+              <span className="font-semibold text-fg">SubBoost</span>
             </div>
-            <p className="text-sm leading-relaxed text-white/50">{SUBBOOST_FOOTER_DESCRIPTION}</p>
+            <p className="text-sm leading-relaxed text-fg-50">{SUBBOOST_FOOTER_DESCRIPTION}</p>
             {brandLinks.length > 0 && (
               <div className="flex items-center gap-4">
                 {brandLinks.map((link) => (
@@ -189,7 +189,7 @@ export function Footer({
           </div>
 
           <div>
-            <h3 className="mb-4 font-medium text-white">功能</h3>
+            <h3 className="mb-4 font-medium text-fg">功能</h3>
             <ul className="space-y-2">
               {visibleFeatureLinks.map((link) => (
                 <li key={link.href}>
@@ -200,7 +200,7 @@ export function Footer({
           </div>
 
           <div>
-            <h3 className="mb-4 font-medium text-white">帮助</h3>
+            <h3 className="mb-4 font-medium text-fg">帮助</h3>
             <ul className="space-y-2">
               {visibleHelpLinks.map((link) => (
                 <li key={`${link.label}-${link.href}`}>
@@ -211,7 +211,7 @@ export function Footer({
           </div>
 
           <div>
-            <h3 className="mb-4 font-medium text-white">相关资源</h3>
+            <h3 className="mb-4 font-medium text-fg">相关资源</h3>
             <ul className="space-y-2">
               {visibleResourceLinks.map((link) => (
                 <li key={link.href}>
@@ -222,8 +222,8 @@ export function Footer({
           </div>
         </div>
 
-        <div className="mt-8 border-t border-white/5 pt-6">
-          <p className="text-center text-xs text-white/40">
+        <div className="mt-8 border-t border-ink/5 pt-6">
+          <p className="text-center text-xs text-fg-40">
             Powered by SubBoost{buildVersion ? ` | v ${buildVersion}` : ""}
           </p>
         </div>

@@ -31,7 +31,7 @@ function SwitchField({
     <Label
       htmlFor={controlId}
       className={cn(
-        "flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 transition-colors hover:bg-white/[0.07]",
+        "flex w-full items-center justify-between rounded-xl border border-ink/10 bg-ink/5 transition-colors hover:bg-ink/[0.07]",
         density === "compact" ? "gap-2 rounded-md px-2 py-1" : "gap-4 px-4 py-3",
         disabled && "cursor-not-allowed opacity-60"
       )}
@@ -40,14 +40,14 @@ function SwitchField({
         <span
           id={labelId}
           className={cn(
-            "block font-medium leading-snug text-white/80",
+            "block font-medium leading-snug text-fg-80",
             density === "compact" ? "text-xs" : "text-sm"
           )}
         >
           {label}
         </span>
         {description ? (
-          <span id={descriptionId} className="block text-xs font-normal leading-relaxed text-white/45">
+          <span id={descriptionId} className="block text-xs font-normal leading-relaxed text-fg-45">
             {description}
           </span>
         ) : null}

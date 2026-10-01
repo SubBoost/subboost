@@ -171,7 +171,7 @@ export function NodeManagementSection({
               <span className="block rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 leading-6 text-amber-100/90">
                 警告：请确保你的设备处于受信任网络；如果你的监听端口暴露在公网，任何人都可以使用你的节点。
               </span>
-              <span className="mt-3 block leading-6 text-white/65">
+              <span className="mt-3 block leading-6 text-fg-65">
                 如果你不清楚安全风险及规避方法，请不要开启。
               </span>
             </span>
@@ -492,13 +492,13 @@ export function NodeManagementSection({
         <div className="mt-2 pl-6">
           <div className="flex flex-col gap-2 pb-2 pr-2 sm:flex-row sm:items-center">
             <div className="relative w-full sm:min-w-0 sm:flex-1">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-30" />
               <Input
                 value={nodeSearchKeyword}
                 onChange={(e) => setNodeSearchKeyword(e.target.value)}
                 placeholder="搜索节点..."
                 disabled={effectiveNodes.length === 0 && deletedMarkedNodes.length === 0}
-                className="pl-7 text-xs h-7 bg-white/5 border-white/10"
+                className="pl-7 text-xs h-7 bg-ink/5 border-ink/10"
               />
             </div>
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">

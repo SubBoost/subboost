@@ -51,7 +51,7 @@ export function MobileNav({ mode = "default" }: { mode?: "default" | "local" }) 
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-white/5 bg-black/50 backdrop-blur-xl",
+        "fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-ink/5 bg-header backdrop-blur-xl",
         zeroRightClassName
       )}
     >
@@ -79,7 +79,7 @@ export function MobileNav({ mode = "default" }: { mode?: "default" | "local" }) 
               }}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 w-full h-full transition-colors",
-                isActive ? "text-indigo-400" : "text-white/40 hover:text-white/60"
+                isActive ? "text-indigo-400" : "text-fg-40 hover:text-fg-60"
               )}
             >
               <item.icon className="h-5 w-5" />

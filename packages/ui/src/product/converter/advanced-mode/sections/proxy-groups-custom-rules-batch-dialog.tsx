@@ -161,8 +161,8 @@ export function ProxyGroupsCustomRulesBatchDialog({
         <div className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-white/60">规则行</div>
-              <div className="text-[10px] text-white/40">
+              <div className="text-xs text-fg-60">规则行</div>
+              <div className="text-[10px] text-fg-40">
                 可导入 {hasInput ? importPlan.readyCount : 0}
                 {hasInput && importPlan.errorCount > 0
                   ? ` · 错误 ${importPlan.errorCount}`
@@ -186,13 +186,13 @@ export function ProxyGroupsCustomRulesBatchDialog({
               ].join("\n")}
               className="min-h-[180px] resize-y font-mono text-xs"
             />
-            <div className="text-[10px] leading-4 text-white/40">
+            <div className="text-[10px] leading-4 text-fg-40">
               每行一条；缺少目标时使用当前目标，纯值行使用当前类型、目标和 no-resolve 设置。
             </div>
           </div>
 
           {hasInput && (importPlan.errorCount > 0 || importPlan.duplicateCount > 0) && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/80">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-warning-soft-fg">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
               <span>存在无效或重复规则，当前不会导入任何内容。</span>
             </div>
@@ -200,14 +200,14 @@ export function ProxyGroupsCustomRulesBatchDialog({
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">预览</div>
-              <div className="text-[10px] text-white/40">
+              <div className="text-xs text-fg-60">预览</div>
+              <div className="text-[10px] text-fg-40">
                 {hasInput ? `${visibleItems.length} 行` : "等待输入"}
               </div>
             </div>
 
             {visibleItems.length === 0 ? (
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-[10px] text-white/40">
+              <div className="rounded-lg border border-ink/10 bg-ink/[0.03] px-3 py-3 text-[10px] text-fg-40">
                 {hasInput ? "暂无可预览的规则行" : "粘贴规则后会在这里预览。"}
               </div>
             ) : (
@@ -218,7 +218,7 @@ export function ProxyGroupsCustomRulesBatchDialog({
                     className={`rounded-md border px-2 py-1.5 text-[11px] ${getStatusClass(item)}`}
                   >
                     <div className="mb-1 flex items-center justify-between gap-3">
-                      <span className="text-white/40">第 {item.lineNumber} 行</span>
+                      <span className="text-fg-40">第 {item.lineNumber} 行</span>
                       <span className={getStatusTextClass(item)}>{item.message}</span>
                     </div>
                     {item.rule ? (
@@ -227,26 +227,26 @@ export function ProxyGroupsCustomRulesBatchDialog({
                           {item.rule.type}
                         </span>
                         <span
-                          className="min-w-0 max-w-[14rem] truncate text-white/75"
+                          className="min-w-0 max-w-[14rem] truncate text-fg-75"
                           title={item.rule.value}
                         >
                           {item.rule.value}
                         </span>
                         {item.rule.noResolve && (
-                          <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/45">
+                          <span className="rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-45">
                             no-resolve
                           </span>
                         )}
-                        <ArrowRight className="h-3 w-3 shrink-0 text-white/35" />
+                        <ArrowRight className="h-3 w-3 shrink-0 text-fg-35" />
                         <span
-                          className="max-w-[11rem] truncate rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/70"
+                          className="max-w-[11rem] truncate rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-70"
                           title={ruleTargetToText(item.rule.target)}
                         >
                           {ruleTargetToText(item.rule.target)}
                         </span>
                       </div>
                     ) : (
-                      <div className="truncate font-mono text-white/45" title={item.raw}>
+                      <div className="truncate font-mono text-fg-45" title={item.raw}>
                         {item.raw}
                       </div>
                     )}

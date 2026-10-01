@@ -44,7 +44,8 @@ describe("basic UI components", () => {
     expect(html).toContain("Desc");
     expect(html).toContain("content-extra");
     expect(html).toContain("type=\"date\"");
-    expect(html).toContain("color-scheme:dark");
+    expect(html).toContain("[-webkit-text-fill-color:var(--fg)]");
+    expect(html).toContain("[color-scheme:var(--date-input-scheme)]");
     expect(html).toContain("placeholder=\"Name\"");
     expect(html).toContain("disabled=\"\"");
   });

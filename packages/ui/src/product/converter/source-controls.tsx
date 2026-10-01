@@ -53,7 +53,7 @@ export function SourceTypeChoices({
               "min-h-0 rounded border-0 p-1",
               value === type
                 ? "bg-indigo-500/20 text-indigo-400"
-                : "bg-transparent text-white/30 hover:bg-white/5 hover:text-white/50"
+                : "bg-transparent text-fg-30 hover:bg-ink/5 hover:text-fg-50"
             )}
           />
         );
@@ -89,22 +89,22 @@ export function SourceStatusPopover({
           <Menu className="h-3 w-3 text-green-300/70" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="bottom" align="start" className="w-[260px] bg-black/90 p-3">
+      <PopoverContent side="bottom" align="start" className="w-[260px] bg-shade/90 p-3">
         <div className="space-y-2 text-xs">
           <div className="flex items-center gap-2">
             <HelpCircle className="h-4 w-4 text-green-300" aria-hidden="true" />
-            <p className="font-medium text-white">订阅信息</p>
+            <p className="font-medium text-fg">订阅信息</p>
           </div>
           {hasUserInfo && userInfo ? (
-            <div className="space-y-1 text-white/60">
+            <div className="space-y-1 text-fg-60">
               {userInfo.traffic ? <p>已用流量：{userInfo.traffic}</p> : null}
               {userInfo.expire ? <p>到期时间：{userInfo.expire}</p> : null}
             </div>
           ) : (
-            <p className="leading-relaxed text-white/60">暂无已用流量/到期时间信息</p>
+            <p className="leading-relaxed text-fg-60">暂无已用流量/到期时间信息</p>
           )}
         </div>
-        <PopoverArrow className="fill-black/90" />
+        <PopoverArrow className="fill-shade/90" />
       </PopoverContent>
     </Popover>
   );
@@ -128,7 +128,7 @@ export function AddSourceMenu({
           variant="outline"
           size="sm"
           className={cn(
-            "w-full border-dashed border-white/20 text-xs text-white/50 hover:border-white/30 hover:text-white/70",
+            "w-full border-dashed border-ink/20 text-xs text-fg-50 hover:border-ink/30 hover:text-fg-70",
             compact ? "h-7" : "h-8"
           )}
         >
@@ -136,7 +136,7 @@ export function AddSourceMenu({
           添加订阅/节点源
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] border-white/10 bg-[#1a1a1a] text-white">
+      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] border-ink/10 bg-surface-raised text-fg">
         {sourceTypes.map((type) => {
           const info = sourceTypeInfo[type];
           const Icon = info.icon;
@@ -144,12 +144,12 @@ export function AddSourceMenu({
             <DropdownMenuItem
               key={type}
               onSelect={() => onAdd(type)}
-              className={cn("gap-3 focus:bg-white/5 focus:text-white", compact ? "py-2" : "py-2.5")}
+              className={cn("gap-3 focus:bg-ink/5 focus:text-fg", compact ? "py-2" : "py-2.5")}
             >
               <Icon className="h-4 w-4 text-indigo-400" aria-hidden="true" />
               <span>
-                <span className="block text-xs font-medium text-white">{info.label}</span>
-                {!compact ? <span className="block text-[10px] text-white/40">{info.description}</span> : null}
+                <span className="block text-xs font-medium text-fg">{info.label}</span>
+                {!compact ? <span className="block text-[10px] text-fg-40">{info.description}</span> : null}
               </span>
             </DropdownMenuItem>
           );

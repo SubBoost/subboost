@@ -207,7 +207,7 @@ export function ProxyGroupsCustomGroupsPanel({
             value={newCustomGroupDescription}
             onChange={(event) => setNewCustomGroupDescription(event.target.value)}
             placeholder="描述文本（默认: 自定义代理组）"
-            className="h-7 min-w-0 border-white/10 bg-white/5 text-xs"
+            className="h-7 min-w-0 border-ink/10 bg-ink/5 text-xs"
           />
         </div>
         <Button
@@ -247,7 +247,7 @@ export function ProxyGroupsCustomGroupsPanel({
 
       {/* 自定义分组列表 */}
       {customProxyGroups.length === 0 ? (
-        <div className="text-xs text-white/40 py-3 text-center">暂无自定义分组</div>
+        <div className="text-xs text-fg-40 py-3 text-center">暂无自定义分组</div>
       ) : (
         <div className="space-y-1">
           {customProxyGroups.map((group) => {
@@ -344,7 +344,7 @@ export function ProxyGroupsCustomGroupsPanel({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-7 px-2 text-white/35 hover:text-red-300"
+                            className="h-7 px-2 text-fg-35 hover:text-red-300"
                             onClick={() => removeModuleRule(group.id, r.id)}
                             title="删除规则集"
                             aria-label={`删除 ${r.name} 规则集`}
@@ -382,7 +382,7 @@ export function ProxyGroupsCustomGroupsPanel({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-7 px-2 text-white/35 hover:text-red-300"
+                            className="h-7 px-2 text-fg-35 hover:text-red-300"
                             onClick={() => removeModuleRule(group.id, rule.id)}
                             title="删除规则集"
                             aria-label={`删除 ${rule.name} 规则集`}
@@ -497,7 +497,7 @@ export function ProxyGroupsCustomGroupsPanel({
                 }
                 rulesContentOverride={
                   totalRules === 0 ? (
-                    <p className="px-2 py-3 text-center text-[11px] text-white/40">
+                    <p className="px-2 py-3 text-center text-[11px] text-fg-40">
                       还没有规则集。可在“搜索规则库”中选择规则后添加到该分组。
                     </p>
                   ) : (

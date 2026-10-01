@@ -159,17 +159,17 @@ export function NodeManagementAutoProcessingDialog({
         </FormField>
 
         <div
-          className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+          className="space-y-2 rounded-xl border border-ink/10 bg-ink/[0.03] p-3"
           aria-live="polite"
         >
-          <p className="text-xs leading-relaxed text-white/60">
+          <p className="text-xs leading-relaxed text-fg-60">
             导入 {plan.result?.rawCount ?? nodes.length} · 排除{" "}
             {plan.result?.excludedCount ?? "—"} · 保留{" "}
             {plan.result?.effectiveCount ?? "—"}
           </p>
 
           {hasProxyProviders ? (
-            <p className="text-xs leading-relaxed text-white/40">
+            <p className="text-xs leading-relaxed text-fg-40">
               proxy-providers 不参与。
             </p>
           ) : null}
@@ -182,7 +182,7 @@ export function NodeManagementAutoProcessingDialog({
 
           {plan.result ? (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-white/60">排除的节点</p>
+              <p className="text-xs font-medium text-fg-60">排除的节点</p>
               {plan.result.excludedNodes.length > 0 ? (
                 <div className="max-h-48 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
                   {plan.result.excludedNodes.map((node, index) => {
@@ -192,11 +192,11 @@ export function NodeManagementAutoProcessingDialog({
                         key={`${node.name}:${index}`}
                         className="rounded-lg border border-red-500/15 bg-red-500/[0.06] px-2.5 py-2"
                       >
-                        <p className="break-words text-xs leading-relaxed text-white/75 [overflow-wrap:anywhere]">
+                        <p className="break-words text-xs leading-relaxed text-fg-75 [overflow-wrap:anywhere]">
                           {node.name}
                         </p>
                         {originName !== node.name ? (
-                          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-white/40 [overflow-wrap:anywhere]">
+                          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-fg-40 [overflow-wrap:anywhere]">
                             原名：{originName}
                           </p>
                         ) : null}
@@ -205,7 +205,7 @@ export function NodeManagementAutoProcessingDialog({
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-white/40">没有排除的节点</p>
+                <p className="text-xs text-fg-40">没有排除的节点</p>
               )}
             </div>
           ) : null}

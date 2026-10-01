@@ -136,11 +136,11 @@ export function HomeLayout({
       {/* Hero */}
       <div className="text-center mb-2 lg:mb-3 [@media(max-height:1000px)]:mb-1.5">
         <h1 className="font-bold leading-[1.08] mb-1 text-[clamp(1.25rem,2vw,2rem)] [@media(max-height:1000px)]:text-[clamp(1.25rem,1.7vw,1.75rem)]">
-          <span className="bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-heading-from via-heading-from to-heading-to bg-clip-text text-transparent">
             SubBoost
           </span>
         </h1>
-        <p className="text-white/50 max-w-2xl mx-auto leading-snug text-[clamp(0.75rem,1vw,0.95rem)] [@media(max-height:1000px)]:text-[0.875rem]">
+        <p className="text-fg-50 max-w-2xl mx-auto leading-snug text-[clamp(0.75rem,1vw,0.95rem)] [@media(max-height:1000px)]:text-[0.875rem]">
           Clash 订阅转换、生成与管理服务，支持链式代理、智能分流、多协议和多订阅聚合
         </p>
       </div>
@@ -270,7 +270,9 @@ export function HomeLayout({
               </CardHeader>
               <CardContent className={`pt-0 relative lg:flex-1 lg:overflow-hidden ${DESKTOP_PANEL_CONTENT_MIN_HEIGHT_CLASS}`}>
                 <TabsContent value="yaml" className="mt-0 data-[state=inactive]:hidden lg:absolute lg:inset-0">
-                  <div className="h-[clamp(420px,70vh,820px)] lg:h-full rounded-xl bg-white/5 border border-white/10 overflow-auto custom-scrollbar">
+                  <div className="h-[clamp(420px,70vh,820px)] lg:h-full rounded-xl bg-code-panel border border-code-panel-border overflow-auto custom-scrollbar">
+                    {/* 代码面板在浅色主题下也保持深色，内部按深色变量取色 */}
+                    <div data-theme="dark" className="contents">
                     {generatedYamlError ? (
                       <div className="h-full p-4 text-sm text-rose-200">
                         <div className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3">
@@ -286,7 +288,7 @@ export function HomeLayout({
                     ) : generatedYaml ? (
                       <YamlHighlight content={generatedYaml} className="h-full" />
                     ) : (
-                      <pre className="p-4 font-mono text-xs text-white/60 whitespace-pre">
+                      <pre className="p-4 font-mono text-xs text-fg-60 whitespace-pre">
                         {`# 请先添加订阅或节点
 # 配置将在此处预览
 
@@ -306,10 +308,11 @@ export function HomeLayout({
 #   ...`}
                       </pre>
                     )}
+                    </div>
                   </div>
                 </TabsContent>
                 <TabsContent value="visual" className="mt-0 data-[state=inactive]:hidden lg:absolute lg:inset-0">
-                  <div className="h-[clamp(420px,70vh,820px)] lg:h-full rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+                  <div className="h-[clamp(420px,70vh,820px)] lg:h-full rounded-xl bg-ink/5 border border-ink/10 overflow-hidden">
                     <VisualGraph />
                   </div>
                 </TabsContent>
@@ -352,10 +355,10 @@ export function HomeLayout({
           <div id="ai" className={`lg:col-span-4 xl:col-span-4 flex flex-col gap-3 min-h-0 ${DESKTOP_PANEL_MIN_HEIGHT_CLASS}`}>
             <Card className={`w-full flex-1 flex flex-col overflow-hidden min-h-0 ${DESKTOP_PANEL_MIN_HEIGHT_CLASS}`}>
               <CardHeader className="pb-3 flex-shrink-0">
-                <CardTitle className="text-base lg:text-lg text-white">AI 助手</CardTitle>
+                <CardTitle className="text-base lg:text-lg text-fg">AI 助手</CardTitle>
               </CardHeader>
               <CardContent className={`flex-1 min-h-0 flex items-center justify-center ${DESKTOP_PANEL_CONTENT_MIN_HEIGHT_CLASS}`}>
-                <p className="text-sm text-white/60">AI 助手施工中</p>
+                <p className="text-sm text-fg-60">AI 助手施工中</p>
               </CardContent>
             </Card>
           </div>

@@ -9,12 +9,12 @@ export type ProxyGroupSummaryItem = {
 };
 
 const toneClass: Record<NonNullable<ProxyGroupSummaryItem["tone"]>, string> = {
-  muted: "text-white/55",
+  muted: "text-fg-55",
   accent: "text-indigo-300",
   success: "text-emerald-300",
   info: "text-sky-300",
   warning: "text-amber-300",
-  disabled: "text-white/30",
+  disabled: "text-fg-30",
 };
 
 export function ProxyGroupSummary({
@@ -29,14 +29,14 @@ export function ProxyGroupSummary({
   return (
     <div
       className={cn(
-        "proxy-group-summary-text min-w-0 max-w-full flex-wrap items-center gap-x-1 gap-y-1 leading-none text-white/45",
+        "proxy-group-summary-text min-w-0 max-w-full flex-wrap items-center gap-x-1 gap-y-1 leading-none text-fg-45",
         className
       )}
     >
       {items.map((item, index) => (
         <span key={`${item.label}:${index}`} className="inline-flex min-w-0 max-w-full items-center gap-1">
           {index > 0 && (
-            <span className="shrink-0 text-white/25">
+            <span className="shrink-0 text-fg-25">
               {item.separator === "arrow" ? "→" : "·"}
             </span>
           )}

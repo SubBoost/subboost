@@ -77,7 +77,7 @@ export function InputSection({
                       onChange={(type) => updateSourceType(source.id, type)}
                       compact
                     />
-                    <span className="text-xs text-white/50">
+                    <span className="text-xs text-fg-50">
                       {sourceDisplayLabel}
                     </span>
                     <SourceStatusPopover source={source} nodes={sourceNodes} />
@@ -92,7 +92,7 @@ export function InputSection({
                         variant="ghost"
                         onClick={() => moveSource(source.id, "up")}
                         disabled={index <= 0}
-                        className="flex h-3.5 w-4 items-center justify-center text-white/30 transition-colors hover:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="flex h-3.5 w-4 items-center justify-center text-fg-30 transition-colors hover:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         <ChevronUp className="h-2.5 w-2.5" aria-hidden="true" />
                       </IconButton>
@@ -101,7 +101,7 @@ export function InputSection({
                         variant="ghost"
                         onClick={() => moveSource(source.id, "down")}
                         disabled={index >= sources.length - 1}
-                        className="flex h-3.5 w-4 items-center justify-center text-white/30 transition-colors hover:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="flex h-3.5 w-4 items-center justify-center text-fg-30 transition-colors hover:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         <ChevronDown className="h-2.5 w-2.5" aria-hidden="true" />
                       </IconButton>
@@ -110,7 +110,7 @@ export function InputSection({
                       label="高级编辑"
                       variant="ghost"
                       onClick={() => setExpandedSourceId(source.id)}
-                      className="h-6 w-6 rounded p-1 text-white/30 hover:bg-white/5 hover:text-white/50"
+                      className="h-6 w-6 rounded p-1 text-fg-30 hover:bg-ink/5 hover:text-fg-50"
                     >
                       <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </IconButton>
@@ -126,8 +126,8 @@ export function InputSection({
                           : source.parsed
                             ? "text-green-400 hover:text-green-300"
                             : source.content.trim()
-                              ? "text-white/50 hover:text-indigo-400 hover:bg-indigo-500/10"
-                              : "text-white/50 cursor-not-allowed"
+                              ? "text-fg-50 hover:text-indigo-400 hover:bg-indigo-500/10"
+                              : "text-fg-50 cursor-not-allowed"
                       )}
                       title={source.parsing ? "导入中..." : source.parsed ? "重新导入" : "导入此源"}
                     >
@@ -142,7 +142,7 @@ export function InputSection({
                         label="删除导入源"
                         variant="ghost"
                         onClick={() => removeSource(source.id)}
-                        className="h-6 w-6 rounded p-1 text-white/50 transition-colors hover:text-red-400"
+                        className="h-6 w-6 rounded p-1 text-fg-50 transition-colors hover:text-red-400"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                       </IconButton>

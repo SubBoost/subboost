@@ -52,8 +52,8 @@ const NORMAL_TYPE_OPTIONS: Array<{ value: Exclude<ProxyGroupTypeMenuValue, "load
 ];
 
 const menuContentClassName =
-  "min-w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border-white/10 bg-[#1a1a1a] text-white shadow-md";
-const menuItemClassName = "gap-2 text-xs text-white/80 focus:bg-white/10 focus:text-white";
+  "min-w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border-ink/10 bg-surface-raised text-fg shadow-md";
+const menuItemClassName = "gap-2 text-xs text-fg-80 focus:bg-ink/10 focus:text-fg";
 
 export function getProxyGroupTypeLabel(groupType?: string) {
   switch (groupType) {
@@ -110,12 +110,12 @@ export function ProxyGroupTypeMenu({
             variant="outline"
             size="sm"
             className={cn(
-              "h-8 w-full justify-between rounded-xl border-white/10 bg-white/10 px-3 text-xs font-normal text-white hover:bg-white/10",
+              "h-8 w-full justify-between rounded-xl border-ink/10 bg-ink/10 px-3 text-xs font-normal text-fg hover:bg-ink/10",
               triggerClassName
             )}
           >
             <span className="truncate">{triggerLabel}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-white/50" />
+            <ChevronDown className="h-3.5 w-3.5 text-fg-50" />
           </Button>
         )}
       </DropdownMenuTrigger>

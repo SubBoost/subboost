@@ -19,7 +19,7 @@ Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-white/10", className)} {...props} />
+    <thead ref={ref} className={cn("[&_tr]:border-b [&_tr]:border-ink/10", className)} {...props} />
   )
 );
 TableHeader.displayName = "TableHeader";
@@ -35,7 +35,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
   ({ className, ...props }, ref) => (
     <th
       ref={ref}
-      className={cn("h-11 px-4 text-left align-middle text-xs font-medium text-white/50", className)}
+      className={cn("h-11 px-4 text-left align-middle text-xs font-medium text-fg-50", className)}
       {...props}
     />
   )
@@ -46,7 +46,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
-      className={cn("border-b border-white/10 transition-colors hover:bg-white/[0.03]", className)}
+      className={cn("border-b border-ink/10 transition-colors hover:bg-ink/[0.03]", className)}
       {...props}
     />
   )
@@ -55,14 +55,14 @@ TableRow.displayName = "TableRow";
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("p-4 align-middle text-white/70", className)} {...props} />
+    <td ref={ref} className={cn("p-4 align-middle text-fg-70", className)} {...props} />
   )
 );
 TableCell.displayName = "TableCell";
 
 const TableCaption = React.forwardRef<HTMLTableCaptionElement, React.HTMLAttributes<HTMLTableCaptionElement>>(
   ({ className, ...props }, ref) => (
-    <caption ref={ref} className={cn("mt-4 text-sm text-white/45", className)} {...props} />
+    <caption ref={ref} className={cn("mt-4 text-sm text-fg-45", className)} {...props} />
   )
 );
 TableCaption.displayName = "TableCaption";

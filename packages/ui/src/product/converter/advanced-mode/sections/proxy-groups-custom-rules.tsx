@@ -265,7 +265,7 @@ export function ProxyGroupsCustomRules() {
   return (
     <div className="min-w-0 space-y-2">
       <div className={RULE_HEADER_ROW_CLASS}>
-        <span className="text-xs font-medium text-white/80">
+        <span className="text-xs font-medium text-fg-80">
           方法二：手动添加规则
         </span>
         <Button
@@ -352,13 +352,13 @@ export function ProxyGroupsCustomRules() {
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2">
+            <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink/10 bg-ink/5 px-2">
               <Switch
                 aria-label="新规则不解析域名"
                 checked={newRuleNoResolve}
                 onCheckedChange={setNewRuleNoResolve}
               />
-              <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">no-resolve</span>
+              <span className="proxy-group-rule-no-resolve-label text-[10px] text-fg-50">no-resolve</span>
             </div>
             <Button
               type="button"
@@ -375,12 +375,12 @@ export function ProxyGroupsCustomRules() {
       </div>
 
       {customRules.length > 0 && (
-        <div className="space-y-1 border-t border-white/10 pt-2">
+        <div className="space-y-1 border-t border-ink/10 pt-2">
           <div className="flex min-h-5 items-center gap-2">
-            <span className="text-[11px] font-medium text-white/65">
+            <span className="text-[11px] font-medium text-fg-65">
               已添加规则
             </span>
-            <span className="ml-auto text-[10px] text-white/40">
+            <span className="ml-auto text-[10px] text-fg-40">
               已添加 {customRules.length}
             </span>
           </div>
@@ -467,7 +467,7 @@ export function ProxyGroupsCustomRules() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2">
+                      <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink/10 bg-ink/5 px-2">
                         <Switch
                           aria-label="编辑规则时不解析域名"
                           checked={Boolean(editingRuleDraft.noResolve)}
@@ -477,7 +477,7 @@ export function ProxyGroupsCustomRules() {
                             )
                           }
                         />
-                        <span className="proxy-group-rule-no-resolve-label text-[10px] text-white/50">
+                        <span className="proxy-group-rule-no-resolve-label text-[10px] text-fg-50">
                           no-resolve
                         </span>
                       </div>
@@ -511,7 +511,7 @@ export function ProxyGroupsCustomRules() {
                             removeCustomRule(index);
                             cancelEditingRule();
                           }}
-                          className="h-7 w-7 shrink-0 p-0 text-white/40 hover:text-red-300"
+                          className="h-7 w-7 shrink-0 p-0 text-fg-40 hover:text-red-300"
                           title="删除规则"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -528,25 +528,25 @@ export function ProxyGroupsCustomRules() {
             return (
               <div
                 key={rule.id}
-                className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px]"
+                className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-ink/10 bg-ink/[0.04] px-2 py-1 text-[10px]"
               >
                 <span className={RULE_TYPE_BADGE_CLASS}>
                   {rule.type}
                 </span>
                 <span
-                  className="min-w-0 max-w-[16rem] truncate text-white/75"
+                  className="min-w-0 max-w-[16rem] truncate text-fg-75"
                   title={rule.value}
                 >
                   {rule.value}
                 </span>
                 {rule.noResolve && (
-                  <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/45">
+                  <span className="rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-45">
                     no-resolve
                   </span>
                 )}
-                <ArrowRight className="h-3 w-3 shrink-0 text-white/35" />
+                <ArrowRight className="h-3 w-3 shrink-0 text-fg-35" />
                 <span
-                  className="max-w-[11rem] truncate rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/70"
+                  className="max-w-[11rem] truncate rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-70"
                   title={ruleTargetName}
                 >
                   {ruleTargetName}
@@ -557,7 +557,7 @@ export function ProxyGroupsCustomRules() {
                     variant="ghost"
                     type="button"
                     onClick={() => startEditingRule(rule)}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/10 hover:text-white/80"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-md text-fg-35 transition-colors hover:bg-ink/10 hover:text-fg-80"
                   >
                     <Pencil className="h-3 w-3" />
                   </IconButton>
@@ -566,7 +566,7 @@ export function ProxyGroupsCustomRules() {
                     variant="ghost"
                     type="button"
                     onClick={() => removeCustomRule(index)}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-md text-fg-30 transition-colors hover:bg-red-500/10 hover:text-red-300"
                   >
                     <Trash2 className="h-3 w-3" />
                   </IconButton>

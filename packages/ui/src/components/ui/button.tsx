@@ -6,19 +6,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@subboost/ui/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "border border-primary-500/50 bg-primary-500/20 text-white hover:bg-primary-500/30 hover:border-primary-400/70 shadow-lg shadow-primary-500/10 hover:shadow-primary-500/20",
+          "border border-btn-primary-border bg-btn-primary text-btn-primary-fg hover:bg-btn-primary-hover hover:border-btn-primary-border-hover shadow-(--btn-primary-shadow) hover:shadow-(--btn-primary-shadow-hover)",
         destructive:
-          "border border-red-500/50 bg-red-500/20 text-white hover:bg-red-500/30 hover:border-red-400/70 shadow-lg shadow-red-500/10 hover:shadow-red-500/20",
+          "border border-btn-danger-border bg-btn-danger text-btn-danger-fg hover:bg-btn-danger-hover hover:border-btn-danger-border-hover shadow-(--btn-danger-shadow) hover:shadow-(--btn-danger-shadow-hover)",
         outline:
-          "border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white",
+          "border border-btn-outline-border bg-btn-outline hover:bg-btn-outline-hover text-btn-outline-fg hover:text-btn-outline-fg-hover shadow-(--btn-outline-shadow)",
         secondary:
-          "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/15",
-        ghost: "hover:bg-white/5 text-white/60 hover:text-white",
+          "bg-btn-outline hover:bg-btn-outline-hover text-btn-outline-fg hover:text-btn-outline-fg-hover border border-btn-outline-border shadow-(--btn-outline-shadow)",
+        ghost: "hover:bg-ink/5 text-fg-60 hover:text-fg",
         link: "text-indigo-400 underline-offset-4 hover:underline hover:text-indigo-300",
       },
       size: {
