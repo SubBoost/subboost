@@ -100,6 +100,53 @@ describe("public UI consistency checker", () => {
     expect(errors.at(-1)).toContain("UI consistency check failed with 6 finding(s).");
   });
 
+  it("rejects dark-only colors with theme token suggestions", () => {
+    const badFile = writeSource(
+      "packages/components/dark-only.tsx",
+      [
+        `export const A = () => <p className="text-white/60 hover:bg-white/5 data-[state=open]:border-white/10" />;`,
+        `export const B = () => <p className="placeholder:text-white/40 bg-black/50 bg-[#141414] ring-offset-black" />;`,
+        `export const C = () => <p className="from-white to-white/60 bg-zinc-950/95 [color-scheme:dark]" />;`,
+      ].join("\n"),
+    );
+    const errors: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((message) => errors.push(String(message)));
+    process.exit = vi.fn((code?: string | number | null) => {
+      throw new Error("exit:" + code);
+    }) as never;
+
+    expect(() => runCheck([badFile])).toThrow("exit:1");
+    const output = errors.join("\n");
+    expect(output).toContain(`dark-only.tsx:1:38 深色专用颜色 text-white/60`);
+    expect(output).toContain("text-fg-N");
+    expect(output).toContain("hover:bg-white/5");
+    expect(output).toContain("data-[state=open]:border-white/10");
+    expect(output).toContain("bg-ink/N");
+    expect(output).toContain("placeholder:text-white/40");
+    expect(output).toContain("bg-black/50");
+    expect(output).toContain("bg-[#141414]");
+    expect(output).toContain("ring-offset-black");
+    expect(output).toContain("from-white");
+    expect(output).toContain("to-white/60");
+    expect(output).toContain("bg-zinc-950");
+    expect(output).toContain("color-scheme:dark");
+    expect(output).toContain("packages/ui/src/styles/theme.css");
+    expect(errors.at(-1)).toContain("UI consistency check failed with 11 finding(s).");
+  });
+
+  it("accepts theme tokens, solid white on colored fills, and excluded roots", () => {
+    writeSource(
+      "packages/components/themed.tsx",
+      `export const A = () => <p className="text-fg-60 bg-ink/5 border-ink/10 bg-shade/90 text-white bg-white bg-surface" />;`,
+    );
+    writeSource("always-dark/admin.tsx", `export const Admin = () => <p className="text-white/60 bg-white/5" />;`);
+
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    runCheck(["packages", "always-dark", "--theme-exclude", "always-dark"]);
+
+    expect(log).toHaveBeenCalledWith("UI consistency check passed (2 source files scanned).");
+  });
+
   it("accepts an explicit missing root as an empty scoped check", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     runCheck([join(tempRoot, "missing")]);
