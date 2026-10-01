@@ -131,4 +131,40 @@ describe("useConfigStore", () => {
 
     expect(useConfigStore.persist.getOptions().name).toBe(prevName);
   });
+
+  it.each(["methods", "getter"])("keeps drafts editable and account scopes isolated when storage %s throws", async (kind) => {
+    const storage = createMemoryStorage();
+    for (const method of ["getItem", "setItem", "removeItem"] as const) {
+      vi.mocked(storage[method]).mockImplementation(() => { throw new Error("storage unavailable"); });
+    }
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("window", kind === "getter" ? {
+      get localStorage() { throw new Error("storage getter unavailable"); },
+    } : { localStorage: storage });
+    const { useConfigStore, setConfigDraftUserScope } = await import("./config-store");
+
+    expect(useConfigStore.persist.hasHydrated()).toBe(true);
+    useConfigStore.getState().setDnsYaml("guest draft");
+    expect(useConfigStore.getState().generatedYaml).toBe("yaml:guest draft");
+    expect(() => setConfigDraftUserScope("u1")).not.toThrow();
+    expect(useConfigStore.persist.getOptions().name).toBe("subboost-config:user:u1");
+    expect(useConfigStore.getState().dnsYaml).not.toBe("guest draft");
+    useConfigStore.getState().setDnsYaml("user draft");
+    setConfigDraftUserScope("u1");
+    expect(useConfigStore.getState().generatedYaml).toBe("yaml:user draft");
+    setConfigDraftUserScope("u2");
+    expect(useConfigStore.getState().dnsYaml).not.toBe("user draft");
+    setConfigDraftUserScope(null);
+    expect(useConfigStore.persist.getOptions().name).toBe("subboost-config:guest");
+    expect(() => useConfigStore.persist.clearStorage()).not.toThrow();
+    useConfigStore.getState().setDnsYaml("editable again");
+    expect(useConfigStore.getState().generatedYaml).toBe("yaml:editable again");
+  });
+
+  it("does not conceal generation errors behind storage failure handling", async () => {
+    const { useConfigStore } = await loadStore();
+    mocks.computeGeneratedYamlResult.mockImplementationOnce(() => { throw new Error("generation failed"); });
+
+    expect(() => useConfigStore.getState().setDnsYaml("draft")).toThrow("generation failed");
+  });
 });

@@ -3,12 +3,56 @@ import { DEFAULT_NODE_NAME_FILTER_CONFIG } from "@subboost/core/subscription/nod
 import { initialState } from "./definitions";
 import {
   CONFIG_DRAFT_STORAGE_VERSION,
+  createSafeConfigDraftStorage,
   normalizePersistedConfigState,
   partializeConfigState,
   prepareConfigDraftScope,
 } from "./persistence";
 
 describe("config store persistence", () => {
+  it("continues without storage when its getter fails or no browser exists", () => {
+    const missing = createSafeConfigDraftStorage(() => null);
+    const throwing = createSafeConfigDraftStorage(() => {
+      throw new Error("storage getter unavailable");
+    });
+
+    for (const storage of [missing, throwing]) {
+      expect(storage.getItem("draft")).toBeNull();
+      expect(() => storage.setItem("draft", "value")).not.toThrow();
+      expect(() => storage.removeItem("draft")).not.toThrow();
+      expect(prepareConfigDraftScope(storage, "user-1")).toEqual({
+        storageName: "subboost-config:user:user-1",
+        state: {},
+      });
+    }
+  });
+
+  it("contains only storage read, write and removal failures", () => {
+    const storage = createSafeConfigDraftStorage(() => ({
+      getItem: () => { throw new Error("read unavailable"); },
+      setItem: () => { throw new Error("write unavailable"); },
+      removeItem: () => { throw new Error("remove unavailable"); },
+    }));
+
+    expect(storage.getItem("draft")).toBeNull();
+    expect(() => storage.setItem("draft", "value")).not.toThrow();
+    expect(() => storage.removeItem("draft")).not.toThrow();
+  });
+
+  it("forwards available storage operations with their receiver intact", () => {
+    const values = new Map<string, string>();
+    const storage = createSafeConfigDraftStorage(() => ({
+      getItem(key) { return values.get(key) ?? null; },
+      setItem(key, value) { values.set(key, value); },
+      removeItem(key) { values.delete(key); },
+    }));
+
+    storage.setItem("draft", "value");
+    expect(storage.getItem("draft")).toBe("value");
+    storage.removeItem("draft");
+    expect(storage.getItem("draft")).toBeNull();
+  });
+
   it("round-trips the normalized node-name filter without persisting node snapshots", () => {
     const state = {
       ...structuredClone(initialState),

@@ -19,6 +19,7 @@ import { createHistoryActions } from "./config-store/actions/history-actions";
 import {
   CONFIG_DRAFT_GUEST_STORAGE_NAME,
   CONFIG_DRAFT_STORAGE_VERSION,
+  createSafeConfigDraftStorage,
   normalizePersistedConfigState,
   partializeConfigState,
   prepareConfigDraftScope,
@@ -43,6 +44,7 @@ export type {
 export type { CustomProxyGroup } from "@subboost/core/types/config";
 
 let activeConfigDraftStorageName = CONFIG_DRAFT_GUEST_STORAGE_NAME;
+const configDraftStorage = createSafeConfigDraftStorage();
 
 export const useConfigStore = create<ConfigState & ConfigActions>()(
   persist<ConfigState & ConfigActions, [], [], Partial<ConfigState>>(
@@ -81,7 +83,7 @@ export const useConfigStore = create<ConfigState & ConfigActions>()(
     {
       name: CONFIG_DRAFT_GUEST_STORAGE_NAME,
       version: CONFIG_DRAFT_STORAGE_VERSION,
-      storage: createJSONStorage<Partial<ConfigState>>(() => localStorage),
+      storage: createJSONStorage<Partial<ConfigState>>(() => configDraftStorage),
       migrate: (persistedState, version) =>
         normalizePersistedConfigState(persistedState, {
           discardDraft: version !== CONFIG_DRAFT_STORAGE_VERSION,
@@ -92,9 +94,9 @@ export const useConfigStore = create<ConfigState & ConfigActions>()(
 );
 
 export function setConfigDraftUserScope(userId: string | null | undefined) {
-  if (typeof window === "undefined" || !window.localStorage) return;
+  if (typeof window === "undefined") return;
 
-  const { storageName, state } = prepareConfigDraftScope(window.localStorage, userId);
+  const { storageName, state } = prepareConfigDraftScope(configDraftStorage, userId);
   if (activeConfigDraftStorageName === storageName) return;
 
   activeConfigDraftStorageName = storageName;
