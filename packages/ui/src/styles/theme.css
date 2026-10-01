@@ -54,6 +54,7 @@
     --warning-strong-fg: color-mix(in oklab, var(--color-amber-300) 90%, transparent);
     --success-muted-fg: color-mix(in oklab, var(--color-green-200) 70%, transparent);
     --success-label-fg: var(--color-green-400);
+    --primary-label-fg: var(--color-primary-300);
     --preview-node-count-fg: var(--color-primary-500);
     --preview-group-count-fg: var(--color-green-500);
     --divider-label-bg: rgb(17 17 17);
@@ -313,6 +314,7 @@
     --warning-strong-fg: #92400e;
     --success-muted-fg: oklch(44.8% 0.119 151.328);
     --success-label-fg: var(--color-green-800);
+    --primary-label-fg: var(--color-primary-800);
     --preview-node-count-fg: #1d4ed8;
     --preview-group-count-fg: oklch(44.8% 0.119 151.328);
     --divider-label-bg: #ebeef5;
@@ -592,6 +594,7 @@
   --color-warning-strong-fg: var(--warning-strong-fg);
   --color-success-muted-fg: var(--success-muted-fg);
   --color-success-label-fg: var(--success-label-fg);
+  --color-primary-label-fg: var(--primary-label-fg);
   --color-preview-node-count-fg: var(--preview-node-count-fg);
   --color-preview-group-count-fg: var(--preview-group-count-fg);
   --color-ink: var(--ink);
