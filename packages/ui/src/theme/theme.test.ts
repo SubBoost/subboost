@@ -4,11 +4,14 @@ import {
   applyTheme,
   DEFAULT_THEME,
   getCurrentTheme,
+  getSystemTheme,
+  getSystemThemeQuery,
   parseTheme,
   persistTheme,
   readStoredTheme,
   THEME_META_COLORS,
   THEME_STORAGE_KEY,
+  SYSTEM_THEME_QUERY,
 } from "./theme";
 import { THEME_INIT_SCRIPT } from "./theme-init-script";
 
@@ -65,6 +68,15 @@ function memoryStorage(initial: Record<string, string> = {}) {
   };
 }
 
+function installSystem(theme: "light" | "dark" | "throws") {
+  const matchMedia = vi.fn(() => {
+    if (theme === "throws") throw new Error("unavailable");
+    return { matches: theme === "light" };
+  });
+  vi.stubGlobal("window", { ...window, matchMedia });
+  return matchMedia;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -97,6 +109,34 @@ describe("theme helpers", () => {
     expect(() => persistTheme("light")).not.toThrow();
   });
 
+  it.each(["light", "dark"] as const)("reads the %s system preference", (theme) => {
+    installStorage(memoryStorage());
+    const matchMedia = installSystem(theme);
+    expect(getSystemTheme()).toBe(theme);
+    expect(matchMedia).toHaveBeenCalledWith(SYSTEM_THEME_QUERY);
+    expect(getSystemThemeQuery()?.matches).toBe(theme === "light");
+  });
+
+  it("falls back to dark when the system preference API is missing or throws", () => {
+    installStorage(memoryStorage());
+    expect(getSystemThemeQuery()).toBeNull();
+    expect(getSystemTheme()).toBe("dark");
+
+    installSystem("throws");
+    expect(getSystemThemeQuery()).toBeNull();
+    expect(getSystemTheme()).toBe("dark");
+  });
+
+  it("handles an unavailable storage getter without preventing system preference reads", () => {
+    vi.stubGlobal("window", {
+      get localStorage() { throw new Error("blocked getter"); },
+      matchMedia: () => ({ matches: true }),
+    });
+    expect(readStoredTheme()).toBeNull();
+    expect(() => persistTheme("dark")).not.toThrow();
+    expect(getSystemTheme()).toBe("light");
+  });
+
   it("applies the theme to the root element and theme-color meta", () => {
     const { root, meta } = installDom();
 
@@ -126,12 +166,14 @@ describe("THEME_INIT_SCRIPT", () => {
   const run = () => new Function(THEME_INIT_SCRIPT)();
 
   it.each([
-    ["light", "light"],
-    ["dark", "dark"],
-    ["system", DEFAULT_THEME],
-  ])("applies stored value %s as %s, matching applyTheme", (stored, expected) => {
+    ["light", "dark", "light"],
+    ["dark", "light", "dark"],
+    ["system", "light", "light"],
+    ["system", "dark", "dark"],
+  ] as const)("prefers stored %s over system %s, resolving to %s", (stored, system, expected) => {
     const { root, meta } = installDom();
     installStorage(memoryStorage({ [THEME_STORAGE_KEY]: stored }));
+    installSystem(system);
 
     run();
 
@@ -139,23 +181,46 @@ describe("THEME_INIT_SCRIPT", () => {
     expect(meta.getAttribute("content")).toBe(THEME_META_COLORS[expected as "dark" | "light"]);
   });
 
-  it("uses the default theme when nothing is stored", () => {
+  it.each(["light", "dark"] as const)("uses system %s when nothing is stored without persisting it", (system) => {
     const { root } = installDom();
-    installStorage(memoryStorage());
+    const storage = memoryStorage();
+    installStorage(storage);
+    installSystem(system);
 
     run();
 
-    expect(root.getAttribute("data-theme")).toBe(DEFAULT_THEME);
+    expect(root.getAttribute("data-theme")).toBe(system);
+    expect(storage.setItem).not.toHaveBeenCalled();
   });
 
-  it("swallows storage errors and leaves the server-rendered theme in place", () => {
+  it("still uses system light when storage methods throw", () => {
     const { root, meta } = installDom();
     root.setAttribute("data-theme", "dark");
     installStorage("throws");
+    installSystem("light");
 
     expect(run).not.toThrow();
-    expect(root.getAttribute("data-theme")).toBe("dark");
-    expect(meta.getAttribute("content")).toBe("#000000");
+    expect(root.getAttribute("data-theme")).toBe("light");
+    expect(meta.getAttribute("content")).toBe(THEME_META_COLORS.light);
+  });
+
+  it("still uses system light when the storage getter throws", () => {
+    const { root } = installDom();
+    vi.stubGlobal("window", {
+      get localStorage() { throw new Error("blocked getter"); },
+      matchMedia: () => ({ matches: true }),
+    });
+    expect(run).not.toThrow();
+    expect(root.getAttribute("data-theme")).toBe("light");
+  });
+
+  it.each([false, true])("safely falls back to dark when system API fails (throws=%s)", (throws) => {
+    const { root, meta } = installDom();
+    installStorage(memoryStorage());
+    if (throws) installSystem("throws");
+    expect(run).not.toThrow();
+    expect(root.getAttribute("data-theme")).toBe(DEFAULT_THEME);
+    expect(meta.getAttribute("content")).toBe(THEME_META_COLORS.dark);
   });
 
   it("works before the theme-color meta tag is parsed", () => {

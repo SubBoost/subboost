@@ -7,33 +7,59 @@ import {
   applyTheme,
   DEFAULT_THEME,
   getCurrentTheme,
+  getSystemTheme,
+  getSystemThemeQuery,
   parseTheme,
   persistTheme,
+  readStoredTheme,
   THEME_STORAGE_KEY,
   type ThemeName,
 } from "@subboost/ui/theme/theme";
 
 export function ThemeToggle() {
   const [theme, setTheme] = React.useState<ThemeName>(DEFAULT_THEME);
+  const manualTheme = React.useRef<ThemeName | null>(null);
 
   React.useEffect(() => {
-    const current = getCurrentTheme();
-    // The init script may run before <meta name="theme-color"> exists; apply again to sync it.
-    applyTheme(current);
-    setTheme(current);
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== THEME_STORAGE_KEY) return;
-      const next = parseTheme(event.newValue) ?? DEFAULT_THEME;
+    manualTheme.current = readStoredTheme();
+    const syncTheme = (next: ThemeName) => {
       applyTheme(next);
       setTheme(next);
     };
+    // The init script may run before <meta name="theme-color"> exists; apply again to sync it.
+    syncTheme(manualTheme.current ?? getSystemTheme());
+
+    const media = getSystemThemeQuery();
+    const onSystemChange = () => {
+      if (manualTheme.current === null) syncTheme(getSystemTheme());
+    };
+    if (media?.addEventListener) media.addEventListener("change", onSystemChange);
+    else media?.addListener?.(onSystemChange);
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== THEME_STORAGE_KEY && event.key !== null) return;
+      if (event.storageArea) {
+        try {
+          if (event.storageArea !== window.localStorage) return;
+        } catch {
+          return;
+        }
+      }
+      manualTheme.current = event.key === null ? null : parseTheme(event.newValue);
+      syncTheme(manualTheme.current ?? getSystemTheme());
+    };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      if (media?.addEventListener) media.removeEventListener("change", onSystemChange);
+      else media?.removeListener?.(onSystemChange);
+    };
   }, []);
 
   const toggle = () => {
     const next: ThemeName = getCurrentTheme() === "light" ? "dark" : "light";
+    // Keep the choice in memory even when persistence is blocked.
+    manualTheme.current = next;
     applyTheme(next);
     persistTheme(next);
     setTheme(next);

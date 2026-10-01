@@ -5,6 +5,7 @@ export type ThemeName = "dark" | "light";
 export const THEME_STORAGE_KEY = "subboost-theme";
 export const THEME_ATTRIBUTE = "data-theme";
 export const DEFAULT_THEME: ThemeName = "dark";
+export const SYSTEM_THEME_QUERY = "(prefers-color-scheme: light)";
 export const THEME_META_COLORS: Record<ThemeName, string> = {
   dark: SUBBOOST_THEME_COLOR,
   light: "#F6F8FC",
@@ -20,6 +21,18 @@ export function readStoredTheme(): ThemeName | null {
   } catch {
     return null;
   }
+}
+
+export function getSystemThemeQuery(): MediaQueryList | null {
+  try {
+    return window.matchMedia(SYSTEM_THEME_QUERY);
+  } catch {
+    return null;
+  }
+}
+
+export function getSystemTheme(): ThemeName {
+  return getSystemThemeQuery()?.matches ? "light" : DEFAULT_THEME;
 }
 
 export function persistTheme(theme: ThemeName): void {
