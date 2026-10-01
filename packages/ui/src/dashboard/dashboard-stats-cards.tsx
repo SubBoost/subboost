@@ -28,10 +28,10 @@ export function DashboardStatsCards({
               <FileCode className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm text-white/50">订阅配额</p>
+              <p className="text-sm text-fg-50">订阅配额</p>
               <p className="text-2xl font-bold">
                 {subscriptionCount}
-                <span className="text-sm font-normal text-white/50">/{user.quota.maxSubscriptions}</span>
+                <span className="text-sm font-normal text-fg-50">/{user.quota.maxSubscriptions}</span>
               </p>
             </div>
           </div>
@@ -45,10 +45,10 @@ export function DashboardStatsCards({
               <Server className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm text-white/50">节点上限配额</p>
+              <p className="text-sm text-fg-50">节点上限配额</p>
               <p className="text-2xl font-bold">
                 {user.quota.maxNodesPerSubscription}
-                <span className="text-sm font-normal text-white/50">/订阅</span>
+                <span className="text-sm font-normal text-fg-50">/订阅</span>
               </p>
             </div>
           </div>
@@ -62,10 +62,10 @@ export function DashboardStatsCards({
               <Database className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm text-white/50">模板配额</p>
+              <p className="text-sm text-fg-50">模板配额</p>
               <p className="text-2xl font-bold">
                 {user.templateCount}
-                <span className="text-sm font-normal text-white/50">/{user.quota.maxCustomTemplates}</span>
+                <span className="text-sm font-normal text-fg-50">/{user.quota.maxCustomTemplates}</span>
               </p>
             </div>
           </div>
@@ -79,10 +79,10 @@ export function DashboardStatsCards({
               <Link2 className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm text-white/50">导入源配额</p>
+              <p className="text-sm text-fg-50">导入源配额</p>
               <p className="text-2xl font-bold">
                 {user.isAdmin || user.quota.maxImportSourcesPerType >= 9999 ? "不限" : user.quota.maxImportSourcesPerType}
-                <span className="text-sm font-normal text-white/50">/每种</span>
+                <span className="text-sm font-normal text-fg-50">/每种</span>
               </p>
             </div>
           </div>

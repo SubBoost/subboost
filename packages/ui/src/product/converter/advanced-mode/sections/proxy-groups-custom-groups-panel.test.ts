@@ -74,6 +74,9 @@ vi.mock("@subboost/core/generator/proxy-groups", () => ({
       rules: [{ id: "builtin-a", name: "Builtin A", behavior: "domain", path: "geosite/builtin-a.mrs" }],
     },
     { id: "fallback", name: "Fallback", rules: [] },
+    { id: "cn", name: "CN", rules: [
+      { id: "cn-ip", name: "CN IP", behavior: "ipcidr", path: "geoip/cn.mrs", noResolve: true },
+    ] },
   ],
 }));
 vi.mock("@subboost/core/proxy-group-name", () => ({
@@ -342,15 +345,20 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
 
     expect(mocks.captures.ruleRows).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: "Builtin A", source: "preset", state: "moved" }),
+        expect.objectContaining({ name: "Builtin A", source: "preset", state: "active" }),
       ]),
     );
     const builtinMove = mocks.captures.moveMenus.find((menu: any) => menu.ariaLabel === "移动 Builtin A 规则集");
     builtinMove.onMove({ kind: "module", id: "fallback", name: "Fallback" });
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("auto", "builtin-a", {
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("custom-1", "builtin-a", {
       kind: "module",
       id: "fallback",
       name: "Fallback",
+    });
+
+    builtinMove.onMove({ kind: "module", id: "auto", name: "Auto" });
+    expect(mocks.store.moveModuleRule).toHaveBeenLastCalledWith("custom-1", "builtin-a", {
+      kind: "module", id: "auto", name: "Auto",
     });
 
     mocks.captures.buttons.find((button: any) => button["aria-label"] === "删除 Builtin A 规则集").onClick();
@@ -376,6 +384,35 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     mocks.store.customProxyGroups = [];
     renderPanel();
     expect(mocks.captures.ruleRows).toEqual([]);
+  });
+
+  it.each([true, false])("keeps moved CN IP no-resolve=%s and hides disabled rules", (noResolve) => {
+    mocks.store.cnIpNoResolve = noResolve;
+    mocks.store.builtinRuleEdits = {
+      "module:cn:cn-ip": { target: { kind: "custom", id: "custom-1" } },
+    };
+    renderPanel({ 0: new Set(["custom-1"]) });
+    const row = mocks.captures.ruleRows.find((item: any) => item.name === "CN IP");
+    expect(row.state).toBe("active");
+    expect(row.noResolve).toBe(noResolve);
+
+    mocks.store.builtinRuleEdits["module:cn:cn-ip"].enabled = false;
+    renderPanel({ 0: new Set(["custom-1"]) });
+    expect(mocks.captures.ruleRows.some((item: any) => item.name === "CN IP")).toBe(false);
+  });
+
+  it("follows custom target identity after rename and retargeting", () => {
+    mocks.store.builtinRuleEdits = {
+      "module:auto:builtin-a": { target: { kind: "custom", id: "custom-1" } },
+    };
+    mocks.store.customProxyGroups = [{ ...customGroup, name: "Renamed" }, targetGroup];
+    renderPanel({ 0: new Set(["custom-1", "custom-2"]) });
+    const getMenu = () => mocks.captures.moveMenus.find((menu: any) => menu.ariaLabel === "移动 Builtin A 规则集");
+    expect(getMenu().currentTarget).toEqual({ kind: "custom", id: "custom-1", name: "Renamed" });
+    mocks.store.builtinRuleEdits["module:auto:builtin-a"].target.id = "custom-2";
+    renderPanel({ 0: new Set(["custom-1", "custom-2"]) });
+    expect(getMenu().currentTarget.id).toBe("custom-2");
+    expect(mocks.captures.ruleRows.filter((item: any) => item.name === "Builtin A")).toHaveLength(1);
   });
 
   it("covers custom group edit controls and duplicate rename guard", () => {

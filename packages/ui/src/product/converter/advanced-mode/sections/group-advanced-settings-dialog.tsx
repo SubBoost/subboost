@@ -20,18 +20,21 @@ import {
   type ProxyGroupGroupType,
 } from "@subboost/core/types/config";
 import { ProxyGroupTypeMenu } from "./proxy-group-type-menu";
+import { normalizeGroupTestUrl } from "@subboost/core/proxy-group-advanced";
 import {
   validateGroupListenerPort,
   type GroupListenerConflictState,
 } from "./group-listener-settings";
 
 export interface GroupAdvancedSettingsValue {
+  testUrl?: string;
   groupType: ProxyGroupGroupType;
   strategy?: LoadBalanceStrategy;
   listener: { port: number; enabled: boolean; allowLan: boolean } | null;
 }
 
 interface GroupAdvancedSettingsDialogProps {
+  testUrl?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupName: string;
@@ -53,6 +56,7 @@ export function GroupAdvancedSettingsDialog({
   groupName,
   groupType,
   strategy,
+  testUrl,
   listenerTarget,
   listenerBinding,
   conflictState,
@@ -65,16 +69,18 @@ export function GroupAdvancedSettingsDialog({
   const [listenerOn, setListenerOn] = React.useState(false);
   const [portInput, setPortInput] = React.useState("");
   const [allowLan, setAllowLan] = React.useState(false);
+  const [draftTestUrl, setDraftTestUrl] = React.useState(testUrl ?? "");
 
   // 每次打开时从当前配置重建草稿，丢弃上次未保存的修改
   React.useEffect(() => {
     if (!open) return;
     setDraftType(groupType);
+    setDraftTestUrl(testUrl ?? "");
     setDraftStrategy(strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY);
     setListenerOn(Boolean(listenerBinding && listenerBinding.enabled !== false));
     setPortInput(listenerBinding ? String(listenerBinding.port) : "");
     setAllowLan(listenerBinding?.allowLan === true);
-  }, [open, groupType, strategy, listenerBinding]);
+  }, [open, groupType, strategy, testUrl, listenerBinding]);
 
   // 开关关闭=暂停（保留配置不生成），端口只需格式合法、无需无冲突（与生成器一致）
   const portCheck = React.useMemo(
@@ -84,12 +90,15 @@ export function GroupAdvancedSettingsDialog({
   // 仅当监听开启，或关闭但保留了端口值时才需要端口合法（允许清空端口来彻底移除配置）
   const portRequired = listenerOn || portInput.trim() !== "";
   const portError = portRequired ? portCheck.error : null;
-  const canSave = !portError;
+  const testUrlError = draftType === "url-test" && draftTestUrl.trim() && !normalizeGroupTestUrl(draftTestUrl)
+    ? "请输入有效的 HTTP/HTTPS 地址" : undefined;
+  const canSave = !portError && !testUrlError;
 
   const handleSave = () => {
     if (!canSave) return;
     onSave({
       groupType: draftType,
+      testUrl: draftTestUrl.trim() || undefined,
       ...(draftType === "load-balance" ? { strategy: draftStrategy } : {}),
       listener: portRequired && portCheck.port !== null
         ? { port: portCheck.port, enabled: listenerOn, allowLan }
@@ -102,7 +111,7 @@ export function GroupAdvancedSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="break-words pr-6 text-white">{groupName} · 高级设置</DialogTitle>
+          <DialogTitle className="break-words pr-6 text-fg">{groupName} · 高级设置</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -118,6 +127,13 @@ export function GroupAdvancedSettingsDialog({
             />
           </FormField>
 
+          {draftType === "url-test" && (
+            <FormField label="测速地址" description="仅用于当前代理组；留空沿用默认测速地址。" error={testUrlError}>
+              <Input value={draftTestUrl} onChange={(event) => setDraftTestUrl(event.target.value)}
+                placeholder="https://www.gstatic.com/generate_204" className="h-8 text-xs" />
+            </FormField>
+          )}
+
           <div className="space-y-3">
             <SwitchField
               label="监听端口"
@@ -128,13 +144,13 @@ export function GroupAdvancedSettingsDialog({
             />
 
             {(listenerOn || portInput.trim() !== "") && (
-              <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+              <div className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.025] p-3">
                 <FormField label="端口" error={portError}>
                   <Input
                     value={portInput}
                     inputMode="numeric"
                     placeholder="例如 7891"
-                    className="h-8 border-white/10 bg-white/5 text-xs"
+                    className="h-8 border-ink/10 bg-ink/5 text-xs"
                     onChange={(event) => setPortInput(event.target.value)}
                   />
                 </FormField>
@@ -160,7 +176,7 @@ export function GroupAdvancedSettingsDialog({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 px-3 text-xs text-white/65 hover:text-white"
+            className="h-8 px-3 text-xs text-fg-65 hover:text-fg"
             onClick={() => onOpenChange(false)}
           >
             取消

@@ -118,8 +118,8 @@ export function YamlHighlight({ content, className }: { content: string; classNa
       ) : (
         <pre className="text-xs font-mono">
           {highlightedLines.map(({ number, html }) => (
-            <div key={number} className="flex hover:bg-white/5">
-              <span className="w-10 px-2 py-0.5 text-right text-white/50 select-none border-r border-white/10 flex-shrink-0">
+            <div key={number} className="flex hover:bg-ink/5">
+              <span className="w-10 px-2 py-0.5 text-right text-fg-50 select-none border-r border-ink/10 flex-shrink-0">
                 {number}
               </span>
               <span
@@ -140,7 +140,7 @@ export function YamlHighlight({ content, className }: { content: string; classNa
 function highlightYamlLine(line: string): string {
   // 注释
   if (line.trim().startsWith("#")) {
-    return `<span class="text-white/50">${escapeHtml(line)}</span>`;
+    return `<span class="text-fg-50">${escapeHtml(line)}</span>`;
   }
 
   // 空行
@@ -162,7 +162,7 @@ function highlightYamlLine(line: string): string {
   if (keyMatch) {
     const [, indent, key, colon, value] = keyMatch;
     const highlightedValue = highlightYamlValue(value.trim());
-    return `${escapeHtml(indent)}<span class="text-cyan-400">${escapeHtml(key)}</span><span class="text-white">${colon}</span> ${highlightedValue}`;
+    return `${escapeHtml(indent)}<span class="text-cyan-400">${escapeHtml(key)}</span><span class="text-fg">${colon}</span> ${highlightedValue}`;
   }
 
   return escapeHtml(line);
@@ -273,10 +273,10 @@ function highlightInlineObject(obj: string): string {
       keyColor = "text-rose-400 font-medium";
     }
 
-    return `<span class="${keyColor}">${escapeHtml(key)}</span><span class="text-white/60">:</span> ${highlightYamlValue(val)}`;
+    return `<span class="${keyColor}">${escapeHtml(key)}</span><span class="text-fg-60">:</span> ${highlightYamlValue(val)}`;
   });
 
-  return `<span class="text-white/40">{</span>${highlighted.join(`<span class="text-white/40">,</span> `)}<span class="text-white/40">}</span>`;
+  return `<span class="text-fg-40">{</span>${highlighted.join(`<span class="text-fg-40">,</span> `)}<span class="text-fg-40">}</span>`;
 }
 
 /**
@@ -317,7 +317,7 @@ function highlightInlineArray(arr: string): string {
   if (current.trim()) parts.push(current.trim());
 
   const highlighted = parts.map((part) => highlightYamlValue(part));
-  return `<span class="text-white/40">[</span>${highlighted.join(`<span class="text-white/40">,</span> `)}<span class="text-white/40">]</span>`;
+  return `<span class="text-fg-40">[</span>${highlighted.join(`<span class="text-fg-40">,</span> `)}<span class="text-fg-40">]</span>`;
 }
 
 /**

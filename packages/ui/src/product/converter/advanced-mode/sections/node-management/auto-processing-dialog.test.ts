@@ -128,7 +128,7 @@ describe("NodeManagementAutoProcessingDialog", () => {
   it("renders the compact wording, counts, and matching display/origin names", () => {
     const { html } = renderDialog();
     const helperText =
-      "每行一条，按节点导入时的原始名称匹配；命中节点会在生成配置时全局排除，关闭后恢复。";
+      "每行一条，命中节点会被全局排除。";
 
     expect(html).toContain("自动处理");
     expect(html).toContain("启用");
@@ -169,9 +169,37 @@ describe("NodeManagementAutoProcessingDialog", () => {
 
     expect(props.onSave).toHaveBeenCalledWith({
       enabled: true,
+      includeEnabled: true,
+      excludeEnabled: true,
       excludeRegexes: ["Alpha"],
     });
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("saves a keep-only filter and describes excluded nodes", () => {
+    const { html, props } = renderDialog({ config: { enabled: true, includeRegexes: [" Alpha ", "Alpha"], excludeRegexes: [] } });
+    expect(html).toContain("导入 2 · 排除 1 · 保留 1");
+    expect(html).toContain("排除的节点");
+    findButton("保存")?.onClick();
+    expect(props.onSave).toHaveBeenCalledWith({ enabled: true, includeEnabled: true, excludeEnabled: true, includeRegexes: ["Alpha"], excludeRegexes: [] });
+  });
+
+  it("saves independent switch states while preserving both regex lists", () => {
+    const { props, html } = renderDialog({ config: { enabled: true, includeEnabled: false, excludeEnabled: false,
+      includeRegexes: ["Alpha"], excludeRegexes: ["Beta"] } });
+    expect(html).toContain("导入 2 · 排除 0 · 保留 2");
+    expect(mocks.formField?.labelAction).toBeDefined();
+    findButton("保存")?.onClick();
+    expect(props.onSave).toHaveBeenCalledWith({ enabled: true, includeEnabled: false, excludeEnabled: false,
+      includeRegexes: ["Alpha"], excludeRegexes: ["Beta"] });
+  });
+
+  it.each(["[", "x".repeat(201), Array.from({length: 21}, (_, i) => `node-${i}`).join("\n")])("identifies invalid keep conditions", (pattern) => {
+    const { html, props } = renderDialog({ config: { enabled: true, includeRegexes: [pattern], excludeRegexes: [] } });
+    expect(html).toContain("保留正则：");
+    expect(findButton("保存")?.disabled).toBe(true);
+    findButton("保存")?.onClick();
+    expect(props.onSave).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -208,6 +236,8 @@ describe("NodeManagementAutoProcessingDialog", () => {
     providerSaveButton?.onClick();
     expect(result.props.onSave).toHaveBeenCalledWith({
       enabled: true,
+      includeEnabled: true,
+      excludeEnabled: true,
       excludeRegexes: [".*"],
     });
   });

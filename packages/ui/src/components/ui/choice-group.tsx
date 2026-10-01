@@ -33,10 +33,10 @@ const ChoiceChip = React.forwardRef<HTMLButtonElement, ChoiceChipProps>(
       type={type}
       aria-pressed={selected}
       className={cn(
-        "inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50",
         selected
-          ? "border-primary-500/50 bg-primary-500/20 text-white"
-          : "border-white/15 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white",
+          ? "border-selected-border bg-selected text-selected-fg"
+          : "border-btn-outline-border bg-btn-outline text-fg-60 shadow-(--btn-outline-shadow) hover:bg-btn-outline-hover hover:text-fg",
         className
       )}
       {...props}

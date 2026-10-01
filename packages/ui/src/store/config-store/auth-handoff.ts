@@ -112,6 +112,7 @@ function hasMeaningfulConfig(state: ConfigState): boolean {
     state.nodes.length > 0 ||
     state.nodeNameFilter.enabled ||
     state.nodeNameFilter.excludeRegexes.length > 0 ||
+    (state.nodeNameFilter.includeRegexes?.length ?? 0) > 0 ||
     state.deletedNodeNames.length > 0 ||
     state.deletedNodes.length > 0 ||
     state.customRules.length > 0 ||

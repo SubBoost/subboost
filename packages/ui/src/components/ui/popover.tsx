@@ -23,7 +23,7 @@ const PopoverContent = React.forwardRef<
       sideOffset={sideOffset}
       collisionPadding={12}
       className={cn(
-        "z-50 w-72 rounded-xl border border-white/15 bg-zinc-950/95 p-4 text-sm text-white/70 shadow-2xl shadow-black/40 outline-none backdrop-blur-xl",
+        "z-50 w-72 rounded-xl border border-ink/15 bg-surface-popover p-4 text-sm text-fg-70 shadow-(--popover-shadow) outline-none backdrop-blur-xl",
         className
       )}
       {...props}
@@ -40,7 +40,7 @@ const PopoverArrow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <PopoverPrimitive.Arrow
     ref={ref}
-    className={cn("fill-zinc-950 stroke-white/15", className)}
+    className={cn("fill-popover-arrow stroke-ink/15", className)}
     {...props}
   />
 ));
@@ -71,7 +71,8 @@ function HelpPopover({
         <IconButton
           label={label}
           variant="ghost"
-          className={cn("h-6 w-6 rounded-md text-white/40 hover:text-white/80", className)}
+          onClick={(event) => event.stopPropagation()}
+          className={cn("h-6 w-6 rounded-md text-fg-40 hover:text-fg-80", className)}
         >
           <CircleHelp aria-hidden="true" />
         </IconButton>

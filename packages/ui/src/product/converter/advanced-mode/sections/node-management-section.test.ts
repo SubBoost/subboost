@@ -425,6 +425,13 @@ describe("NodeManagementSection", () => {
     expect(autoProcessingButton.disabled).not.toBe(true);
   });
 
+  it.each([true, false])("counts only enabled keep/exclude rules in the automatic-processing badge (%s)", (includeEnabled) => {
+    mocks.store.nodeNameFilter = { enabled: true, includeEnabled, excludeEnabled: false, includeRegexes: ["Alpha"], excludeRegexes: ["beta"] };
+    renderSection();
+    const button = mocks.captures.buttons.find((props: any) => Array.isArray(props.children) && props.children[0] === "自动处理");
+    expect(button.children[1]?.props?.children ?? null).toBe(includeEnabled ? 1 : null);
+  });
+
   it("orders only effective node slots when filtered nodes are hidden", () => {
     const gamma = {
       name: "Gamma",

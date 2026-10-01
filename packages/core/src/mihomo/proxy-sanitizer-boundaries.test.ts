@@ -306,7 +306,7 @@ describe("Mihomo proxy sanitizer boundaries", () => {
       (vlessWithoutReality["xhttp-opts"] as Record<string, Record<string, unknown>>)["download-settings"]["ech-opts"]
     ).not.toHaveProperty("query-server-name");
 
-    expect(isMihomoSupportedProxyNode({ type: "http", name: "HTTP" })).toBe(true);
+    expect(isMihomoSupportedProxyNode({ type: "http", name: "HTTP" })).toBe(false);
     expect(
       isMihomoSupportedProxyNode({
         type: "wireguard",

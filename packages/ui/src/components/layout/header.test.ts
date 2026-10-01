@@ -71,6 +71,13 @@ vi.mock("@subboost/ui/components/auth/user-menu", async () => {
   };
 });
 
+vi.mock("@subboost/ui/components/layout/theme-toggle", async () => {
+  const ReactModule = await import("react");
+  return {
+    ThemeToggle: () => ReactModule.createElement("button", null, "theme-toggle"),
+  };
+});
+
 vi.mock("@subboost/ui/store/config-store/auth-handoff", () => ({
   captureAuthConfigHandoff: mocks.captureAuthConfigHandoff,
 }));
@@ -121,7 +128,17 @@ describe("Header", () => {
     expect(html).toContain("FAQ");
     expect(html).not.toContain("我的订阅");
     expect(html).toContain("menu-icon");
-    expect(mocks.userMenuProps[0]).toEqual({ privilegedMenuItem: undefined });
+    expect(mocks.userMenuProps[0]).toEqual({ privilegedMenuItem: undefined, compactAtTablet: true });
+  });
+
+  it("places the theme toggle before the user menu unless the shell hides it", () => {
+    const html = renderHeader();
+    expect(html.indexOf("theme-toggle")).toBeGreaterThan(-1);
+    expect(html.indexOf("theme-toggle")).toBeLessThan(html.indexOf("user-menu"));
+    expect(mocks.userMenuProps[0].compactAtTablet).toBe(true);
+
+    expect(renderHeader({ themeToggle: false })).not.toContain("theme-toggle");
+    expect(mocks.userMenuProps[0].compactAtTablet).toBe(false);
   });
 
   it("renders local navigation without default-only privileged links", () => {
@@ -189,6 +206,25 @@ describe("Header", () => {
     mobileAdmin.onClick();
 
     expect(stateMock.setter).toHaveBeenCalledWith(false);
+  });
+
+  it.each([
+    { mode: "default", user: { isAdmin: true }, tabletMenu: true },
+    { mode: "default", user: { isAdmin: false }, tabletMenu: false },
+    { mode: "default", user: { isAdmin: true, isBanned: true }, tabletMenu: false },
+    { mode: "local", user: { isAdmin: true }, tabletMenu: false },
+    { mode: "default", user: null, tabletMenu: false },
+  ] as const)("uses the tablet menu only for visible privileged navigation: $mode / $user", ({ mode, user, tabletMenu }) => {
+    mocks.userState = { user };
+    const html = renderHeader({ mode, privilegedMenuItem: { href: adminPath, label: "管理" } as any }, true);
+    const desktop = html.match(/<nav class="([^"]+)"/)?.[1];
+    const mobile = html.match(/id="subboost-mobile-navigation" class="([^"]+)"/)?.[1];
+    expect(desktop).toContain(tabletMenu ? "lg:flex" : "md:flex");
+    expect(desktop).not.toContain(tabletMenu ? "md:flex" : "lg:flex");
+    expect(mobile).toContain(tabletMenu ? "lg:hidden" : "md:hidden");
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-controls="subboost-mobile-navigation"');
+    if (tabletMenu) expect(mocks.links.some(link => link.href === adminPath && typeof link.onClick === "function")).toBe(true);
   });
 
   it("captures guest draft state before mobile login navigation", () => {

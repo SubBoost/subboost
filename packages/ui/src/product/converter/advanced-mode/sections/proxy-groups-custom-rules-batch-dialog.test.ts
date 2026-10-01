@@ -150,6 +150,17 @@ describe("ProxyGroupsCustomRulesBatchDialog", () => {
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("previews the current rule-set type and dispatches providers instead of domain rules", () => {
+    const onImportRuleSets = vi.fn();
+    const { html, props } = renderDialog("https://local.subboost.test/geosite/udemy.mrs", {
+      defaultType: "RULE-SET", onImportRuleSets,
+    });
+    expect(html).toContain("RULE-SET");
+    mocks.buttons.at(-1).onClick();
+    expect(props.onImport).not.toHaveBeenCalled();
+    expect(onImportRuleSets).toHaveBeenCalledWith([expect.objectContaining({ id: "udemy", name: "udemy", target: "Proxy" })]);
+  });
+
   it("shows duplicate and invalid rows without importing", () => {
     const { html, props } = renderDialog(
       ["DOMAIN,example.com,Proxy", "BAD,thing,Proxy", "# comment"].join("\n"),

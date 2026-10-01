@@ -1,6 +1,7 @@
 import type { SubscriptionSource } from "@subboost/ui/store/config-store";
 import { parseSubscription } from "@subboost/core/parser";
 import type { ParsedNode } from "@subboost/core/types/node";
+import { buildNodeEndpointKey } from "@subboost/core/node-endpoint";
 
 const ORIGIN_NAME_KEY = "_originName";
 const SOURCE_IDS_KEY = "_sourceIds";
@@ -53,7 +54,7 @@ export function ensureNodesHaveValidSourceIds(
   );
   const urlSources = sources.filter((s) => s.type === "url");
 
-  const keyOf = (node: ParsedNode) => `${getNodeOriginName(node)}-${node.server}-${node.port}`;
+  const keyOf = (node: ParsedNode) => `${getNodeOriginName(node)}-${buildNodeEndpointKey(node)}`;
   const keyToIndices = new Map<string, number[]>();
   nodes.forEach((node, idx) => {
     const key = keyOf(node);
@@ -82,7 +83,7 @@ export function ensureNodesHaveValidSourceIds(
     try {
       const parsed = parseSubscription(content);
       for (const n of parsed.nodes) {
-        const key = `${n.name}-${n.server}-${n.port}`;
+        const key = keyOf(n);
         const hit = keyToIndices.get(key);
         if (!hit || hit.length === 0) continue;
         for (const idx of hit) {

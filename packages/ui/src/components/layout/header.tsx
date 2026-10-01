@@ -18,6 +18,7 @@ import {
 import { cn } from "@subboost/ui/lib/utils";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { UserMenu, type AccountMenuItem } from "@subboost/ui/components/auth/user-menu";
+import { ThemeToggle } from "@subboost/ui/components/layout/theme-toggle";
 import { captureAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
 import { useConfigStore } from "@subboost/ui/store/config-store";
 import { useUserStore } from "@subboost/ui/store/user-store";
@@ -63,8 +64,8 @@ function BrandBadge({ badge, tone = "default" }: { badge: HeaderBrandBadge; tone
   const className = cn(
     "inline-flex w-fit items-center rounded-full border px-1.5 py-[2px] text-[0.68rem] font-medium leading-none backdrop-blur-sm",
     tone === "new"
-      ? "border-emerald-300/30 bg-emerald-400/12 text-emerald-100/90 shadow-[0_0_12px_rgba(52,211,153,0.16)]"
-      : "border-sky-300/25 bg-sky-400/10 text-sky-100/80 shadow-[0_0_12px_rgba(56,189,248,0.16)]"
+      ? "border-emerald-300/30 bg-emerald-400/12 text-badge-new-fg shadow-[0_0_12px_rgba(52,211,153,0.16)]"
+      : "border-sky-300/25 bg-sky-400/10 text-badge-mode-fg shadow-[0_0_12px_rgba(56,189,248,0.16)]"
   );
 
   if (badge.href) {
@@ -74,7 +75,7 @@ function BrandBadge({ badge, tone = "default" }: { badge: HeaderBrandBadge; tone
           href={badge.href}
           target="_blank"
           rel="noopener noreferrer"
-          className={cn(className, "transition-colors hover:text-white")}
+          className={cn(className, "transition-colors hover:text-fg")}
           title={badge.title}
           aria-label={badge.ariaLabel}
         >
@@ -86,7 +87,7 @@ function BrandBadge({ badge, tone = "default" }: { badge: HeaderBrandBadge; tone
     return (
       <Link
         href={badge.href}
-        className={cn(className, "transition-colors hover:text-white")}
+        className={cn(className, "transition-colors hover:text-fg")}
         title={badge.title}
         aria-label={badge.ariaLabel}
       >
@@ -106,10 +107,13 @@ export function Header({
   mode = "default",
   extraBrandBadge = null,
   privilegedMenuItem,
+  themeToggle = true,
 }: {
   mode?: HeaderMode;
   extraBrandBadge?: HeaderBrandBadge | null;
   privilegedMenuItem?: AccountMenuItem;
+  /** Shells without the theme init script (always-dark surfaces) hide the toggle. */
+  themeToggle?: boolean;
 }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -119,13 +123,14 @@ export function Header({
   const visibleNavItems = user ? navItems : navItems.filter((i) => !i.authOnly);
   const showPrivilegedLink = mode === "default";
   const visiblePrivilegedItem = showPrivilegedLink && canShowPrivilegedItem ? privilegedMenuItem : null;
+  const tabletMenu = Boolean(visiblePrivilegedItem);
   const modeBadge: HeaderBrandBadge = {
     label: mode === "local" ? "self-host" : "online",
     title: mode === "local" ? "自部署入口" : "在线入口",
   };
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-black/50 border-b border-white/5">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-header border-b border-ink/5">
       <div className="w-full max-w-[clamp(1200px,95vw,2400px)] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -138,7 +143,7 @@ export function Header({
                 height={36}
                 className="rounded-xl shadow-lg shadow-blue-500/25 transition-shadow group-hover:shadow-blue-500/40"
               />
-              <span className="hidden text-xl font-bold leading-none bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent sm:inline-flex">
+              <span className="hidden text-xl font-bold leading-none bg-gradient-to-r from-heading-from to-heading-to bg-clip-text text-transparent sm:inline-flex">
                 SubBoost
               </span>
             </Link>
@@ -149,7 +154,7 @@ export function Header({
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <nav className={cn("hidden items-center rounded-full border border-seg-track-border bg-seg-track p-1 shadow-(--seg-track-shadow)", tabletMenu ? "lg:flex" : "md:flex")}>
             {visibleNavItems.map((item) => {
               const isActive = isNavItemActive(pathname, item.href);
               return (
@@ -159,11 +164,11 @@ export function Header({
                   className={cn(
                     "inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200",
                     isActive
-                      ? "border border-white/10 bg-white/10 text-white shadow-[0_10px_30px_rgba(15,23,42,0.22)]"
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
+                      ? "border border-seg-active-border bg-seg-active text-seg-active-fg shadow-(--seg-active-shadow)"
+                      : "text-fg-60 hover:bg-ink/5 hover:text-fg"
                   )}
                 >
-                  <item.icon className={cn("h-3.5 w-3.5", isActive ? "text-indigo-300" : "text-white/45")} />
+                  <item.icon className={cn("h-3.5 w-3.5", isActive ? "text-indigo-300" : "text-fg-45")} />
                   {item.label}
                 </Link>
               );
@@ -175,7 +180,7 @@ export function Header({
                   "ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200",
                   isNavItemActive(pathname, visiblePrivilegedItem.href)
                     ? "border border-indigo-500/30 bg-indigo-500/15 text-indigo-200 shadow-[0_10px_30px_rgba(79,70,229,0.18)]"
-                    : "text-indigo-300/75 hover:bg-indigo-500/10 hover:text-indigo-200"
+                    : "text-privileged-nav-fg hover:bg-indigo-500/10 hover:text-indigo-200"
                 )}
               >
                 <Shield className="h-3.5 w-3.5" />
@@ -186,8 +191,10 @@ export function Header({
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
+            {themeToggle && <ThemeToggle />}
+
             {/* User Menu */}
-            <UserMenu privilegedMenuItem={privilegedMenuItem} />
+            <UserMenu privilegedMenuItem={privilegedMenuItem} compactAtTablet={themeToggle} />
 
             {/* Mobile Menu Button */}
             <IconButton
@@ -195,13 +202,13 @@ export function Header({
               variant="ghost"
               aria-expanded={mobileMenuOpen}
               aria-controls="subboost-mobile-navigation"
-              className="rounded-lg p-2 transition-colors hover:bg-white/5 md:hidden"
+              className={cn("rounded-lg p-2 transition-colors hover:bg-ink/5", tabletMenu ? "lg:hidden" : "md:hidden")}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? (
-                <X className="w-5 h-5 text-white/60" />
+                <X className="w-5 h-5 text-fg-60" />
               ) : (
-                <Menu className="w-5 h-5 text-white/60" />
+                <Menu className="w-5 h-5 text-fg-60" />
               )}
             </IconButton>
           </div>
@@ -209,7 +216,7 @@ export function Header({
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div id="subboost-mobile-navigation" className="md:hidden border-t border-white/10 py-4">
+          <div id="subboost-mobile-navigation" className={cn("border-t border-ink/10 py-4", tabletMenu ? "lg:hidden" : "md:hidden")}>
             <nav className="flex flex-col gap-1">
               {visibleNavItems.map((item) => {
                 const isActive = isNavItemActive(pathname, item.href);
@@ -221,8 +228,8 @@ export function Header({
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
                       isActive
-                        ? "text-white bg-white/5"
-                        : "text-white/60 hover:text-white hover:bg-white/5"
+                        ? "text-fg bg-ink/5"
+                        : "text-fg-60 hover:text-fg hover:bg-ink/5"
                     )}
                   >
                     <item.icon className="w-5 h-5" />
@@ -238,7 +245,7 @@ export function Header({
                     "flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors",
                     isNavItemActive(pathname, visiblePrivilegedItem.href)
                       ? "text-indigo-400 bg-indigo-500/10"
-                      : "text-indigo-400/70 hover:text-indigo-400 hover:bg-white/5"
+                      : "text-privileged-nav-mobile-fg hover:text-indigo-400 hover:bg-ink/5"
                   )}
                 >
                   <Shield className="w-5 h-5" />
@@ -252,7 +259,7 @@ export function Header({
                     captureAuthConfigHandoff(useConfigStore.getState());
                     setMobileMenuOpen(false);
                   }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-indigo-400 hover:text-indigo-300 hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-indigo-400 hover:text-indigo-300 hover:bg-ink/5 transition-colors"
                 >
                   <LogIn className="w-5 h-5" />
                   登录

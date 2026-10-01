@@ -54,6 +54,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-remove-scroll-bar": "^2.3.8",
+    "qrcode.react": "^4.2.0",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },

@@ -19,17 +19,17 @@ export function SmartNodeMatchingHelp({ enabled }: Props) {
       label="更新时智能匹配节点说明"
       side="bottom"
       align="start"
-      contentClassName="w-[340px] max-w-[calc(100vw-2rem)] bg-black/90 p-3"
+      contentClassName="w-[340px] max-w-[calc(100vw-2rem)] bg-shade/90 p-3"
     >
       <div className="space-y-2 text-xs">
         <div className="flex items-center gap-2">
           <HelpCircle className="h-4 w-4 text-amber-300" aria-hidden="true" />
-          <p className="font-medium text-white">更新时智能匹配节点</p>
+          <p className="font-medium text-fg">更新时智能匹配节点</p>
         </div>
-        <p className="leading-relaxed text-white/60">
+        <p className="leading-relaxed text-fg-60">
           {enabled ? ENABLED_DESCRIPTION : DISABLED_DESCRIPTION}
         </p>
-        <p className="leading-relaxed text-white/50">{SUMMARY_DESCRIPTION}</p>
+        <p className="leading-relaxed text-fg-50">{SUMMARY_DESCRIPTION}</p>
       </div>
     </HelpPopover>
   );

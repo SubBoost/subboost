@@ -87,7 +87,7 @@ export function SubscriptionSettingsDialog({
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm text-white/70">更新时智能匹配节点</p>
+                <p className="text-sm text-fg-70">更新时智能匹配节点</p>
                 <SmartNodeMatchingHelp enabled={smartNodeMatchingEnabled} />
               </div>
             </div>

@@ -2,13 +2,15 @@
  * Clash YAML 配置解析器
  */
 
-import yaml from "js-yaml";
-import type { ParsedNode, ParseResult, UnknownNodeType, XHttpOpts } from "@subboost/core/types/node";
+import { loadSubscriptionYaml } from "./yaml-scalars";
+import type { BaseNode, ParsedNode, ParseResult, UnknownNodeType, XHttpOpts } from "@subboost/core/types/node";
 import { normalizeRealityShortId } from "@subboost/core/mihomo/reality";
 import { canonicalizeParsedNode } from "./canonical-fields";
 import { normalizePortsSpecValue, parsePortNumber, pickStablePortFromPorts } from "./port-spec";
 import { normalizeSsPlugin } from "./protocols/ss";
 import { splitWsPathEarlyData } from "./ws-early-data";
+import { getNodeEndpointError } from "../node-endpoint";
+import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "../mihomo/string-scalar";
 
 interface ClashConfig {
   proxies?: Record<string, unknown>[];
@@ -163,7 +165,7 @@ export function parseClashYaml(content: string): ParseResult {
   try {
     const normalizeTabs = (s: string) => s.replace(/\t/g, "  ");
 
-    const tryLoad = (raw: string): unknown => yaml.load(raw) as unknown;
+    const tryLoad = loadSubscriptionYaml;
     const normalizedContent = normalizeClashYamlScalarText(normalizeTabs(content));
 
     let parsed: unknown;
@@ -270,8 +272,21 @@ function normalizeNode(proxy: Record<string, unknown>): ParsedNode | null {
   }
 
   const name = (proxy.name as string) || "未命名节点";
-  if (type === "direct" || type === "dns") {
+  proxy = { ...proxy };
+  for (const field of MIHOMO_STRING_SCALAR_FIELDS) {
+    if (proxy[field] === undefined || proxy[field] === null) continue;
+    const value = normalizeMihomoStringScalar(proxy[field]);
+    if (value === undefined) throw new Error(`${field} 必须是字符串或可无损表示的整数`);
+    proxy[field] = value;
+  }
+  if (type === "direct" || type === "dns" || type === "reject") {
     return { ...proxy, name, type } as unknown as ParsedNode;
+  }
+
+  if (type === "wireguard" && Array.isArray(proxy.peers)) {
+    proxy.peers = proxy.peers.map((peer) => peer && typeof peer === "object" && !Array.isArray(peer)
+      ? { ...peer, port: parsePortNumber(peer.port) }
+      : peer);
   }
 
   const server = proxy.server as string;
@@ -282,19 +297,17 @@ function normalizeNode(proxy: Record<string, unknown>): ParsedNode | null {
   const shouldNormalizePorts = (isHysteria2 || isHysteria) && ports;
   const port = parsePortNumber(proxy.port) ?? (supportsPortsOnly && ports ? pickStablePortFromPorts(ports) : undefined);
 
-  if (!server || port === undefined) {
-    throw new Error("缺少服务器地址或端口无效");
-  }
-
   // 透传上游字段：避免因字段映射表不完整而丢失协议关键参数（如 hy2 ports / vless client-fingerprint 等）
   const baseNode = {
     ...proxy,
     name,
     type,
-    server,
-    port,
+    ...(server !== undefined ? { server } : {}),
+    ...(proxy.port !== undefined || port !== undefined ? { port } : {}),
     ...(shouldNormalizePorts ? { ports } : {}),
-  };
+  } as BaseNode;
+  const endpointError = getNodeEndpointError(baseNode);
+  if (endpointError) throw new Error(endpointError);
   applyWsEarlyDataInPlace(baseNode as unknown as Record<string, unknown>);
 
   switch (type) {
@@ -504,6 +517,8 @@ function normalizeNode(proxy: Record<string, unknown>): ParsedNode | null {
     case "mieru":
     case "masque":
     case "sudoku":
+    case "wireguard":
+    case "trusttunnel":
       return { ...(baseNode as Record<string, unknown>), type } as unknown as ParsedNode;
 
     default:

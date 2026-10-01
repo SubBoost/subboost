@@ -180,7 +180,7 @@ export function ProxyGroupNameEditor({
               type="button"
               variant="ghost"
               size="sm"
-              className="absolute right-1 top-1/2 h-4 w-4 -translate-y-1/2 shrink-0 px-0 text-white/45 hover:text-white"
+              className="absolute right-1 top-1/2 h-4 w-4 -translate-y-1/2 shrink-0 px-0 text-fg-45 hover:text-fg"
               title="选择 emoji"
               aria-label="选择 emoji"
             >
@@ -196,7 +196,7 @@ export function ProxyGroupNameEditor({
             />
             <div className="grid max-h-64 grid-cols-8 gap-1 overflow-y-auto pr-1">
               <DropdownMenuItem
-                className="flex h-8 items-center justify-center p-0 text-white/75"
+                className="flex h-8 items-center justify-center p-0 text-fg-75"
                 title="随机 emoji"
                 aria-label="随机 emoji"
                 onClick={() => setEmoji(pickRandomEmoji(draft.emoji))}

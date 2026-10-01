@@ -296,6 +296,8 @@ export function useSubscriptionLink({
     }
 
     setIsCreatingSubscription(true);
+    const draftRevision = useConfigStore.getState().draftRevision;
+    const isCurrentDraft = () => useConfigStore.getState().draftRevision === draftRevision;
 
     try {
       const nodeNameFilter: NodeNameFilterConfig = useConfigStore.getState().nodeNameFilter;
@@ -411,6 +413,7 @@ export function useSubscriptionLink({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = await response.json().catch(() => ({} as any));
+      if (!isCurrentDraft()) return;
 
       if (response.status === 401) {
         clearUser();
@@ -451,6 +454,7 @@ export function useSubscriptionLink({
         toast({ title: data.error || "创建失败", variant: "destructive" });
       }
     } catch (error) {
+      if (!isCurrentDraft()) return;
       console.error("Create subscription error:", error);
       trackSubscriptionMutation("runtimeError");
       toast({ title: "创建订阅失败，请稍后重试", variant: "destructive" });

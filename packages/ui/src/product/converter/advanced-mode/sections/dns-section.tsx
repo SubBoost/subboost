@@ -24,7 +24,7 @@ export function DnsSection({
         isExpanded={isExpanded}
         onToggle={onToggle}
         badge={
-          <Badge variant="outline" className="ml-auto border-white/15 bg-white/5 text-white/60">
+          <Badge variant="outline" className="ml-auto border-ink/15 bg-ink/5 text-fg-60">
             YAML
           </Badge>
         }
@@ -34,7 +34,7 @@ export function DnsSection({
           <Textarea
             value={dnsYaml}
             onChange={(e) => setDnsYaml(e.target.value)}
-            className="font-mono text-xs min-h-[400px] bg-white/5 border-white/10"
+            className="font-mono text-xs min-h-[400px] bg-ink/5 border-ink/10"
             placeholder={`# 基础配置
 mixed-port: ${DEFAULT_SUBBOOST_CONFIG.mixedPort}
 allow-lan: ${DEFAULT_SUBBOOST_CONFIG.allowLan}

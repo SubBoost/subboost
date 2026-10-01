@@ -6,10 +6,12 @@ const mocks = vi.hoisted(() => {
   const bag: {
     effectCleanups: Array<() => void>;
     storeState: any;
+    editRef: { current: string | null };
     stateSetters: Array<ReturnType<typeof vi.fn>>;
   } = {
     effectCleanups: [],
     storeState: {},
+    editRef: { current: null },
     stateSetters: [],
   };
 
@@ -39,8 +41,10 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("react", () => ({
+vi.mock("react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react")>(),
   useState: mocks.useState,
+  useRef: () => mocks.bag.editRef,
   useEffect: mocks.useEffect,
 }));
 
@@ -130,6 +134,7 @@ describe("useEditingSubscriptionLoader", () => {
     vi.clearAllMocks();
     mocks.bag.effectCleanups = [];
     mocks.bag.stateSetters = [];
+    mocks.bag.editRef.current = null;
     resetStoreState();
     originalWindow = globalThis.window;
     Object.defineProperty(globalThis, "window", {
@@ -148,8 +153,8 @@ describe("useEditingSubscriptionLoader", () => {
     });
   });
 
-  it("does nothing when there is no editing subscription id", async () => {
-    const options = makeOptions({ editSubscriptionId: null });
+  it.each([null, "sub-1"])("waits for authentication and skips absent edit IDs (%s)", async (id) => {
+    const options = makeOptions({ editSubscriptionId: id, authChecked: false });
 
     const isLoading = useEditingSubscriptionLoader(options);
     await flushAsync();
@@ -157,6 +162,16 @@ describe("useEditingSubscriptionLoader", () => {
     expect(isLoading).toBe(false);
     expect(options.loadSubscription).not.toHaveBeenCalled();
     expect(mocks.useConfigStore.setState).not.toHaveBeenCalled();
+  });
+
+  it("clears draft and labels when navigating away from editing", () => {
+    mocks.bag.editRef.current = "sub-1";
+    const options = makeOptions({ editSubscriptionId: null });
+    useEditingSubscriptionLoader(options);
+    expect(mocks.bag.storeState.reset).toHaveBeenCalledOnce();
+    expect(options.setEditingSubscription).toHaveBeenCalledWith(null);
+    expect(options.setSubscriptionName).toHaveBeenCalledWith("");
+    expect(options.setSubscriptionUrl).toHaveBeenCalledWith("");
   });
 
   it("captures the draft and redirects to login on 401", async () => {
@@ -446,7 +461,7 @@ describe("useEditingSubscriptionLoader", () => {
     expect(restoredSources[1]).not.toHaveProperty("subscriptionUserInfo");
   });
 
-  it("preserves current non-url sources when subscription urls still match", async () => {
+  it("does not inherit another draft's non-url sources even when subscription urls match", async () => {
     const { reset, generateConfig } = resetStoreState({
       sources: [
         {
@@ -503,18 +518,11 @@ describe("useEditingSubscriptionLoader", () => {
     expect(generateConfig).toHaveBeenCalled();
     expect(options.setStoreSources).toHaveBeenCalledWith([
       expect.objectContaining({
-        id: "url-current",
+        id: "sub-url-1",
         type: "url",
         content: "https://one.example/sub",
         lastParsedContent: "https://one.example/sub",
-        tag: "A",
-        nameTemplate: "{tag}-{name}",
-        useProxyProviders: true,
-        userinfoUrl: "https://one.example/userinfo",
-        userinfoUserAgent: "Clash.Meta",
       }),
-      expect.objectContaining({ id: "yaml-current", type: "yaml", content: "proxies: []", lastParsedContent: "proxies: []" }),
-      expect.objectContaining({ id: "nodes-current", type: "nodes", content: "ss://node", lastParsedContent: "ss://node" }),
     ]);
     expect(mocks.bag.storeState.nodes).toEqual([
       expect.objectContaining({ name: "Active", _originName: "Active" }),
@@ -645,7 +653,7 @@ describe("useEditingSubscriptionLoader", () => {
     expect(mocks.toast).toHaveBeenCalledWith({ title: "服务异常", variant: "destructive" });
   });
 
-  it("skips final state updates after cleanup cancels the load", async () => {
+  it.each(["cleanup", "draft", "json"])("discards stale loads after %s changes", async (change) => {
     let resolveLoad: (value: Response) => void = () => undefined;
     const options = makeOptions({
       loadSubscription: vi.fn(
@@ -658,9 +666,10 @@ describe("useEditingSubscriptionLoader", () => {
 
     useEditingSubscriptionLoader(options);
     expect(mocks.bag.effectCleanups).toHaveLength(1);
-    mocks.bag.effectCleanups[0]();
+    if (change === "cleanup") mocks.bag.effectCleanups[0]();
+    else if (change === "draft") mocks.bag.storeState.draftRevision = 1;
     resolveLoad(
-      response(200, {
+      change === "json" ? { ...response(200, {}), json: async () => { mocks.bag.storeState.draftRevision = 1; return {}; } } as Response : response(200, {
         subscription: {
           id: "sub-1",
           token: "token-1",
@@ -673,7 +682,10 @@ describe("useEditingSubscriptionLoader", () => {
     await flushAsync();
 
     expect(options.setEditingSubscription).not.toHaveBeenCalled();
+    expect(mocks.useConfigStore.setState).not.toHaveBeenCalled();
+    expect(mocks.bag.storeState.reset).not.toHaveBeenCalled();
+    expect(options.setStoreSources).not.toHaveBeenCalled();
     expect(mocks.bag.stateSetters[0]).toHaveBeenCalledWith(true);
-    expect(mocks.bag.stateSetters[0]).not.toHaveBeenCalledWith(false);
+    if (change === "cleanup") expect(mocks.bag.stateSetters[0]).not.toHaveBeenCalledWith(false);
   });
 });

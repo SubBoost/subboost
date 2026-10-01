@@ -437,6 +437,8 @@ function parseDialerProxyGroups(value: unknown): { ok: true; value: DialerProxyG
     if (!relayNodes.ok) return relayNodes;
     const targetNodes = parseStringArray(item.targetNodes, "dialerProxyGroups.targetNodes");
     if (!targetNodes.ok) return targetNodes;
+    const groupTestUrl = item.testUrl === undefined ? undefined : parseHttpUrlString(item.testUrl, "dialerProxyGroups.testUrl");
+    if (groupTestUrl && !groupTestUrl.ok) return groupTestUrl;
     const enabled = parseOptionalBoolean(item.enabled, "dialerProxyGroups.enabled");
     if (!enabled.ok) return enabled;
     out.push({
@@ -448,6 +450,7 @@ function parseDialerProxyGroups(value: unknown): { ok: true; value: DialerProxyG
         : {}),
       relayNodes: relayNodes.value,
       targetNodes: targetNodes.value,
+      ...(groupTestUrl?.ok ? { testUrl: groupTestUrl.value } : {}),
       ...(enabled.value !== undefined ? { enabled: enabled.value } : {}),
     });
   }

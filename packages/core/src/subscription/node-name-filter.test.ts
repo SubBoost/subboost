@@ -26,6 +26,30 @@ function unsafeNestedQuantifierPattern(): string {
 }
 
 describe("node name filter config", () => {
+  it("keeps independent switches and patterns across normalization and applies only enabled filters", () => {
+    const nodes = [node("日本"), node("日本 过期"), node("美国")];
+    const config = { enabled: true, includeEnabled: false, excludeEnabled: false, includeRegexes: ["日本"], excludeRegexes: ["过期"] };
+    expect(parseNodeNameFilterConfig(config)).toEqual(config);
+    expect(resolveNodeNameFilter(nodes, config).effectiveCount).toBe(3);
+    expect(resolveNodeNameFilter(nodes, { ...config, includeEnabled: true }).effectiveCount).toBe(2);
+    expect(resolveNodeNameFilter(nodes, { ...config, excludeEnabled: true }).effectiveCount).toBe(2);
+    expect(resolveNodeNameFilter(nodes, { ...config, includeEnabled: true, excludeEnabled: true }).effectiveCount).toBe(1);
+    expect(validateNodeNameFilterConfig({ ...config, includeEnabled: "yes" }).ok).toBe(false);
+    expect(validateNodeNameFilterConfig({ ...config, excludeEnabled: 1 }).ok).toBe(false);
+  });
+  it("keeps any included original name, with exclusions taking precedence", () => {
+    const nodes = [node("renamed", "日本 01"), node("新加坡 02"), node("日本 过期"), node("美国 01")];
+    const config = { enabled: true, includeRegexes: [" 日本|新加坡 ", "日本|新加坡"], excludeRegexes: ["过期"] };
+    expect(validateNodeNameFilterConfig(config)).toEqual({ ok: true, config: { enabled: true, includeRegexes: ["日本|新加坡"], excludeRegexes: ["过期"] } });
+    expect(parseNodeNameFilterConfig(config).includeRegexes).toEqual(["日本|新加坡"]);
+    expect(resolveNodeNameFilter(nodes, config).effectiveNodes).toEqual(nodes.slice(0, 2));
+    expect(resolveNodeNameFilter(nodes, { ...config, excludeRegexes: [] }).effectiveCount).toBe(3);
+    expect(resolveNodeNameFilter(nodes, { ...config, includeRegexes: ["不存在"] }).effectiveCount).toBe(0);
+    expect(resolveNodeNameFilter(nodes, { ...config, enabled: false }).effectiveCount).toBe(4);
+    expect(validateNodeNameFilterConfig({ ...config, includeRegexes: ["["] })).toMatchObject({
+      ok: false, errors: [{ field: "includeRegexes", code: "invalid_regex", line: 1 }],
+    });
+  });
   it("treats a missing config as disabled and disables an empty enabled config", () => {
     expect(parseNodeNameFilterConfig(undefined)).toEqual({
       enabled: false,

@@ -44,7 +44,7 @@ export function generateDialerProxyGroups(
         name: group.group.name,
         groupType: group.group.type,
         proxies: group.proxies,
-        testUrl,
+        testUrl: group.group.type === "url-test" ? group.group.testUrl || testUrl : testUrl,
         testInterval,
         strategy: group.group.strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY,
         extraFields: providerUse,

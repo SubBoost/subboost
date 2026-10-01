@@ -21,6 +21,7 @@ import {
 } from "@subboost/ui/components/ui/dialog";
 import { FormField } from "@subboost/ui/components/ui/form-field";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
+import { Switch } from "@subboost/ui/components/ui/switch";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 
 type NodeManagementAutoProcessingDialogProps = {
@@ -51,19 +52,29 @@ export function NodeManagementAutoProcessingDialog({
   onSave,
 }: NodeManagementAutoProcessingDialogProps) {
   const configText = config.excludeRegexes.join("\n");
+  const includeText = (config.includeRegexes ?? []).join("\n");
   const [enabled, setEnabled] = React.useState(config.enabled);
+  const [includeEnabled, setIncludeEnabled] = React.useState(config.includeEnabled !== false);
+  const [excludeEnabled, setExcludeEnabled] = React.useState(config.excludeEnabled !== false);
+  const [includeRegexText, setIncludeRegexText] = React.useState(includeText);
   const [excludeRegexText, setExcludeRegexText] = React.useState(configText);
 
   React.useEffect(() => {
     if (!open) return;
     setEnabled(config.enabled);
+    setIncludeEnabled(config.includeEnabled !== false);
+    setExcludeEnabled(config.excludeEnabled !== false);
+    setIncludeRegexText(includeText);
     setExcludeRegexText(configText);
-  }, [config.enabled, configText, open]);
+  }, [config.enabled, config.includeEnabled, config.excludeEnabled, configText, includeText, open]);
 
   const plan = React.useMemo(() => {
     try {
       const parsedConfig = parseNodeNameFilterConfig({
         enabled,
+        includeEnabled,
+        excludeEnabled,
+        includeRegexes: includeRegexText.split("\n"),
         excludeRegexes: excludeRegexText.split("\n"),
       });
       return {
@@ -81,10 +92,10 @@ export function NodeManagementAutoProcessingDialog({
             : [{ code: "invalid_config" as const, message: "配置格式无效" }],
       };
     }
-  }, [enabled, excludeRegexText, nodes]);
+  }, [enabled, includeEnabled, excludeEnabled, excludeRegexText, includeRegexText, nodes]);
 
   const validationMessage =
-    plan.errors.length > 0 ? plan.errors.map(formatValidationError).join("；") : undefined;
+    plan.errors.length > 0 ? plan.errors.map((error) => `${error.field === "includeRegexes" ? "保留正则：" : "排除正则："}${formatValidationError(error)}`).join("；") : undefined;
   const blocksEmptyResult = Boolean(
     plan.config?.enabled &&
       plan.result &&
@@ -106,7 +117,7 @@ export function NodeManagementAutoProcessingDialog({
         <DialogHeader>
           <DialogTitle>自动处理</DialogTitle>
           <DialogDescription className="sr-only">
-            设置按导入名称自动排除节点的规则
+            设置按导入名称自动保留或排除节点的规则
           </DialogDescription>
         </DialogHeader>
 
@@ -117,8 +128,24 @@ export function NodeManagementAutoProcessingDialog({
         />
 
         <FormField
+          label="保留正则"
+          labelAction={<span className="mr-px pr-4"><Switch aria-label="启用保留正则" checked={includeEnabled} onCheckedChange={setIncludeEnabled} /></span>}
+          description="每行一条，匹配任意一条即可保留。"
+          descriptionPlacement="before-control"
+        >
+          <Textarea
+            value={includeRegexText}
+            onChange={(event) => setIncludeRegexText(event.target.value)}
+            placeholder="日本|新加坡"
+            rows={3}
+            className="min-h-20 resize-y break-words [overflow-wrap:anywhere]"
+          />
+        </FormField>
+
+        <FormField
           label="排除正则"
-          description="每行一条，按节点导入时的原始名称匹配；命中节点会在生成配置时全局排除，关闭后恢复。"
+          labelAction={<span className="mr-px pr-4"><Switch aria-label="启用排除正则" checked={excludeEnabled} onCheckedChange={setExcludeEnabled} /></span>}
+          description="每行一条，命中节点会被全局排除。"
           descriptionPlacement="before-control"
           error={validationMessage}
         >
@@ -126,23 +153,23 @@ export function NodeManagementAutoProcessingDialog({
             value={excludeRegexText}
             onChange={(event) => setExcludeRegexText(event.target.value)}
             placeholder="剩余流量|套餐到期|注意事项"
-            rows={6}
-            className="min-h-32 resize-y break-words [overflow-wrap:anywhere]"
+            rows={3}
+            className="min-h-20 resize-y break-words [overflow-wrap:anywhere]"
           />
         </FormField>
 
         <div
-          className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+          className="space-y-2 rounded-xl border border-ink/10 bg-ink/[0.03] p-3"
           aria-live="polite"
         >
-          <p className="text-xs leading-relaxed text-white/60">
+          <p className="text-xs leading-relaxed text-fg-60">
             导入 {plan.result?.rawCount ?? nodes.length} · 排除{" "}
             {plan.result?.excludedCount ?? "—"} · 保留{" "}
             {plan.result?.effectiveCount ?? "—"}
           </p>
 
           {hasProxyProviders ? (
-            <p className="text-xs leading-relaxed text-white/40">
+            <p className="text-xs leading-relaxed text-fg-40">
               proxy-providers 不参与。
             </p>
           ) : null}
@@ -155,7 +182,7 @@ export function NodeManagementAutoProcessingDialog({
 
           {plan.result ? (
             <div className="space-y-1.5">
-              <p className="text-xs font-medium text-white/60">匹配节点</p>
+              <p className="text-xs font-medium text-fg-60">排除的节点</p>
               {plan.result.excludedNodes.length > 0 ? (
                 <div className="max-h-48 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
                   {plan.result.excludedNodes.map((node, index) => {
@@ -165,11 +192,11 @@ export function NodeManagementAutoProcessingDialog({
                         key={`${node.name}:${index}`}
                         className="rounded-lg border border-red-500/15 bg-red-500/[0.06] px-2.5 py-2"
                       >
-                        <p className="break-words text-xs leading-relaxed text-white/75 [overflow-wrap:anywhere]">
+                        <p className="break-words text-xs leading-relaxed text-fg-75 [overflow-wrap:anywhere]">
                           {node.name}
                         </p>
                         {originName !== node.name ? (
-                          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-white/40 [overflow-wrap:anywhere]">
+                          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-fg-40 [overflow-wrap:anywhere]">
                             原名：{originName}
                           </p>
                         ) : null}
@@ -178,7 +205,7 @@ export function NodeManagementAutoProcessingDialog({
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-white/40">没有匹配节点</p>
+                <p className="text-xs text-fg-40">没有排除的节点</p>
               )}
             </div>
           ) : null}

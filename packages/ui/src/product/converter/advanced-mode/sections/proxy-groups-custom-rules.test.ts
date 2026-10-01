@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     ruleAdded: vi.fn(),
   },
   createCustomRuleId: vi.fn(),
+  toast: vi.fn(),
 }));
 
 const stateMock = vi.hoisted(() => ({
@@ -106,8 +107,8 @@ vi.mock("@subboost/ui/components/ui/switch", () => ({
 }));
 vi.mock("@subboost/core/generator/proxy-groups", () => ({
   PROXY_GROUP_MODULES: [
-    { id: "auto", name: "Auto" },
-    { id: "fallback", name: "Fallback" },
+    { id: "auto", name: "Auto", rules: [] },
+    { id: "fallback", name: "Fallback", rules: [] },
   ],
 }));
 vi.mock("@subboost/core/proxy-group-name", () => ({
@@ -134,6 +135,7 @@ vi.mock("@subboost/core/rules/custom-rule-utils", () => ({
 vi.mock("@subboost/ui/store/config-store", () => ({
   useConfigStore: () => mocks.store,
 }));
+vi.mock("@subboost/ui/components/ui/toaster", () => ({ toast: mocks.toast }));
 vi.mock("@subboost/ui/product/interactions", () => ({
   useProductInteractionAdapter: () => mocks.interactions,
 }));
@@ -207,6 +209,7 @@ describe("ProxyGroupsCustomRules", () => {
     mocks.store = {
       customRules: [],
       addCustomRule: vi.fn(),
+      addModuleRules: vi.fn(),
       addCustomRules: vi.fn(),
       updateCustomRule: vi.fn(),
       removeCustomRule: vi.fn(),
@@ -214,6 +217,64 @@ describe("ProxyGroupsCustomRules", () => {
       customProxyGroups: [{ id: "custom-1", name: "Custom Group", rules: [] }],
       proxyGroupNameOverrides: { auto: "节点选择" },
     };
+  });
+
+  it("adds a remote rule set using the existing input and automatically derived name", () => {
+    const url = "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/udemy.mrs";
+    const { html, setters } = renderRules({ 0: "RULE-SET", 1: url, 2: "Custom Group" });
+    expect(html).toContain("规则集 (RULE-SET)");
+    expect(mocks.captures.inputs).toHaveLength(1);
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [expect.objectContaining({
+      name: "udemy", path: url, behavior: "domain", id: "udemy",
+    })]);
+    expect(mocks.store.addCustomRule).not.toHaveBeenCalled();
+    expect(setters[1]).toHaveBeenCalledWith("");
+    expect(mocks.captures.batchDialogs[0].defaultType).toBe("RULE-SET");
+  });
+
+  it("suffixes existing provider names and imports provider batches into their selected group", () => {
+    mocks.store.customRuleSets = [{ id: "udemy", path: "geosite/udemy.mrs", target: { kind: "custom", id: "custom-1" } }];
+    renderRules({ 0: "RULE-SET", 1: "https://local.subboost.test/geosite/udemy.mrs", 2: "Custom Group" });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [expect.objectContaining({ id: "udemy-2", name: "udemy-2" })]);
+    const batch = mocks.captures.batchDialogs[0];
+    expect(batch.existingRuleSets[0].target).toBe("Custom Group");
+    batch.onImportRuleSets([{ id: "udemy-3", name: "udemy-3", path: "geosite/udemy.mrs", target: "Custom Group", behavior: "domain" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenLastCalledWith("custom-1", [expect.objectContaining({ id: "udemy-3" })]);
+  });
+
+  it.each(["DIRECT", "REJECT"])("requires a proxy group for rule sets instead of %s", (target) => {
+    const { setters } = renderRules({ 0: "RULE-SET", 1: "https://local.subboost.test/geosite/finance.mrs", 2: target });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "请选择规则集使用的代理组" }));
+    mocks.captures.selects[0].onValueChange("RULE-SET");
+    expect(setters[2]).toHaveBeenCalledWith("节点选择");
+  });
+
+  it("leaves no target when switching to rule sets with no available group", () => {
+    mocks.store.enabledProxyGroups = [];
+    mocks.store.customProxyGroups = [];
+    const { setters } = renderRules({ 2: "DIRECT" });
+    mocks.captures.selects[0].onValueChange("RULE-SET");
+    expect(setters[2]).toHaveBeenCalledWith("");
+  });
+
+  it.each(["invalid", "https://local.subboost.test/geosite/finance.yaml"])("rejects unsupported rule-set input %s", (url) => {
+    const { setters } = renderRules({ 0: "RULE-SET", 1: url, 2: "Custom Group" });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+    expect(setters[1]).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+  });
+
+  it("reports an unexpected provider-add failure without clearing input", () => {
+    mocks.store.addModuleRules.mockImplementationOnce(() => { throw "failed"; });
+    const { setters } = renderRules({ 0: "RULE-SET", 1: "https://local.subboost.test/geosite/finance.mrs", 2: "Custom Group" });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(setters[1]).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "规则集链接无效" }));
   });
 
   it("builds add and batch-import controls from enabled targets", () => {

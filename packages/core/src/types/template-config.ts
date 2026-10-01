@@ -17,6 +17,7 @@ export interface DialerProxyGroup {
   relayNodes: string[]; // 用于中转的节点名称列表
   type: ProxyGroupGroupType; // 组类型
   strategy?: LoadBalanceStrategy; // 负载均衡策略，仅 type=load-balance 时生效
+  testUrl?: string;
   targetNodes: string[]; // 使用此中转的落地节点名称列表
 }
 

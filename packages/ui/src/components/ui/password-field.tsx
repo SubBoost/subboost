@@ -27,7 +27,7 @@ const PasswordControl = React.forwardRef<HTMLInputElement, PasswordControlProps>
         variant="ghost"
         disabled={disabled}
         onClick={onVisibleChange}
-        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg text-white/50 hover:text-white"
+        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg text-fg-50 hover:text-fg"
       >
         {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
       </IconButton>

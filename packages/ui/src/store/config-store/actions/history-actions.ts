@@ -91,7 +91,7 @@ export function createHistoryActions(set: SetState, get: GetState): HistoryActio
     },
 
     reset: () => {
-      set(initialState);
+      set((state) => ({ ...initialState, draftRevision: (state.draftRevision ?? 0) + 1 }));
     },
   };
 }

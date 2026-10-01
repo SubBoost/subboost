@@ -116,11 +116,11 @@ export function TemplateUploadDialog({
               />
             </ChoiceGroup>
             {mode === "config" ? (
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-fg-50">
                 将保存你当前的配置器设置（模板/分组/规则/DNS/自定义分流/中转等），不包含节点，可直接“使用”应用到配置器。
               </p>
             ) : (
-              <p className="text-xs text-white/50">YAML 模板上传开发中。</p>
+              <p className="text-xs text-fg-50">YAML 模板上传开发中。</p>
             )}
           </div>
 
@@ -163,7 +163,7 @@ export function TemplateUploadDialog({
                 {asDefault || isPublic ? (
                   <Globe className="h-4 w-4 text-green-400" />
                 ) : (
-                  <Lock className="h-4 w-4 text-white/50" />
+                  <Lock className="h-4 w-4 text-fg-50" />
                 )}
                   {visibilityLabel}
                 </span>

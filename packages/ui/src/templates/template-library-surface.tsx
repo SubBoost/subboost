@@ -346,7 +346,7 @@ function TemplateLibraryInner({ adapter }: Props) {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold mb-1">模板库</h1>
-          <p className="text-white/50">{enabledTabLabelText}</p>
+          <p className="text-fg-50">{enabledTabLabelText}</p>
         </div>
         {canUpload && (
           <Button className="gap-2" onClick={() => openUploadDialog("templatesPage")}>
@@ -358,7 +358,7 @@ function TemplateLibraryInner({ adapter }: Props) {
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fg-50" />
           <Input
             placeholder="搜索模板..."
             value={searchQuery}
@@ -457,9 +457,9 @@ function EmptyTemplates({
   if (tab === "my" && canUpload) {
     return (
       <div className="text-center py-12">
-        <Plus className="h-12 w-12 mx-auto text-white/40 mb-4" />
+        <Plus className="h-12 w-12 mx-auto text-fg-40 mb-4" />
         <h3 className="text-lg font-medium mb-2">暂无模板</h3>
-        <p className="text-white/50 mb-4">创建您的第一个配置模板</p>
+        <p className="text-fg-50 mb-4">创建您的第一个配置模板</p>
         <Button onClick={onUpload}>
           <Plus className="mr-2 h-4 w-4" />
           创建模板
@@ -470,9 +470,9 @@ function EmptyTemplates({
 
   return (
     <div className="text-center py-12">
-      <FileCode className="h-12 w-12 mx-auto text-white/40 mb-4" />
+      <FileCode className="h-12 w-12 mx-auto text-fg-40 mb-4" />
       <h3 className="text-lg font-medium mb-2">{tab === "catalog" ? "没有找到模板" : "暂无模板"}</h3>
-      <p className="text-white/50">尝试调整搜索条件</p>
+      <p className="text-fg-50">尝试调整搜索条件</p>
     </div>
   );
 }

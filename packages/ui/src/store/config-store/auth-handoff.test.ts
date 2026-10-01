@@ -324,6 +324,13 @@ describe("auth config handoff", () => {
     });
   });
 
+  it("preserves a disabled keep-only draft and its switches across authentication", () => {
+    installStorage(createStorage());
+    const nodeNameFilter = { enabled: false, includeEnabled: false, excludeEnabled: true, includeRegexes: ["日本"], excludeRegexes: [] };
+    captureAuthConfigHandoff({ ...structuredClone(initialState), nodeNameFilter });
+    expect(consumeAuthConfigHandoff()?.nodeNameFilter).toEqual(nodeNameFilter);
+  });
+
   it("normalizes valid sources while dropping invalid optional source fields", () => {
     vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
     const storage = createStorage({

@@ -5,13 +5,77 @@ const path = require("node:path");
 const ts = require("typescript");
 
 const workspaceRoot = process.cwd();
-const requestedRoots = process.argv.slice(2);
+const requestedRoots = [];
+const themeExcludedRoots = [];
+const cliArgs = process.argv.slice(2);
+for (let index = 0; index < cliArgs.length; index += 1) {
+  if (cliArgs[index] === "--theme-exclude") {
+    if (cliArgs[index + 1]) themeExcludedRoots.push(path.resolve(workspaceRoot, cliArgs[index + 1]));
+    index += 1;
+  } else {
+    requestedRoots.push(cliArgs[index]);
+  }
+}
 const roots = (requestedRoots.length > 0 ? requestedRoots : ["packages", "local"])
   .map((entry) => path.resolve(workspaceRoot, entry))
   .filter((entry) => fs.existsSync(entry));
 
 const ignoredDirectoryNames = new Set([".next", "dist", "generated", "node_modules"]);
 const findings = [];
+
+// Dark-only colors break the light theme. Colors that change between themes come from
+// packages/ui/src/styles/theme.css; components use its utilities instead.
+const VARIANT_PREFIX = String.raw`(?:[\w-]+(?:-\[[^\]\s]*\])?:|\[[^\]\s]+\]:)*`;
+const BOUNDARY = String.raw`(?<![\w-])`;
+const themeColorRules = [
+  {
+    pattern: new RegExp(BOUNDARY + VARIANT_PREFIX + String.raw`(?:text|placeholder)-white\/[\w.\[\]]+`, "g"),
+    hint: "text-fg-N 或 placeholder:text-fg-N",
+  },
+  {
+    pattern: new RegExp(
+      BOUNDARY + VARIANT_PREFIX + String.raw`(?:bg|border(?:-[trblxy])?|divide|ring|stroke|outline)-white\/[\w.\[\]]+`,
+      "g"
+    ),
+    hint: "bg-ink/N、border-ink/N 等 ink 前景色",
+  },
+  {
+    pattern: new RegExp(BOUNDARY + VARIANT_PREFIX + String.raw`(?:from|via|to)-white\b(?:\/[\w.\[\]]+)?`, "g"),
+    hint: "from-heading-from、to-heading-to",
+  },
+  {
+    pattern: new RegExp(BOUNDARY + VARIANT_PREFIX + String.raw`(?:bg|fill)-black\/[\w.\[\]]+`, "g"),
+    hint: "bg-shade/N、bg-header 或 bg-overlay",
+  },
+  { pattern: new RegExp(BOUNDARY + String.raw`ring-offset-black\b`, "g"), hint: "ring-offset-shade 或 ring-offset-page" },
+  {
+    pattern: new RegExp(BOUNDARY + String.raw`(?:bg|text|border)-\[#[0-9a-fA-F]+\]`, "g"),
+    hint: "bg-surface、bg-surface-raised，或先在 theme.css 定义主题变量",
+  },
+  { pattern: /color-scheme:\s*dark/g, hint: "按主题取值的变量，例如 [color-scheme:var(--date-input-scheme)]" },
+  { pattern: new RegExp(BOUNDARY + String.raw`(?:bg|text|border|fill)-zinc-950\b`, "g"), hint: "bg-surface-popover" },
+];
+
+function isThemeExcluded(filePath) {
+  return themeExcludedRoots.some((root) => filePath === root || filePath.startsWith(root + path.sep));
+}
+
+function checkThemeColors(filePath, sourceText) {
+  if (isThemeExcluded(filePath)) return;
+  const lines = sourceText.split("\n");
+  lines.forEach((lineText, lineIndex) => {
+    for (const { pattern, hint } of themeColorRules) {
+      for (const match of lineText.matchAll(pattern)) {
+        findings.push({
+          file: path.relative(workspaceRoot, filePath),
+          line: lineIndex + 1,
+          column: match.index + 1,
+          message: `深色专用颜色 ${match[0]} 会破坏浅色主题，请改用 ${hint}（主题变量见 packages/ui/src/styles/theme.css）`,
+        });
+      }
+    }
+  });
+}
 
 function normalizePath(filePath) {
   return filePath.replaceAll("\\", "/");
@@ -79,6 +143,7 @@ function report(sourceFile, node, message) {
 
 function checkFile(filePath) {
   const sourceText = fs.readFileSync(filePath, "utf8");
+  checkThemeColors(filePath, sourceText);
   const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const normalized = normalizePath(filePath);
   const isUiWrapper = normalized.includes("/components/ui/");

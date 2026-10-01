@@ -19,15 +19,15 @@ export function SectionHeader({
   return (
     <button
       onClick={onToggle}
-      className="w-full flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-white/5 transition-colors"
+      className="w-full flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-ink/5 transition-colors"
     >
       {isExpanded ? (
-        <ChevronDown className="h-4 w-4 text-white/50" />
+        <ChevronDown className="h-4 w-4 text-fg-50" />
       ) : (
-        <ChevronRight className="h-4 w-4 text-white/50" />
+        <ChevronRight className="h-4 w-4 text-fg-50" />
       )}
       <Icon className="h-4 w-4 text-indigo-400" />
-      <span className="text-sm font-medium text-white">{title}</span>
+      <span className="text-sm font-medium text-fg">{title}</span>
       {badge}
     </button>
   );

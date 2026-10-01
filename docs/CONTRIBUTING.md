@@ -34,6 +34,10 @@ npm run check:local-app
 
 For parser, template, subscription output, or deployment changes, also run the focused test or selftest that covers the changed behavior.
 
+## UI Colors
+
+The app has a dark and a light theme with the same layout. Take colors from the theme tokens in `packages/ui/src/styles/theme.css` (for example `text-fg-60`, `bg-ink/5`, `border-ink/10`, `bg-surface`) instead of dark-only classes such as `text-white/60` or `bg-white/5`; `npm run lint` rejects the latter. Check UI changes in both themes.
+
 ## Documentation
 
 - Keep README changes bilingual: update `README-CN.md` first, then sync `README.md`.

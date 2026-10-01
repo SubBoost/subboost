@@ -46,8 +46,10 @@ const PROXY_FIELD_ORDER_PROTOCOL: Partial<Record<KnownNodeType, string[]>> = {
   snell: ["psk", "version", "obfs-opts", "reuse"],
   direct: ["udp", "ip-version", "interface-name", "routing-mark"],
   dns: ["udp"],
+  reject: [],
   mieru: ["username", "password", "transport", "port-range", "multiplexing", "handshake-mode"],
   masque: ["username", "password"],
+  trusttunnel: ["username", "password", "health-check", "quic", "congestion-controller", "max-connections", "min-streams", "max-streams"],
   sudoku: [
     "key",
     "aead-method",

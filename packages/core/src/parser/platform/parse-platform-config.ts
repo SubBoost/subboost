@@ -48,8 +48,15 @@ function isPlatformDirectPolicyLine(line: string): boolean {
   return /^[^=]+=\s*direct\s*$/i.test(line.trim());
 }
 
+export function isPlatformConfigSectionHeader(line: string): boolean {
+  return /^\[.+\]$/.test(line);
+}
+
 export function looksLikePlatformConfigContent(content: string): boolean {
-  return /^\s*\[(?:proxy|server_local|server_remote|wireguard\s+)/im.test(content);
+  const lines = content.split(/[\r\n]+/).map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith(";"));
+  return lines.some((line) => isPlatformConfigSectionHeader(line) &&
+    /^\[[ \t]*(?:proxy|server_local|server_remote|wireguard\s+)/i.test(line));
 }
 
 export function parsePlatformConfigContent(content: string): ParseResult {

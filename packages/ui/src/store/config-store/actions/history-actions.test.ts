@@ -135,7 +135,7 @@ describe("config store history actions", () => {
     expect(store.state()).toEqual({ generatedYaml: "only", history: ["only"], historyIndex: 0 });
 
     actions.reset();
-    expect(store.state()).toEqual(expect.objectContaining(initialState));
+    expect(store.state()).toEqual(expect.objectContaining({ ...initialState, draftRevision: 1 }));
     expect(store.state()).toMatchObject({
       nodeNameFilter: { enabled: false, excludeRegexes: [] },
     });

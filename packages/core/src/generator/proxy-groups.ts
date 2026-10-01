@@ -230,13 +230,14 @@ export function generateProxyGroups(options: ProxyGroupGenerateOptions): ProxyGr
     groupType: ProxyGroupGroupType,
     proxies: string[],
     strategy?: LoadBalanceStrategy,
-    extraFields: Record<string, unknown> = providerUse
+    extraFields: Record<string, unknown> = providerUse,
+    groupTestUrl?: string,
   ): ProxyGroup =>
     buildTypedProxyGroup({
       name,
       groupType,
       proxies,
-      testUrl,
+      testUrl: groupType === "url-test" ? groupTestUrl || testUrl : testUrl,
       testInterval,
       strategy,
       extraFields,
@@ -292,6 +293,7 @@ export function generateProxyGroups(options: ProxyGroupGenerateOptions): ProxyGr
               id: module.id,
               name: moduleName,
             }),
+            undefined, providerUse, advanced?.testUrl,
           ));
         break;
 
@@ -372,7 +374,7 @@ export function generateProxyGroups(options: ProxyGroupGenerateOptions): ProxyGr
 
     if (usesFilteredNodeMembers(customGroup)) {
       if (customGroup.groupType === "url-test" || customGroup.groupType === "fallback") {
-        return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames), undefined, {});
+        return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames), undefined, {}, customGroup.advanced?.testUrl);
       }
       if (customGroup.groupType === "load-balance") {
         return createGeneratedProxyGroup(
@@ -392,7 +394,7 @@ export function generateProxyGroups(options: ProxyGroupGenerateOptions): ProxyGr
       };
     }
     if (customGroup.groupType === "url-test") {
-      return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames));
+      return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames), undefined, providerUse, customGroup.advanced?.testUrl);
     }
     if (customGroup.groupType === "fallback") {
       return createGeneratedProxyGroup(customGroup.name, customGroup.groupType, resolveCustom(filteredNodeNames));

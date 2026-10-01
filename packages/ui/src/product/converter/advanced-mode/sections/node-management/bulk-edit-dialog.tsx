@@ -166,13 +166,13 @@ export function NodeManagementBulkEditDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="text-[11px] text-white/40">
+          <div className="text-[11px] text-fg-40">
             仅修改节点名中的 {"{name}"} 部分，不改变导入源 tag；筛选基于完整节点名（含 tag）。
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <div className="text-xs text-white/60">筛选：包含正则（可选）</div>
+              <div className="text-xs text-fg-60">筛选：包含正则（可选）</div>
               <Input
                 value={nameRulesInclude}
                 onChange={(e) => setNameRulesInclude(e.target.value)}
@@ -184,7 +184,7 @@ export function NodeManagementBulkEditDialog({
               )}
             </div>
             <div className="space-y-1">
-              <div className="text-xs text-white/60">筛选：排除正则（可选）</div>
+              <div className="text-xs text-fg-60">筛选：排除正则（可选）</div>
               <Input
                 value={nameRulesExclude}
                 onChange={(e) => setNameRulesExclude(e.target.value)}
@@ -198,14 +198,14 @@ export function NodeManagementBulkEditDialog({
           </div>
 
           <div className={listenerPortEnabled ? "grid gap-3 lg:grid-cols-2" : "grid gap-3"}>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
+            <div className="rounded-lg border border-ink/10 bg-ink/5 p-3 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs text-white/60">批量重命名</div>
-                <div className="shrink-0 text-[10px] text-white/40">将修改 {nameRulesPlan.renames.length}</div>
+                <div className="text-xs text-fg-60">批量重命名</div>
+                <div className="shrink-0 text-[10px] text-fg-40">将修改 {nameRulesPlan.renames.length}</div>
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-white/60">查找（正则，可选）</div>
+                <div className="text-xs text-fg-60">查找（正则，可选）</div>
                 <Input
                   value={nameRulesFind}
                   onChange={(e) => setNameRulesFind(e.target.value)}
@@ -218,14 +218,14 @@ export function NodeManagementBulkEditDialog({
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-white/60">替换为</div>
+                <div className="text-xs text-fg-60">替换为</div>
                 <Input
                   value={nameRulesReplace}
                   onChange={(e) => setNameRulesReplace(e.target.value)}
                   placeholder="例如: -"
                   className="text-xs font-mono"
                 />
-                <div className="text-[10px] text-white/40">支持 $1、$2… 分组引用；留空表示删除匹配内容</div>
+                <div className="text-[10px] text-fg-40">支持 $1、$2… 分组引用；留空表示删除匹配内容</div>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
@@ -245,14 +245,14 @@ export function NodeManagementBulkEditDialog({
             </div>
 
             {listenerPortEnabled && (
-              <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
+              <div className="rounded-lg border border-ink/10 bg-ink/5 p-3 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-white/60">监听端口批量操作</div>
-                  <div className="shrink-0 text-[10px] text-white/40">对命中节点生效：{nameRulesPlan.matchedCount}</div>
+                  <div className="text-xs text-fg-60">监听端口批量操作</div>
+                  <div className="shrink-0 text-[10px] text-fg-40">对命中节点生效：{nameRulesPlan.matchedCount}</div>
                 </div>
 
                 <div className="space-y-1">
-                  <div className="text-xs text-white/60">起始监听端口</div>
+                  <div className="text-xs text-fg-60">起始监听端口</div>
                   <Input
                     value={nameRulesStartListenerPort}
                     onChange={(e) => setNameRulesStartListenerPort(e.target.value)}
@@ -263,7 +263,7 @@ export function NodeManagementBulkEditDialog({
                 </div>
 
                 <div className="space-y-1">
-                  <div className="text-xs text-white/60">批量操作</div>
+                  <div className="text-xs text-fg-60">批量操作</div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button
                       onClick={() => {
@@ -356,7 +356,7 @@ export function NodeManagementBulkEditDialog({
                     </Button>
                   </div>
 
-                  <div className="text-[10px] text-white/40">
+                  <div className="text-[10px] text-fg-40">
                     将按当前节点顺序为命中节点填充监听端口：起始监听端口 + 序号
                   </div>
                 </div>
@@ -366,15 +366,15 @@ export function NodeManagementBulkEditDialog({
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">预览</div>
-              <div className="text-[10px] text-white/40">
+              <div className="text-xs text-fg-60">预览</div>
+              <div className="text-[10px] text-fg-40">
                 匹配 {nameRulesPlan.matchedCount} · 将修改 {nameRulesPlan.renames.length}
                 {nameRulesPlan.skippedCount > 0 ? ` · 跳过 ${nameRulesPlan.skippedCount}` : ""}
               </div>
             </div>
 
             {nameRulesPlan.preview.length === 0 ? (
-              <div className="text-[10px] text-white/40 py-2">
+              <div className="text-[10px] text-fg-40 py-2">
                 {nameRulesPlan.previewMode === "matched" ? "暂无匹配节点" : "暂无可预览的变更"}
               </div>
             ) : (
@@ -382,9 +382,9 @@ export function NodeManagementBulkEditDialog({
                 {nameRulesPlan.preview.map((item) => (
                   <div
                     key={item.oldName}
-                    className="text-[11px] bg-white/5 rounded border border-white/10 px-2 py-1 space-y-0.5"
+                    className="text-[11px] bg-ink/5 rounded border border-ink/10 px-2 py-1 space-y-0.5"
                   >
-                    <div className="text-white/60 truncate" title={item.oldName}>
+                    <div className="text-fg-60 truncate" title={item.oldName}>
                       {item.oldName}
                     </div>
                     {item.status === "skipped" ? (
@@ -396,7 +396,7 @@ export function NodeManagementBulkEditDialog({
                         {item.newName}
                       </div>
                     ) : (
-                      <div className="text-white/30 truncate" title="无变更">
+                      <div className="text-fg-30 truncate" title="无变更">
                         无变更
                       </div>
                     )}

@@ -23,7 +23,7 @@ import {
   PROXY_GROUP_MODULES,
   generateProxyGroups,
 } from "@subboost/core/generator/proxy-groups";
-import type { HiddenPresetRuleIds } from "@subboost/core/generator/module-rules";
+import type { EffectiveModuleRuleSource, HiddenPresetRuleIds } from "@subboost/core/generator/module-rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
@@ -40,7 +40,7 @@ import { GroupAdvancedSettingsDialog } from "./group-advanced-settings-dialog";
 import { findGroupListenerBinding } from "./group-listener-settings";
 
 const PROXY_GROUP_SECTION_LABEL_ROW_CLASS = "flex min-h-7 items-center gap-2";
-const PROXY_GROUP_SECTION_LABEL_CLASS = "text-xs text-white/50";
+const PROXY_GROUP_SECTION_LABEL_CLASS = "text-xs text-fg-50";
 const CUSTOM_CATEGORY_ID = "custom";
 
 export function ProxyGroupsCategories() {
@@ -227,7 +227,7 @@ export function ProxyGroupsCategories() {
       moduleNames[proxyModule.id] = name;
     }
 
-    const pushRuleSetForTarget = (moduleId: string, rule: RuleSetDraft) => {
+    const pushRuleSetForTarget = (moduleId: string, rule: RuleSetDraft & { source?: EffectiveModuleRuleSource }) => {
       ruleSetsByTarget[moduleId] = [...(ruleSetsByTarget[moduleId] || []), rule];
     };
     const hidePresetRule = (moduleId: string, ruleId: string) => {
@@ -242,13 +242,8 @@ export function ProxyGroupsCategories() {
       });
       const moduleId = moduleNameToId.get(targetName);
       if (!moduleId) continue;
-      pushRuleSetForTarget(moduleId, {
-        id: ruleSet.id,
-        name: ruleSet.name,
-        behavior: ruleSet.behavior,
-        path: ruleSet.path,
-        ...(ruleSet.noResolve ? { noResolve: true } : {}),
-      });
+      const { target: _target, ...rule } = ruleSet;
+      pushRuleSetForTarget(moduleId, rule);
     }
 
     for (const [key, edit] of Object.entries(builtinRuleEdits || {})) {
@@ -267,17 +262,20 @@ export function ProxyGroupsCategories() {
           })
         : "";
 
-      if (edit.enabled === false) hidePresetRule(sourceModuleId, ruleId);
+      if (edit.enabled === false) {
+        hidePresetRule(sourceModuleId, ruleId);
+        continue;
+      }
       if (editTarget && editTarget !== defaultTarget) {
         hidePresetRule(sourceModuleId, ruleId);
-        const targetModuleId = moduleNameToId.get(editTarget);
+        const targetModuleId = moduleNameToId.get(editTarget)
+          || customProxyGroups.find((group) => group.name === editTarget)?.id;
         if (targetModuleId) {
           pushRuleSetForTarget(targetModuleId, {
-            id: sourceRule.id,
-            name: sourceRule.name,
-            behavior: sourceRule.behavior,
-            path: sourceRule.path,
-            ...(sourceRule.noResolve ? { noResolve: true } : {}),
+            ...sourceRule,
+            source: "preset",
+            noResolve: sourceModuleId === "cn" && ruleId === "cn-ip"
+              ? cnIpNoResolve : sourceRule.noResolve,
           });
         }
       }
@@ -286,6 +284,7 @@ export function ProxyGroupsCategories() {
     return { ruleSetsByTarget, hiddenPresetRuleIds };
   }, [
     builtinRuleEdits,
+    cnIpNoResolve,
     customRuleSets,
     customProxyGroups,
     resolveModuleDisplayName,
@@ -323,7 +322,7 @@ export function ProxyGroupsCategories() {
             <p className={PROXY_GROUP_SECTION_LABEL_CLASS}>规则集 URL</p>
           </div>
           <div
-            className="min-w-0 rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/65"
+            className="min-w-0 rounded-md border border-ink/10 bg-ink/5 px-3 py-2 font-mono text-xs text-fg-65"
             title={ruleProviderBaseUrl}
           >
             <span className="block truncate">{ruleProviderBaseUrl}</span>
@@ -333,8 +332,8 @@ export function ProxyGroupsCategories() {
           <div className={PROXY_GROUP_SECTION_LABEL_ROW_CLASS}>
             <p className="text-xs text-amber-300">高级模式</p>
           </div>
-          <div className="flex h-9 w-full items-center justify-center gap-1 rounded-md border border-white/10 bg-white/5 px-2">
-            <span className="text-[10px] text-white/65">
+          <div className="flex h-9 w-full items-center justify-center gap-1 rounded-md border border-ink/10 bg-ink/5 px-2">
+            <span className="text-[10px] text-fg-65">
               {proxyGroupAdvancedModeEnabled ? "已开启" : "未开启"}
             </span>
             <Switch checked={proxyGroupAdvancedModeEnabled} onCheckedChange={setProxyGroupAdvancedModeEnabled} aria-label="高级模式" />
@@ -352,7 +351,7 @@ export function ProxyGroupsCategories() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="ml-auto h-6 gap-1 rounded-md px-2 text-[10px] text-white/60 hover:bg-white/10 hover:text-white/85"
+                  className="ml-auto h-6 gap-1 rounded-md px-2 text-[10px] text-fg-60 hover:bg-ink/10 hover:text-fg-85"
                   title="恢复隐藏分组"
                 >
                   <RotateCcw className="h-3 w-3" />
@@ -395,18 +394,18 @@ export function ProxyGroupsCategories() {
               return (
                 <div
                   key={categoryId}
-                  className="border border-white/10 rounded-lg overflow-hidden"
+                  className="border border-ink/10 rounded-lg overflow-hidden"
                 >
                   <button
                     onClick={() => toggleCategory(categoryId)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 bg-white/5 hover:bg-white/10 transition-colors"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 bg-ink/5 hover:bg-ink/10 transition-colors"
                   >
                     {expandedCategories.has(categoryId) ? (
-                      <ChevronDown className="h-3.5 w-3.5 text-white/50" />
+                      <ChevronDown className="h-3.5 w-3.5 text-fg-50" />
                     ) : (
-                      <ChevronRight className="h-3.5 w-3.5 text-white/50" />
+                      <ChevronRight className="h-3.5 w-3.5 text-fg-50" />
                     )}
-                    <span className="text-xs text-white font-medium">
+                    <span className="text-xs text-fg font-medium">
                       {categoryInfo.name}
                     </span>
                     <Badge variant="secondary" className="ml-auto text-[10px]">
@@ -459,7 +458,7 @@ export function ProxyGroupsCategories() {
                                           「{display.full}
                                           」属于核心分流组。删除后会从列表隐藏，并从生成配置中移除，可能导致生成的订阅不可用或分流异常。
                                         </span>
-                                        <span className="mt-3 block leading-6 text-white/65">
+                                        <span className="mt-3 block leading-6 text-fg-65">
                                           之后可以通过“已隐藏”菜单恢复该分组。
                                         </span>
                                       </span>
@@ -532,7 +531,7 @@ export function ProxyGroupsCategories() {
                                     「{display.full}
                                     」属于核心分流组。关闭后，生成的订阅可能无法正常使用，或出现分流异常。
                                   </span>
-                                  <span className="mt-3 block leading-6 text-white/65">
+                                  <span className="mt-3 block leading-6 text-fg-65">
                                     除非你打算之后手动修改配置文件，否则不建议取消勾选。
                                   </span>
                                 </span>
@@ -672,20 +671,19 @@ export function ProxyGroupsCategories() {
             groupName={resolveModuleDisplayName(settingsModule).full}
             groupType={(advancedConfig.groupType ?? settingsModule.groupType) as ProxyGroupGroupType}
             strategy={advancedConfig.strategy}
+            testUrl={advancedConfig.testUrl}
             listenerTarget={target}
             listenerBinding={findGroupListenerBinding(groupListeners, target)}
             conflictState={listenerConflictState}
-            onSave={({ groupType, strategy, listener }) => {
+            onSave={({ groupType, strategy, listener, testUrl }) => {
               updateProxyGroupAdvanced(settingsModule.id, {
+                testUrl,
                 groupType,
                 ...(groupType === "load-balance"
                   ? { strategy: strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY }
                   : { strategy: undefined }),
               });
-              setGroupListener(
-                target,
-                listener ? { port: listener.port, enabled: listener.enabled, allowLan: listener.allowLan } : null
-              );
+              setGroupListener(target, listener);
             }}
           />
         );

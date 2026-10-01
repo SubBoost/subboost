@@ -1,12 +1,14 @@
 import type { SubscriptionSource } from "./definitions";
 
 export type SingleSourceImportOperation = {
+  draftRevision: number;
   id: number;
   sourceId: string;
   fingerprint: string;
 };
 
 export type BatchSourceImportOperation = {
+  draftRevision: number;
   id: number;
   sources: Array<{ sourceId: string; fingerprint: string }>;
 };
@@ -24,6 +26,7 @@ export function buildSourceImportFingerprint(source: SubscriptionSource): string
 }
 
 export class SourceImportOperationGuard {
+  constructor(private readonly getDraftRevision: () => number = () => 0) {}
   private sequence = 0;
   private readonly singleOperations = new Map<string, number>();
   private activeBatchId: number | null = null;
@@ -31,6 +34,7 @@ export class SourceImportOperationGuard {
   startSingle(source: SubscriptionSource): SingleSourceImportOperation {
     this.activeBatchId = null;
     const operation = {
+      draftRevision: this.getDraftRevision(),
       id: ++this.sequence,
       sourceId: source.id,
       fingerprint: buildSourceImportFingerprint(source),
@@ -41,6 +45,7 @@ export class SourceImportOperationGuard {
 
   startBatch(sources: readonly SubscriptionSource[]): BatchSourceImportOperation {
     const operation = {
+      draftRevision: this.getDraftRevision(),
       id: ++this.sequence,
       sources: sources.map((source) => ({
         sourceId: source.id,
@@ -58,7 +63,7 @@ export class SourceImportOperationGuard {
   }
 
   ownsSingle(operation: SingleSourceImportOperation): boolean {
-    return this.singleOperations.get(operation.sourceId) === operation.id;
+    return operation.draftRevision === this.getDraftRevision() && this.singleOperations.get(operation.sourceId) === operation.id;
   }
 
   isSingleCurrent(sources: readonly SubscriptionSource[], operation: SingleSourceImportOperation): boolean {
@@ -72,7 +77,7 @@ export class SourceImportOperationGuard {
   }
 
   ownsBatch(operation: BatchSourceImportOperation): boolean {
-    return this.activeBatchId === operation.id;
+    return operation.draftRevision === this.getDraftRevision() && this.activeBatchId === operation.id;
   }
 
   isBatchCurrent(sources: readonly SubscriptionSource[], operation: BatchSourceImportOperation): boolean {

@@ -263,7 +263,7 @@ describe("RulesManagementSection", () => {
       defaultTree,
       (element) =>
         typeof element.props.className === "string" &&
-        element.props.className.includes("border-white/10 bg-white/5 px-3 py-1.5"),
+        element.props.className.includes("border-ink/10 bg-ink/5 px-3 py-1.5"),
     )[0];
     const row = collectElements(
       defaultTree,
@@ -295,8 +295,8 @@ describe("RulesManagementSection", () => {
     expect(collectText(detail)).not.toContain("🚀 节点选择");
     expect(collectText(detail)).not.toContain("no-resolve");
     expect(detail.props.title).toBe("IP-CIDR,203.0.113.0/24,🚀 节点选择");
-    expect(entryRow.props.className).toContain("border-white/10");
-    expect(entryRow.props.className).toContain("bg-white/5");
+    expect(entryRow.props.className).toContain("border-ink/10");
+    expect(entryRow.props.className).toContain("bg-ink/5");
     expect(row.props.className).not.toContain("sm:grid");
     expect(orderControls.props.className).toContain("shrink-0");
     expect(modeRows.map((element) => element.props.className)).toEqual([

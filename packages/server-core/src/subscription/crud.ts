@@ -3,6 +3,8 @@ import { parseNodeNameFilterConfig } from "@subboost/core/subscription/node-name
 import { normalizeSubscriptionResponseInfo } from "@subboost/core/subscription/subscription-response-info";
 import { tryNormalizeSubscriptionUrlInput } from "@subboost/core/subscription/url-input";
 import type { ParsedNode } from "@subboost/core/types/node";
+import { getNodeEndpointError } from "@subboost/core/node-endpoint";
+import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "@subboost/core/mihomo/string-scalar";
 import { resolveSubscriptionAutoUpdateState, type SubscriptionAutoUpdateStateFields } from "./auto-update-state";
 import { normalizeSavedSourcesForPersistence, type NormalizeSavedSourcesForPersistenceOptions } from "./saved-sources";
 import { resolveSmartNodeMatchingEnabled } from "./refresh-node-snapshot";
@@ -92,13 +94,13 @@ export function validateSubscriptionNodeList(value: unknown): ParsedNode[] {
       continue;
     }
 
-    if (type === "direct" || type === "dns") continue;
-
-    if (typeof item.server !== "string" || !item.server.trim()) {
-      throw new Error(`节点 #${index + 1} 缺少有效服务器地址`);
-    }
-    if (typeof item.port !== "number" || !Number.isInteger(item.port) || item.port < 1 || item.port > 65535) {
-      throw new Error(`节点 #${index + 1} 的端口必须是 1 到 65535 的整数`);
+    const endpointError = getNodeEndpointError(item);
+    if (endpointError) throw new Error(`节点 #${index + 1} ${endpointError.startsWith("端口") ? "的" : ""}${endpointError}`);
+    for (const field of MIHOMO_STRING_SCALAR_FIELDS) {
+      if (item[field] === undefined || item[field] === null) continue;
+      if (normalizeMihomoStringScalar(item[field]) === undefined) {
+        throw new Error(`节点 #${index + 1} 的 ${field} 必须是字符串或可无损表示的整数`);
+      }
     }
   }
 

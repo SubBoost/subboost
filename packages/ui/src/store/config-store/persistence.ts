@@ -8,9 +8,38 @@ export {
   getConfigDraftStorageNameForUser,
 } from "./draft-storage";
 
-export const CONFIG_DRAFT_STORAGE_VERSION = 10;
+export const CONFIG_DRAFT_STORAGE_VERSION = 11;
 
 type ConfigDraftStorage = Pick<Storage, "getItem" | "setItem">;
+
+export function createSafeConfigDraftStorage(
+  getStorage: () => Pick<Storage, "getItem" | "setItem" | "removeItem"> | null = () =>
+    typeof window === "undefined" ? null : window.localStorage
+) {
+  return {
+    getItem(key: string): string | null {
+      try {
+        return getStorage()?.getItem(key) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    setItem(key: string, value: string): void {
+      try {
+        getStorage()?.setItem(key, value);
+      } catch {
+        // Keep the current in-memory draft editable when storage is unavailable.
+      }
+    },
+    removeItem(key: string): void {
+      try {
+        getStorage()?.removeItem(key);
+      } catch {
+        // Storage availability must not block clearing the persisted draft.
+      }
+    },
+  };
+}
 
 type PersistedEnvelope = {
   state?: unknown;

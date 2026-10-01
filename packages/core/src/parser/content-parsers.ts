@@ -1,8 +1,9 @@
 import { parseClashYaml } from "./clash-yaml";
 import { looksLikeConfigLine, parseConfigLine } from "./config-line-parser";
-import { parsePlatformConfigContent, looksLikePlatformConfigContent } from "./platform/parse-platform-config";
+import { parsePlatformConfigContent, looksLikePlatformConfigContent, isPlatformConfigSectionHeader } from "./platform/parse-platform-config";
 import { parsePlatformProxyLine } from "./platform/parse-platform-proxy-line";
 import { parseNodeLink } from "./parse-node-link";
+import { loadSubscriptionYaml } from "./yaml-scalars";
 import type { ParseResult } from "@subboost/core/types/node";
 
 interface SubscriptionContentParser {
@@ -59,24 +60,43 @@ export function splitNodeLinkSegments(content: string): string[] {
   return segments;
 }
 
-function looksLikeInlineFlowProxyList(content: string): boolean {
-  let hasItem = false;
-  let hasType = false;
-  let hasServer = false;
-  let hasPort = false;
-
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    if (!trimmed.startsWith("- {")) return false;
-
-    hasItem = true;
-    hasType ||= trimmed.includes("type:");
-    hasServer ||= trimmed.includes("server:");
-    hasPort ||= trimmed.includes("port:") || trimmed.includes("ports:");
+function hasBlockMappingSeparator(line: string): boolean {
+  for (let index = line.indexOf(":"); index >= 0; index = line.indexOf(":", index + 1)) {
+    const next = line[index + 1];
+    if (next === undefined || next === " " || next === "\t") return true;
   }
+  return false;
+}
 
-  return hasItem && hasType && hasServer && hasPort;
+function startsWithYamlNodeDocument(content: string): boolean {
+  // Only route by root syntax. The YAML parser owns keys, fields and node validation.
+  for (const line of content.split(/[\r\n]+/)) {
+    let trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith(";") || trimmed.startsWith("%")) continue;
+    if (/^---(?:[ \t]|$)/.test(trimmed)) {
+      trimmed = trimmed.slice(3).trimStart();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+    }
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) return false;
+    if (isPlatformConfigSectionHeader(trimmed)) {
+      // Bracketed section names overlap flow sequences; valid YAML keeps its parser.
+      try {
+        const root = loadSubscriptionYaml(content);
+        if (!Array.isArray(root) && looksLikePlatformConfigContent(content)) return false;
+      } catch {
+        if (looksLikePlatformConfigContent(content)) return false;
+        try {
+          const header = loadSubscriptionYaml(trimmed);
+          if (Array.isArray(header) && header.length === 1 && typeof header[0] === "string") return false;
+        } catch {
+          // Malformed flow sequences must reach the YAML parser's error reporting.
+        }
+      }
+    }
+    return trimmed.startsWith("{") || trimmed.startsWith("[") ||
+      /^[-?](?:[ \t]|$)/.test(trimmed) || /^[!&]/.test(trimmed) || hasBlockMappingSeparator(trimmed);
+  }
+  return false;
 }
 
 export function isClashYamlContent(content: string): boolean {
@@ -84,13 +104,7 @@ export function isClashYamlContent(content: string): boolean {
     return true;
   }
 
-  if (looksLikeInlineFlowProxyList(content)) return true;
-
-  const hasType = /(^|\n)\s*(?:-\s*)?type\s*:\s*\S+/i.test(content);
-  const hasServer = /(^|\n)\s*(?:-\s*)?server\s*:\s*\S+/i.test(content);
-  const hasPort = /(^|\n)\s*(?:-\s*)?port\s*:\s*\d+/i.test(content);
-  const hasPorts = /(^|\n)\s*(?:-\s*)?ports\s*:\s*\S+/i.test(content);
-  return hasType && hasServer && (hasPort || hasPorts);
+  return startsWithYamlNodeDocument(content);
 }
 
 export function parseLineBasedSubscriptionContent(content: string): ParseResult {
@@ -158,7 +172,7 @@ const CONTENT_PARSERS: SubscriptionContentParser[] = [
   },
   {
     name: "platform-config",
-    test: (content) => looksLikePlatformConfigContent(content),
+    test: (content) => !isClashYamlContent(content) && looksLikePlatformConfigContent(content),
     parse: (content) => parsePlatformConfigContent(content),
   },
   {

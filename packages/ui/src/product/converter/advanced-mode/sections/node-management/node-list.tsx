@@ -81,9 +81,9 @@ export function NodeManagementNodeList({
   return (
     <>
           {nodes.length === 0 && deletedMarkedNodes.length === 0 ? (
-            <div className="text-xs text-white/40 py-4 text-center">请先在上方导入节点</div>
+            <div className="text-xs text-fg-40 py-4 text-center">请先在上方导入节点</div>
           ) : nodeSearchKeyword.trim() && visibleNodes.length === 0 && visibleDeletedMarkedNodes.length === 0 ? (
-            <div className="text-xs text-white/40 py-4 text-center">未找到匹配节点</div>
+            <div className="text-xs text-fg-40 py-4 text-center">未找到匹配节点</div>
           ) : (
             <div className={NODE_LIST_HEIGHT_CLASS}>
               {visibleNodes.map((node) => {
@@ -118,7 +118,7 @@ export function NodeManagementNodeList({
                 return (
                   <div
                     key={node.name}
-                    className="flex items-center gap-2 text-xs bg-white/5 rounded px-2 py-1.5 group"
+                    className="flex items-center gap-2 text-xs bg-ink/5 rounded px-2 py-1.5 group"
                   >
                     {editingNodeName === node.name ? (
                       <>
@@ -142,7 +142,7 @@ export function NodeManagementNodeList({
                               setEditingNodeName(null);
                             }
                           }}
-                          className="flex-1 h-6 text-xs bg-white/10"
+                          className="flex-1 h-6 text-xs bg-ink/10"
                           autoFocus
                         />
                         <IconButton
@@ -160,7 +160,7 @@ export function NodeManagementNodeList({
                           label="取消重命名"
                           variant="ghost"
                           onClick={() => setEditingNodeName(null)}
-                          className="h-6 w-6 p-1 text-white/30 hover:text-white/50"
+                          className="h-6 w-6 p-1 text-fg-30 hover:text-fg-50"
                         >
                           <X className="h-3 w-3" />
                         </IconButton>
@@ -177,7 +177,7 @@ export function NodeManagementNodeList({
                               {primaryTag}
                             </span>
                           )}
-                          <span className="text-white truncate" title={node.name}>
+                          <span className="text-fg truncate" title={node.name}>
                             {parts.canEditBase ? parts.baseName : node.name}
                           </span>
                           {isRenamed && (
@@ -185,7 +185,7 @@ export function NodeManagementNodeList({
                               label={`恢复原名: ${originName}`}
                               variant="ghost"
                               onClick={() => restoreNodeName(node.name)}
-                              className="h-5 w-5 p-0.5 text-white/30 transition-colors hover:text-amber-400"
+                              className="h-5 w-5 p-0.5 text-fg-30 transition-colors hover:text-amber-400"
                             >
                               <RotateCcw className="h-2.5 w-2.5" />
                             </IconButton>
@@ -193,7 +193,7 @@ export function NodeManagementNodeList({
                         </span>
                         {isListenerPortVisible && (
                           <>
-                            <span className="text-[10px] text-white/40 whitespace-nowrap">监听端口:</span>
+                            <span className="text-[10px] text-fg-40 whitespace-nowrap">监听端口:</span>
                             <Input
                               value={
                                 Object.prototype.hasOwnProperty.call(listenerPortDrafts, node.name)
@@ -231,13 +231,13 @@ export function NodeManagementNodeList({
                               placeholder="-"
                               title={listenerPortErrors[node.name] || "为该节点生成 listeners（mixed）本地监听端口"}
                               className={cn(
-                                "h-6 w-16 md:w-[4.5rem] text-[10px] bg-white/10 border-white/10 text-center",
+                                "h-6 w-16 md:w-[4.5rem] text-[10px] bg-ink/10 border-ink/10 text-center",
                                 listenerPortErrors[node.name] && "border-red-500/30 focus:border-red-500/50"
                               )}
                             />
                           </>
                         )}
-                        <span className="text-[10px] text-white/40 whitespace-nowrap">顺序:</span>
+                        <span className="text-[10px] text-fg-40 whitespace-nowrap">顺序:</span>
                         <div className="flex items-center gap-0.5">
                           <Input
                             value={
@@ -272,7 +272,7 @@ export function NodeManagementNodeList({
                             }}
                             inputMode="numeric"
                             title="排序位置（1=最前）"
-                            className="h-6 w-10 text-[10px] bg-white/10 border-white/10 text-center px-1"
+                            className="h-6 w-10 text-[10px] bg-ink/10 border-ink/10 text-center px-1"
                           />
                           <div className="flex flex-col">
                             <IconButton
@@ -280,7 +280,7 @@ export function NodeManagementNodeList({
                               variant="ghost"
                               onClick={() => moveNode(node.name, "up")}
                               disabled={(nodeIndexByName.get(node.name) ?? 0) <= 0}
-                              className="h-3 w-4 flex items-center justify-center text-white/30 hover:text-indigo-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              className="h-3 w-4 flex items-center justify-center text-fg-30 hover:text-indigo-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
                               <ChevronUp className="h-2.5 w-2.5" />
                             </IconButton>
@@ -289,7 +289,7 @@ export function NodeManagementNodeList({
                               variant="ghost"
                               onClick={() => moveNode(node.name, "down")}
                               disabled={(nodeIndexByName.get(node.name) ?? 0) >= nodes.length - 1}
-                              className="h-3 w-4 flex items-center justify-center text-white/30 hover:text-indigo-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              className="h-3 w-4 flex items-center justify-center text-fg-30 hover:text-indigo-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
                               <ChevronDown className="h-2.5 w-2.5" />
                             </IconButton>
@@ -311,7 +311,7 @@ export function NodeManagementNodeList({
                             setEditingNodeName(node.name);
                             setEditNodeValue(parts.baseName);
                           }}
-                          className="h-6 w-6 p-1 text-white/50 hover:text-indigo-400 transition-colors"
+                          className="h-6 w-6 p-1 text-fg-50 hover:text-indigo-400 transition-colors"
                         >
                           <Pencil className="h-3 w-3" />
                         </IconButton>
@@ -319,7 +319,7 @@ export function NodeManagementNodeList({
                           label="删除节点"
                           variant="ghost"
                           onClick={() => removeNode(node.name)}
-                          className="h-6 w-6 p-1 text-white/50 hover:text-red-400 transition-colors"
+                          className="h-6 w-6 p-1 text-fg-50 hover:text-red-400 transition-colors"
                         >
                           <Trash2 className="h-3 w-3" />
                         </IconButton>
@@ -332,11 +332,11 @@ export function NodeManagementNodeList({
               {visibleDeletedMarkedNodes.length > 0 && (
                 <div
                   className={cn(
-                    "pt-2 mt-2 border-t border-white/10",
+                    "pt-2 mt-2 border-t border-ink/10",
                     visibleNodes.length === 0 && "pt-0 mt-0 border-t-0"
                   )}
                 >
-                  <div className="text-[10px] text-white/40 mb-1">
+                  <div className="text-[10px] text-fg-40 mb-1">
                     已删除节点（不会生成到配置；点击“恢复”可立即恢复；若缺少来源信息可能需要重新导入）
                   </div>
                   <div className="space-y-1">
@@ -347,11 +347,11 @@ export function NodeManagementNodeList({
                       >
                         <span className="text-red-400 text-[10px] w-4">DEL</span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-white/50 line-through truncate" title={name}>
+                          <div className="text-fg-50 line-through truncate" title={name}>
                             {name}
                           </div>
                           {originName !== name && (
-                            <div className="text-[10px] text-white/30 truncate" title={`源名: ${originName}`}>
+                            <div className="text-[10px] text-fg-30 truncate" title={`源名: ${originName}`}>
                               源名: {originName}
                             </div>
                           )}
@@ -366,7 +366,7 @@ export function NodeManagementNodeList({
                           label={`恢复节点 ${originName}`}
                           variant="ghost"
                           onClick={() => restoreDeletedNode(originName)}
-                          className="h-6 w-6 p-1 text-white/30 hover:text-white/60"
+                          className="h-6 w-6 p-1 text-fg-30 hover:text-fg-60"
                         >
                           <RotateCcw className="h-3 w-3" />
                         </IconButton>

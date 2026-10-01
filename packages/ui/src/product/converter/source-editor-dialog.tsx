@@ -57,12 +57,12 @@ export function SourceEditorDialog({
               </FormField>
             </div>
 
-            <p className="text-[11px] text-white/40">
+            <p className="text-[11px] text-fg-40">
               可用占位符：{"{tag}"}、{"{name}"}；留空则默认：{DEFAULT_NODE_NAME_TEMPLATE}
             </p>
 
             <div className="space-y-1">
-              <p className="text-xs text-white/60">{sourceTypeInfo[source.type].label}</p>
+              <p className="text-xs text-fg-60">{sourceTypeInfo[source.type].label}</p>
               {source.type === "url" ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
@@ -72,33 +72,33 @@ export function SourceEditorDialog({
                       placeholder={sourceTypeInfo[source.type].placeholder}
                       className="min-w-0 flex-1 text-xs"
                     />
-                    <div className="flex h-10 flex-none items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3">
-                      <span className="whitespace-nowrap text-xs text-white/70">proxy-providers模式</span>
+                    <div className="flex h-10 flex-none items-center gap-2 rounded-xl border border-ink/10 bg-ink/5 px-3">
+                      <span className="whitespace-nowrap text-xs text-fg-70">proxy-providers模式</span>
                       <HelpPopover
                         label="proxy-providers 模式说明"
                         side="bottom"
                         align="end"
-                        contentClassName="w-[360px] bg-black/90 p-3"
+                        contentClassName="w-[360px] bg-shade/90 p-3"
                       >
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center gap-2">
                             <HelpCircle className="h-4 w-4 text-amber-300" aria-hidden="true" />
-                            <p className="font-medium text-white">proxy-providers 模式</p>
+                            <p className="font-medium text-fg">proxy-providers 模式</p>
                           </div>
-                          <p className="leading-relaxed text-white/60">
+                          <p className="leading-relaxed text-fg-60">
                             部分订阅限制 CN IP 导入，url 无法在 SubBoost 内拉取解析。开启后 SubBoost
                             不再拉取/解析该 url，而是在最终配置中写入{" "}
                             <span className="font-mono">proxy-providers</span>，交由客户端自行拉取节点。
                           </p>
-                          <div className="space-y-1 border-t border-white/10 pt-2 text-white/60">
-                            <p className="font-medium text-white/80">注意开启后：</p>
+                          <div className="space-y-1 border-t border-ink/10 pt-2 text-fg-60">
+                            <p className="font-medium text-fg-80">注意开启后：</p>
                             <ul className="ml-4 list-disc space-y-1">
                               <li>无法在预览中查看/管理该 url 的节点</li>
                               <li>无法将这些节点用于中转代理组、分流组高级模式等高级功能</li>
                               <li>节点命名模板与 tag 在该模式下不生效</li>
                             </ul>
                           </div>
-                          <p className="border-t border-white/10 pt-2 text-[10px] text-white/40">
+                          <p className="border-t border-ink/10 pt-2 text-[10px] text-fg-40">
                             若导入 url 报“未解析到有效节点/获取失败”等，可尝试开启此模式。
                           </p>
                         </div>
@@ -129,7 +129,7 @@ export function SourceEditorDialog({
                       />
                     </FormField>
                   </div>
-                  <p className="text-[11px] text-white/40">
+                  <p className="text-[11px] text-fg-40">
                     有些订阅源不会直接返回 <span className="font-mono">subscription-userinfo</span>，但会提供独立的流量接口。
                     设置后，SubBoost 会在导入/刷新时额外抓取该接口，用来更新这个源自己的流量与到期快照。
                   </p>
