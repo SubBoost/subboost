@@ -123,6 +123,7 @@ export function Header({
   const visibleNavItems = user ? navItems : navItems.filter((i) => !i.authOnly);
   const showPrivilegedLink = mode === "default";
   const visiblePrivilegedItem = showPrivilegedLink && canShowPrivilegedItem ? privilegedMenuItem : null;
+  const tabletMenu = Boolean(visiblePrivilegedItem);
   const modeBadge: HeaderBrandBadge = {
     label: mode === "local" ? "self-host" : "online",
     title: mode === "local" ? "自部署入口" : "在线入口",
@@ -153,7 +154,7 @@ export function Header({
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center rounded-full border border-seg-track-border bg-seg-track p-1 shadow-(--seg-track-shadow)">
+          <nav className={cn("hidden items-center rounded-full border border-seg-track-border bg-seg-track p-1 shadow-(--seg-track-shadow)", tabletMenu ? "lg:flex" : "md:flex")}>
             {visibleNavItems.map((item) => {
               const isActive = isNavItemActive(pathname, item.href);
               return (
@@ -201,7 +202,7 @@ export function Header({
               variant="ghost"
               aria-expanded={mobileMenuOpen}
               aria-controls="subboost-mobile-navigation"
-              className="rounded-lg p-2 transition-colors hover:bg-ink/5 md:hidden"
+              className={cn("rounded-lg p-2 transition-colors hover:bg-ink/5", tabletMenu ? "lg:hidden" : "md:hidden")}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? (
@@ -215,7 +216,7 @@ export function Header({
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div id="subboost-mobile-navigation" className="md:hidden border-t border-ink/10 py-4">
+          <div id="subboost-mobile-navigation" className={cn("border-t border-ink/10 py-4", tabletMenu ? "lg:hidden" : "md:hidden")}>
             <nav className="flex flex-col gap-1">
               {visibleNavItems.map((item) => {
                 const isActive = isNavItemActive(pathname, item.href);

@@ -208,6 +208,25 @@ describe("Header", () => {
     expect(stateMock.setter).toHaveBeenCalledWith(false);
   });
 
+  it.each([
+    { mode: "default", user: { isAdmin: true }, tabletMenu: true },
+    { mode: "default", user: { isAdmin: false }, tabletMenu: false },
+    { mode: "default", user: { isAdmin: true, isBanned: true }, tabletMenu: false },
+    { mode: "local", user: { isAdmin: true }, tabletMenu: false },
+    { mode: "default", user: null, tabletMenu: false },
+  ] as const)("uses the tablet menu only for visible privileged navigation: $mode / $user", ({ mode, user, tabletMenu }) => {
+    mocks.userState = { user };
+    const html = renderHeader({ mode, privilegedMenuItem: { href: adminPath, label: "管理" } as any }, true);
+    const desktop = html.match(/<nav class="([^"]+)"/)?.[1];
+    const mobile = html.match(/id="subboost-mobile-navigation" class="([^"]+)"/)?.[1];
+    expect(desktop).toContain(tabletMenu ? "lg:flex" : "md:flex");
+    expect(desktop).not.toContain(tabletMenu ? "md:flex" : "lg:flex");
+    expect(mobile).toContain(tabletMenu ? "lg:hidden" : "md:hidden");
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-controls="subboost-mobile-navigation"');
+    if (tabletMenu) expect(mocks.links.some(link => link.href === adminPath && typeof link.onClick === "function")).toBe(true);
+  });
+
   it("captures guest draft state before mobile login navigation", () => {
     const html = renderHeader({}, true);
 
