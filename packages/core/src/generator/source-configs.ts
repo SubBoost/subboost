@@ -18,90 +18,54 @@ function merge(left: unknown, right: unknown): unknown {
   return structuredClone(right);
 }
 
+// Imported providers feed SubBoost's own groups; upstream groups and rules are never exported.
+export function buildSourceProxyProviders(sources: SourceClashConfig[], nodes: ParsedNode[]): Record<string, unknown> {
+  const providers: Record<string, unknown> = {};
+  for (const source of sources) {
+    const raw = source.config["proxy-providers"];
+    if (!record(raw)) continue;
+    const nodeNames = new Map(nodes.filter(node => getNodeSourceIds(node).includes(source.id))
+      .map(node => [getNodeOriginName(node), node.name]));
+    for (const [name, value] of Object.entries(raw)) {
+      if (!record(value)) continue;
+      const provider = structuredClone(value);
+      if (typeof provider.proxy === "string" && !["DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE"].includes(provider.proxy)) {
+        const target = nodeNames.get(provider.proxy);
+        if (target) provider.proxy = target;
+        else delete provider.proxy;
+      }
+      if (provider.type === "http") {
+        provider.path = `./source_providers/${source.id.replace(/[^a-zA-Z0-9_-]/g, "_")}_${name.replace(/[^a-zA-Z0-9_-]/g, "_")}.yaml`;
+      }
+      providers[`source:${source.id}:${name}`] = provider;
+    }
+  }
+  return providers;
+}
+
 export function mergeSourceClashConfigs(generated: Record<string, unknown>, sources: SourceClashConfig[], nodes: ParsedNode[]): Record<string, unknown> {
   if (!sources.length) return generated;
   let base: Record<string, unknown> = {};
-  const groups: Record<string, unknown>[] = [];
-  const sourceEntrypoints: string[] = [];
-  const importedRules: string[] = [];
-  const proxyProviders: Record<string, unknown> = {};
-  const ruleProviders: Record<string, unknown> = {};
   const dnsSelfAddresses = new Set<string>();
-  const occupied = new Set([
-    ...nodes.map(node => node.name),
-    ...(Array.isArray(generated["proxy-groups"]) ? generated["proxy-groups"].filter(record).map(group => String(group.name)) : []),
-  ]);
 
   for (const source of sources) {
     const config = source.config;
-    const prefix = `source:${source.id}:`;
-    const unique = (name: string) => {
-      let candidate = prefix + name;
-      let suffix = 1;
-      while (occupied.has(candidate)) candidate = prefix + name + ` (${++suffix})`;
-      occupied.add(candidate);
-      return candidate;
-    };
     const nodeNames = new Map<string, string>();
     for (const node of nodes) if (getNodeSourceIds(node).includes(source.id)) nodeNames.set(getNodeOriginName(node), node.name);
-    const rawGroups = Array.isArray(config["proxy-groups"]) ? config["proxy-groups"].filter(record) : [];
-    const groupNames = new Map(rawGroups.filter(group => typeof group.name === "string").map(group => [String(group.name), unique(String(group.name))]));
-    const entrypoint = rawGroups.find(group => typeof group.name === "string");
-    if (entrypoint) sourceEntrypoints.push(groupNames.get(String(entrypoint.name))!);
-    const proxyNames = new Map(Object.keys(record(config["proxy-providers"]) ? config["proxy-providers"] : {}).map(name => [name, prefix + name]));
-    const ruleNames = new Map(Object.keys(record(config["rule-providers"]) ? config["rule-providers"] : {}).map(name => [name, prefix + name]));
     const builtins = new Set(["DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE"]);
-    const policy = (name: string) => builtins.has(name) ? name : groupNames.get(name) ?? nodeNames.get(name);
+    const policy = (name: string) => builtins.has(name) ? name : nodeNames.get(name);
 
-    for (const [key, names, target] of [["proxy-providers", proxyNames, proxyProviders], ["rule-providers", ruleNames, ruleProviders]] as const) {
-      const providers = config[key];
-      if (!record(providers)) continue;
-      for (const [name, value] of Object.entries(providers)) {
-        const next = record(value) ? { ...value } : value;
-        if (record(next)) {
-          if (typeof next.proxy === "string") next.proxy = policy(next.proxy) ?? "DIRECT";
-          if (next.type === "http") {
-            const extension = next.format === "mrs" ? "mrs" : "yaml";
-            next.path = `./source_providers/${source.id.replace(/[^a-zA-Z0-9_-]/g, "_")}_${name.replace(/[^a-zA-Z0-9_-]/g, "_")}.${extension}`;
-          }
-        }
-        target[names.get(name)!] = next;
-      }
-    }
-    for (const group of rawGroups) {
-      if (typeof group.name !== "string") continue;
-      const entries = Array.isArray(group.proxies) ? group.proxies.filter((name): name is string => typeof name === "string").map(policy).filter((name): name is string => Boolean(name)) : [];
-      const use = Array.isArray(group.use) ? group.use.filter((name): name is string => typeof name === "string").map(name => proxyNames.get(name)).filter((name): name is string => Boolean(name)) : [];
-      if (group["include-all-proxies"] === true) entries.push(...nodeNames.values());
-      if (group["include-all-providers"] === true) use.push(...proxyNames.values());
-      const next: Record<string, unknown> = { ...group, name: groupNames.get(group.name), proxies: [...new Set(entries.length || use.length ? entries : ["DIRECT"])], ...(use.length ? { use: [...new Set(use)] } : {}) };
-      delete next["include-all-proxies"];
-      delete next["include-all-providers"];
-      groups.push(next);
-    }
-    for (const rule of Array.isArray(config.rules) ? config.rules : []) {
-      if (typeof rule !== "string") continue;
-      const parts = rule.split(",");
-      if (["MATCH", "FINAL"].includes(parts[0])) continue; // Only one final catch-all can be active.
-      const targetIndex = parts.length - (parts.at(-1) === "no-resolve" ? 2 : 1);
-      const destination = policy(parts[targetIndex]);
-      if (!destination) continue;
-      parts[targetIndex] = destination;
-      if (parts[0] === "RULE-SET") {
-        const provider = ruleNames.get(parts[1]);
-        if (!provider) continue;
-        parts[1] = provider;
-      }
-      importedRules.push(parts.join(","));
-    }
     if (record(config.dns) && typeof config.dns.listen === "string") {
       const listener = config.dns.listen.replace(/^0\.0\.0\.0:/, "127.0.0.1:");
       dnsSelfAddresses.add("udp://" + listener);
     }
-    const metadata = Object.fromEntries(Object.entries(config).filter(([key]) => !["proxies", "proxy-groups", "rules", "proxy-providers", "rule-providers"].includes(key)));
+    const metadata = Object.fromEntries(Object.entries(config).filter(([key]) => !["proxies", "proxy-groups", "rules", "sub-rules", "proxy-providers", "rule-providers"].includes(key)));
     if (Array.isArray(metadata.listeners)) {
-      metadata.listeners = metadata.listeners.map(listener => record(listener) && typeof listener.proxy === "string"
-        ? { ...listener, proxy: policy(listener.proxy) ?? "DIRECT" } : listener);
+      metadata.listeners = metadata.listeners.flatMap(listener => {
+        if (!record(listener) || typeof listener.proxy !== "string") return [listener];
+        const target = policy(listener.proxy);
+        return target ? [{ ...listener, proxy: target }] : [];
+      });
     }
     base = merge(metadata, base) as Record<string, unknown>;
   }
@@ -140,15 +104,5 @@ export function mergeSourceClashConfigs(generated: Record<string, unknown>, sour
       return listen ? ["udp://" + listen] : Array.isArray(dns.nameserver) ? dns.nameserver : [];
     });
   }
-  if (Object.keys(proxyProviders).length) result["proxy-providers"] = { ...proxyProviders, ...(record(result["proxy-providers"]) ? result["proxy-providers"] : {}) };
-  if (Object.keys(ruleProviders).length) result["rule-providers"] = { ...ruleProviders, ...(record(result["rule-providers"]) ? result["rule-providers"] : {}) };
-  result["proxy-groups"] = [...(Array.isArray(generated["proxy-groups"]) ? generated["proxy-groups"].map(group => {
-    if (!record(group) || group.type !== "select") return group;
-    return { ...group, proxies: [...new Set([...(Array.isArray(group.proxies) ? group.proxies : []), ...sourceEntrypoints])] };
-  }) : []), ...groups];
-  const rules = Array.isArray(generated.rules) ? generated.rules : [];
-  const catchAll = rules.findIndex(rule => typeof rule === "string" && /^(MATCH|FINAL),/.test(rule));
-  const split = catchAll < 0 ? rules.length : catchAll;
-  result.rules = [...new Set([...rules.slice(0, split), ...importedRules, ...rules.slice(split)])];
   return result;
 }

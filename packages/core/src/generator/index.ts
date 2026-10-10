@@ -1,4 +1,4 @@
-import { mergeSourceClashConfigs, type SourceClashConfig } from "./source-configs";
+import { buildSourceProxyProviders, mergeSourceClashConfigs, type SourceClashConfig } from "./source-configs";
 /**
  * Clash 配置生成器 - 浏览器端运行
  */
@@ -202,9 +202,10 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
   };
   const hasExplicitBaseConfigYaml = typeof userConfig.dnsYaml === "string";
 
+  const allProxyProviders = { ...buildSourceProxyProviders(options.sourceConfigs ?? [], nodes), ...proxyProviders };
   const resolvedProxyProviders =
-    proxyProviders && typeof proxyProviders === "object" && Object.keys(proxyProviders).length > 0
-      ? proxyProviders
+    Object.keys(allProxyProviders).length > 0
+      ? allProxyProviders
       : undefined;
   const proxyProviderNames = resolvedProxyProviders
     ? Object.keys(resolvedProxyProviders).map((k) => k.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b))
