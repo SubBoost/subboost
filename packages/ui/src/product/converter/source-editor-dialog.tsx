@@ -86,16 +86,16 @@ export function SourceEditorDialog({
                             <p className="font-medium text-fg">proxy-providers 模式</p>
                           </div>
                           <p className="leading-relaxed text-fg-60">
-                            部分订阅限制 CN IP 导入，url 无法在 SubBoost 内拉取解析。开启后 SubBoost
-                            不再拉取/解析该 url，而是在最终配置中写入{" "}
-                            <span className="font-mono">proxy-providers</span>，交由客户端自行拉取节点。
+                            开启后优先尝试在 SubBoost 导入完整订阅。成功时更新该源的节点和配置；
+                            失败时保留上次成功的数据。只有从未成功导入过的源才交由客户端通过
+                            <span className="font-mono">proxy-providers</span> 拉取。
                           </p>
                           <div className="space-y-1 border-t border-ink/10 pt-2 text-fg-60">
-                            <p className="font-medium text-fg-80">注意开启后：</p>
+                            <p className="font-medium text-fg-80">尚无成功缓存、使用客户端拉取时：</p>
                             <ul className="ml-4 list-disc space-y-1">
                               <li>无法在预览中查看/管理该 url 的节点</li>
                               <li>无法将这些节点用于中转代理组、分流组高级模式等高级功能</li>
-                              <li>节点命名模板与 tag 在该模式下不生效</li>
+                              <li>此模式保留原节点名称，节点命名模板与 tag 不生效</li>
                             </ul>
                           </div>
                           <p className="border-t border-ink/10 pt-2 text-[10px] text-fg-40">

@@ -78,6 +78,8 @@ export function normalizeParseResult(result: ParseResult, priorErrors: string[] 
   );
 
   return {
+    ...(result.sourceConfig ? { sourceConfig: result.sourceConfig } : {}),
+    ...(result.resolvedHosts ? { resolvedHosts: result.resolvedHosts } : {}),
     nodes: deduped.nodes,
     errors,
     totalParsed: deduped.nodes.length,

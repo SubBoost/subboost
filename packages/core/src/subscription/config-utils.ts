@@ -1,3 +1,4 @@
+import { collectSourceConfigs } from "./source-snapshot";
 import type { GenerateOptions } from "@subboost/core/generator";
 import { normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
 import type { DialerProxyGroup } from "@subboost/core/types/template-config";
@@ -352,6 +353,7 @@ export function buildGenerateOptionsFromConfig(
 
   return {
     nodes: sanitizedNodes,
+    ...(collectSourceConfigs(config.sources).length ? { sourceConfigs: collectSourceConfigs(config.sources) } : {}),
     ...(proxyProviders ? { proxyProviders } : {}),
     template,
     userConfig,

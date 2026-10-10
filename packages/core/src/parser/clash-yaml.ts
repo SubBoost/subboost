@@ -246,6 +246,9 @@ export function parseClashYaml(content: string): ParseResult {
       errors,
       totalParsed: nodes.length,
       totalFailed: errors.length,
+      ...(parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        && ["hosts", "dns", "proxy-groups", "proxy-providers", "rules", "rule-providers"].some(key => Object.prototype.hasOwnProperty.call(parsed, key))
+        ? { sourceConfig: structuredClone(parsed as Record<string, unknown>) } : {}),
     };
   } catch (e) {
     return {

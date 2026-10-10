@@ -198,7 +198,7 @@ export function parseSubscriptionContentByRegistry(content: string): ParseResult
       if (parser.name === "link-lines") {
         return buildParseResult(result.nodes, [...accumulatedErrors, ...result.errors]);
       }
-      if (result.nodes.length > 0) return result;
+      if (result.nodes.length > 0 || result.sourceConfig) return result;
       accumulatedErrors.push(...result.errors);
     } catch (error) {
       if (parser.name === "clash-yaml") {

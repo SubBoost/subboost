@@ -1,3 +1,4 @@
+import { createSourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 import { parseSubscription } from "@subboost/core/parser";
 import { stripImportedNodeControlFields } from "@subboost/core/subscription/imported-node-controls";
 import {
@@ -5,7 +6,6 @@ import {
   normalizeNodeOriginName,
 } from "@subboost/core/subscription/node-source-state";
 import {
-  detachSourceNodesFromState,
   type DeletedNodeDescriptor,
   mergeParsedSourceNodes,
   prepareSourceParsedNodes,
@@ -30,6 +30,8 @@ import { normalizeSavedSourcesForPersistence, type SavedSource, type SavedSource
 type UrlNodeFetchResult = {
   ok: boolean;
   nodes: ParsedNode[];
+  sourceConfig?: Record<string, unknown>;
+  resolvedHosts?: Record<string, string[]>;
   errors?: string[];
   headers?: Record<string, string>;
   error?: string;
@@ -57,6 +59,7 @@ export type RefreshNodeSnapshotOptions = {
   config: Record<string, unknown>;
   urls: string[];
   storedNodes: ParsedNode[];
+  resolveHosts?: (config: Record<string, unknown> | undefined) => Promise<Record<string, string[]>>;
   fetchUrlNodes: (source: SavedSource) => Promise<UrlNodeFetchResult>;
   fetchUrlUserInfo?: (source: SavedSource) => Promise<Record<string, string> | undefined>;
 };
@@ -134,13 +137,13 @@ export async function refreshNodeSnapshot(
   const subscriptionInfo: SubscriptionResponseInfo = {};
   const profileWebPageUrlState: StableMetadataState = { conflicted: false };
   const planNameState: StableMetadataState = { conflicted: false };
-  const attemptedUrlFetch = savedSources.some((source) => source.type === "url" && !source.useProxyProviders);
+  const attemptedUrlFetch = savedSources.some((source) => source.type === "url");
   let usedUrlFetch = false;
   let refreshableSourceCount = 0;
   let refreshedSourceCount = 0;
   let refreshedUrlSourceCount = 0;
   let refreshedStaticSourceCount = 0;
-  let detachedSourceCount = 0;
+  const detachedSourceCount = 0;
   let failedSourceCount = 0;
   const failedSources: RefreshNodeSnapshotFailedSource[] = [];
   let renameMap = new Map<string, string>();
@@ -203,45 +206,19 @@ export async function refreshNodeSnapshot(
   };
 
   for (const source of savedSources) {
-    if (source.type === "url" && source.useProxyProviders) {
-      const detached = detachSourceNodesFromState(currentNodes, source.id);
-      if (detached.nodes.length !== currentNodes.length) {
-        detachedSourceCount += 1;
-        refreshedSourceCount += 1;
-      }
-      currentNodes = detached.nodes;
-      if (
-        typeof options.fetchUrlUserInfo === "function" &&
-        shouldFetchSupplementalUserInfoForSource(source)
-      ) {
-        const headers = await options.fetchUrlUserInfo(source);
-        if (headers) {
-          mergeResponseMetadata(headers);
-          const header = headers["subscription-userinfo"];
-          mergeSourceSubscriptionInfo(
-            source.id,
-            header ? resolveSubscriptionUserInfo(parseSubscriptionUserInfo(header)) : undefined
-          );
-        }
-      }
-      continue;
-    }
-
     refreshableSourceCount += 1;
 
     if (source.type === "url") {
-      const fetched = await options.fetchUrlNodes(source);
-      mergeResponseMetadata(fetched.headers);
+      let fetched: UrlNodeFetchResult;
+      try { fetched = await options.fetchUrlNodes(source); }
+      catch (error) { fetched = { ok: false, nodes: [], error: error instanceof Error ? error.message : "获取失败" }; }
+      fetched ??= { ok: false, nodes: [], error: "获取失败" };
       const userInfoHeader = fetched.headers?.["subscription-userinfo"];
       const rawUserInfo = userInfoHeader ? parseSubscriptionUserInfo(userInfoHeader) : undefined;
       const resolvedUserInfo = resolveSubscriptionUserInfo(
         rawUserInfo,
         fetched.ok ? fetched.nodes : []
       );
-      if (hasSubscriptionUserInfo(resolvedUserInfo)) {
-        mergeSubscriptionUserInfo(subscriptionInfo, resolvedUserInfo);
-      }
-
       if (!fetched.ok || fetched.nodes.length === 0) {
         const errorInfo = fetched.errorInfo ?? null;
         const firstParseError =
@@ -261,16 +238,21 @@ export async function refreshNodeSnapshot(
         });
         continue;
       }
+      mergeResponseMetadata(fetched.headers);
+      if (hasSubscriptionUserInfo(resolvedUserInfo)) mergeSubscriptionUserInfo(subscriptionInfo, resolvedUserInfo);
       updateSourceSubscriptionInfo(source.id, resolvedUserInfo);
+      const resolvedHosts = fetched.resolvedHosts ?? await options.resolveHosts?.(fetched.sourceConfig);
+      refreshedSavedSources = refreshedSavedSources.map(item => item.id === source.id
+        ? { ...item, sourceSnapshot: createSourceSnapshot(fetched.nodes, fetched.sourceConfig, fetched.headers, resolvedHosts, source.sourceSnapshot) } : item);
 
       const parsedNodes = prepareSourceParsedNodes(fetched.nodes, {
-        currentTag: source.tag,
-        currentNameTemplate: source.nameTemplate,
+        currentTag: source.useProxyProviders ? undefined : source.tag,
+        currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate,
       });
       const merged = mergeParsedSourceNodes(currentNodes, parsedNodes, deletedNodeNames, {
         sourceId: source.id,
-        currentTag: source.tag,
-        currentNameTemplate: source.nameTemplate,
+        currentTag: source.useProxyProviders ? undefined : source.tag,
+        currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate,
         lastTag: source.lastParsedTag,
         lastNameTemplate: source.lastParsedNameTemplate,
         treatAsNewSource: Boolean(
@@ -301,15 +283,18 @@ export async function refreshNodeSnapshot(
         continue;
       }
       updateSourceSubscriptionInfo(source.id, resolvedUserInfo);
+      const resolvedHosts = await options.resolveHosts?.(parsed.sourceConfig);
+      refreshedSavedSources = refreshedSavedSources.map(item => item.id === source.id
+        ? { ...item, sourceSnapshot: createSourceSnapshot(parsed.nodes, parsed.sourceConfig, undefined, resolvedHosts) } : item);
 
       const parsedNodes = prepareSourceParsedNodes(parsed.nodes, {
-        currentTag: source.tag,
-        currentNameTemplate: source.nameTemplate,
+        currentTag: source.useProxyProviders ? undefined : source.tag,
+        currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate,
       });
       const merged = mergeParsedSourceNodes(currentNodes, parsedNodes, deletedNodeNames, {
         sourceId: source.id,
-        currentTag: source.tag,
-        currentNameTemplate: source.nameTemplate,
+        currentTag: source.useProxyProviders ? undefined : source.tag,
+        currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate,
         lastTag: source.lastParsedTag,
         lastNameTemplate: source.lastParsedNameTemplate,
         treatAsNewSource: false,
@@ -347,6 +332,35 @@ export async function refreshNodeSnapshot(
         source.id,
         header ? resolveSubscriptionUserInfo(parseSubscriptionUserInfo(header)) : undefined
       );
+    }
+  }
+
+  // A failed source retains its successful data and response metadata.
+  for (let index = 0; index < refreshedSavedSources.length; index++) {
+    const source = refreshedSavedSources[index];
+    if (!failedSources.some(failed => failed.id === source.id)) continue;
+    if (source.subscriptionUserInfo) mergeSubscriptionUserInfo(subscriptionInfo, source.subscriptionUserInfo);
+    mergeResponseMetadata(source.sourceSnapshot?.headers);
+    // A closed upstream retains the original successful response. Its hostname
+    // aliases still follow normal DNS changes, independently of subscription fetch.
+    if (source.sourceSnapshot && options.resolveHosts) {
+      const addresses = await options.resolveHosts(source.sourceSnapshot.config).catch(() => ({}));
+      refreshedSavedSources[index] = {
+        ...source,
+        sourceSnapshot: createSourceSnapshot(source.sourceSnapshot.nodes, source.sourceSnapshot.config,
+          source.sourceSnapshot.headers, addresses, source.sourceSnapshot),
+      };
+    }
+    if (source.sourceSnapshot && !currentNodes.some(node => {
+      const ids = (node as unknown as Record<string, unknown>)._sourceIds;
+      return Array.isArray(ids) && ids.includes(source.id);
+    })) {
+      const prepared = prepareSourceParsedNodes(source.sourceSnapshot.nodes, { currentTag: source.useProxyProviders ? undefined : source.tag, currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate });
+      currentNodes = mergeParsedSourceNodes(currentNodes, prepared, deletedNodeNames, {
+        sourceId: source.id, currentTag: source.useProxyProviders ? undefined : source.tag, currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate,
+        lastTag: source.lastParsedTag, lastNameTemplate: source.lastParsedNameTemplate,
+        treatAsNewSource: false, deletedNodes,
+      }).nodes;
     }
   }
 

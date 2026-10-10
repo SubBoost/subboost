@@ -396,6 +396,8 @@ export type ParsedNode =
   | (BaseNode & { type: UnknownNodeType });
 
 export interface ParseResult {
+  sourceConfig?: Record<string, unknown>;
+  resolvedHosts?: Record<string, string[]>;
   nodes: ParsedNode[];
   errors: string[];
   totalParsed: number;

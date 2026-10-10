@@ -1,3 +1,4 @@
+import { normalizeSourceSnapshot } from "./source-snapshot";
 import { tryNormalizeSubscriptionUrlInput } from "@subboost/core/subscription/url-input";
 
 /**
@@ -23,7 +24,7 @@ export function buildProxyProvidersFromConfig(
     if (!raw || typeof raw !== "object") continue;
     const item = raw as Record<string, unknown>;
     if (item.type !== "url") continue;
-    if (item.useProxyProviders !== true) continue;
+    if (item.useProxyProviders !== true || normalizeSourceSnapshot(item.sourceSnapshot)) continue;
 
     const url =
       typeof item.content === "string"

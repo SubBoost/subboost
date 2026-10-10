@@ -1,4 +1,5 @@
 import type { ConfigState, SourceType, SubscriptionSource } from "./definitions";
+import { normalizeSourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 import { initialState } from "./definitions";
 import { safeParseJsonObject } from "@subboost/core/json";
 import { normalizeNodeNameFilterConfig } from "@subboost/core/subscription/node-name-filter";
@@ -63,6 +64,7 @@ function sourceArray(value: unknown): SubscriptionSource[] | undefined {
       id: item.id,
       type: item.type,
       content: item.content,
+      ...(normalizeSourceSnapshot(item.sourceSnapshot) ? { sourceSnapshot: normalizeSourceSnapshot(item.sourceSnapshot) } : {}),
       ...(typeof item.name === "string" ? { name: item.name } : {}),
       ...(typeof item.lastParsedContent === "string" ? { lastParsedContent: item.lastParsedContent } : {}),
       ...(typeof item.lastParsedTag === "string" ? { lastParsedTag: item.lastParsedTag } : {}),

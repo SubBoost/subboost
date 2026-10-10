@@ -5,12 +5,15 @@ import {
   type SubscriptionUserInfo,
 } from "@subboost/core/subscription/subscription-userinfo";
 
+import { normalizeSourceSnapshot, type SourceSnapshot } from "@subboost/core/subscription/source-snapshot";
+
 export type SavedSourceType = "url" | "yaml" | "nodes";
 
 export type SavedSource = {
   id: string;
   type: SavedSourceType;
   content: string;
+  sourceSnapshot?: SourceSnapshot;
   useProxyProviders?: boolean;
   userinfoUrl?: string;
   userinfoUserAgent?: string;
@@ -80,6 +83,7 @@ export function normalizeSavedSourcesForPersistence(
     const userinfoUrl = toTrimmedString(record.userinfoUrl);
     const userinfoUserAgent = toTrimmedString(record.userinfoUserAgent);
     const subscriptionUserInfo = normalizeSavedSourceUserInfo(record.subscriptionUserInfo);
+    const sourceSnapshot = normalizeSourceSnapshot(record.sourceSnapshot);
     const tag = toTrimmedString(record.tag);
     const nameTemplate = toTrimmedString(record.nameTemplate);
     const lastParsedContent = toTrimmedString(record.lastParsedContent);
@@ -94,6 +98,7 @@ export function normalizeSavedSourcesForPersistence(
       ...(type === "url" && userinfoUrl ? { userinfoUrl: normalizeUrlContent(userinfoUrl) } : {}),
       ...(type === "url" && userinfoUserAgent ? { userinfoUserAgent } : {}),
       ...(subscriptionUserInfo ? { subscriptionUserInfo } : {}),
+      ...(sourceSnapshot ? { sourceSnapshot } : {}),
       ...(tag ? { tag } : {}),
       ...(nameTemplate ? { nameTemplate } : {}),
       ...(lastParsedContent

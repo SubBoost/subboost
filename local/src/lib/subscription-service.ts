@@ -1,3 +1,4 @@
+import { resolveSourceHosts } from "@subboost/server-core/subscription/source-hosts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { generateClashYaml } from "@subboost/core/generator";
 import { buildGenerateOptionsFromConfig, getEffectiveTestOptions } from "@subboost/core/subscription/config-utils";
@@ -313,6 +314,7 @@ export async function deleteSubscription(ownerId: string, id: string): Promise<b
 
 export function buildSubscriptionFetchCallbacks() {
   return {
+    resolveHosts: resolveSourceHosts,
     fetchUrlNodes: async (source: SavedSource) => {
       const imported = await importSourceUrlDirect({
         url: source.content,
@@ -323,6 +325,8 @@ export function buildSubscriptionFetchCallbacks() {
         return {
           ok: true,
           nodes: imported.parsedNodes,
+          ...(imported.sourceConfig ? { sourceConfig: imported.sourceConfig } : {}),
+          ...(imported.resolvedHosts ? { resolvedHosts: imported.resolvedHosts } : {}),
           errors: imported.parseErrors,
           headers: imported.headers,
         };

@@ -1,3 +1,4 @@
+import { resolveSourceHosts } from "@subboost/server-core/subscription/source-hosts";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import {
@@ -244,11 +245,15 @@ async function fetchTextDirect(
 
 export async function importSourceUrlDirect(request: SourceImportRequest): Promise<SourceImportResult> {
   const allowUnsafeSubscriptionSources = await getAllowUnsafeSubscriptionSources();
-  return importSubscriptionFromUrl(request, {
+  const result = await importSubscriptionFromUrl(request, {
     timeoutMs: DEFAULT_TIMEOUT_MS,
     maxBytes: DEFAULT_MAX_BYTES,
     fetchText: (transportRequest) => fetchTextDirect(transportRequest, allowUnsafeSubscriptionSources),
   });
+  if (result.ok && result.sourceConfig?.hosts) {
+    return { ...result, resolvedHosts: await resolveSourceHosts(result.sourceConfig) };
+  }
+  return result;
 }
 
 export async function fetchSourceUserInfoHeadersDirect(source: {

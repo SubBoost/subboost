@@ -1,4 +1,5 @@
 "use client";
+import { normalizeSourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 
 import * as React from "react";
 import { toast, ToastAction } from "@subboost/ui/components/ui/toaster";
@@ -362,6 +363,7 @@ export function useSubscriptionLink({
                   ...(typeof s.lastParsedTag === "string" && s.lastParsedTag.trim()
                     ? { lastParsedTag: s.lastParsedTag.trim() }
                     : {}),
+                  ...(normalizeSourceSnapshot(s.sourceSnapshot) ? { sourceSnapshot: normalizeSourceSnapshot(s.sourceSnapshot) } : {}),
                   ...(typeof s.lastParsedNameTemplate === "string" && s.lastParsedNameTemplate.trim()
                     ? { lastParsedNameTemplate: s.lastParsedNameTemplate.trim() }
                     : {}),

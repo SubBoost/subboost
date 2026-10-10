@@ -1,8 +1,8 @@
+import { createSourceSnapshot, type SourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 import type { ParsedNode, ParseResult } from "@subboost/core/types/node";
 import { parseSubscription } from "@subboost/core/parser";
 import { buildNodeContentKey, buildScopedNodeIdentityKey } from "@subboost/core/node-identity";
 import {
-  detachSourceNodesFromState,
   mergeParsedSourceNodes,
   prepareSourceParsedNodes,
 } from "@subboost/core/subscription/source-node-refresh";
@@ -47,6 +47,13 @@ function pickUrlFetchParseResult(fetched: Awaited<ReturnType<typeof fetchUrlCont
 }
 
 const DEFAULT_PARSE_FAILURE_MESSAGE = "解析失败";
+
+function validateSourceUrl(content: string): void {
+  const normalized = tryNormalizeSubscriptionUrlInput(content);
+  if (!normalized) throw new Error("无效的 url 格式");
+  if (!["http:", "https:"].includes(new URL(normalized).protocol)) throw new Error("只支持 HTTP/HTTPS url");
+}
+
 
 function toSubscriptionImportErrorInfo(
   error: unknown,
@@ -155,7 +162,8 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
 
       try {
         const result: ParseResult = parseSubscription(content);
-        const sanitizedNodes = stripImportedNodeControlFieldsFromList(result.nodes);
+        const pastedSourceId = result.sourceConfig ? `source-yaml-${globalThis.crypto.randomUUID()}` : undefined;
+        const sanitizedNodes = stripImportedNodeControlFieldsFromList(result.nodes).map(node => pastedSourceId ? withNodeSourceId(node, pastedSourceId) : node);
 
         setAndGenerateConfig((state) => {
           const normalizeOriginName = (node: ParsedNode): ParsedNode => {
@@ -183,6 +191,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
 
           return {
             nodes: [...existingNormalized, ...uniqueNewNodes],
+            ...(pastedSourceId ? { sources: [...state.sources, { id: pastedSourceId, type: "yaml" as const, content, parsed: true, nodeCount: result.nodes.length, sourceSnapshot: createSourceSnapshot(result.nodes, result.sourceConfig) }] } : {}),
             parseErrors: result.errors,
             isLoading: false,
           };
@@ -211,8 +220,8 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
       const treatAsNewSource =
         source.type === "url" && Boolean(lastParsedContent) && lastParsedContent !== currentSourceContent;
 
-      const currentTag = typeof source.tag === "string" ? source.tag.trim() : "";
-      const currentNameTemplate = typeof source.nameTemplate === "string" ? source.nameTemplate.trim() : "";
+      const currentTag = !source.useProxyProviders && typeof source.tag === "string" ? source.tag.trim() : "";
+      const currentNameTemplate = !source.useProxyProviders && typeof source.nameTemplate === "string" ? source.nameTemplate.trim() : "";
       const lastTag = typeof source.lastParsedTag === "string" ? source.lastParsedTag.trim() : "";
       const lastNameTemplate = typeof source.lastParsedNameTemplate === "string" ? source.lastParsedNameTemplate.trim() : "";
 
@@ -228,70 +237,17 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
         let contentToParse = source.content;
         let subscriptionUserInfo: SubscriptionUserInfo | undefined;
         let prefetchedParseResult: ParseResult | null = null;
-
-        // URL 源的 proxy-providers 模式：不拉取/解析节点，仅标记为已导入并移除该源原节点
-        if (source.type === "url" && source.useProxyProviders) {
-          const rawUrl = source.content.trim();
-          const normalizedUrl = tryNormalizeSubscriptionUrlInput(rawUrl);
-          if (!normalizedUrl) {
-            throw new Error("无效的 url 格式");
-          }
-          const parsed = new URL(normalizedUrl);
-          if (!["http:", "https:"].includes(parsed.protocol)) {
-            throw new Error("只支持 HTTP/HTTPS url");
-          }
-
-          if (discardStaleSingle(operation)) return;
-
-          setAndGenerateConfig((state) => {
-            const baseNodes = detachSourceNodesFromState(state.nodes, sourceId).nodes;
-
-            const availableNames = new Set(baseNodes.map((n) => n.name));
-            const nextListenerPorts: Record<string, number> = {};
-            for (const [name, port] of Object.entries(state.listenerPorts)) {
-              if (!availableNames.has(name)) continue;
-              if (typeof port !== "number" || !Number.isInteger(port)) continue;
-              nextListenerPorts[name] = port;
-            }
-
-            const nextDialerProxyGroups = filterDialerProxyGroupsByAvailableNames(
-              state.dialerProxyGroups, availableNames, state
-            );
-
-            return {
-              nodes: baseNodes,
-              listenerPorts: nextListenerPorts,
-              dialerProxyGroups: nextDialerProxyGroups,
-              sources: state.sources.map((s) =>
-                s.id === sourceId
-                  ? {
-                      ...s,
-                      parsing: false,
-                      parsed: true,
-                      nodeCount: undefined,
-                      subscriptionUserInfo: undefined,
-                      error: undefined,
-                      errorInfo: undefined,
-                      lastParsedContent: normalizedUrl,
-                      lastParsedTag: currentTag || undefined,
-                      lastParsedNameTemplate: currentNameTemplate || undefined,
-                    }
-                  : s
-              ),
-              parseErrors: [],
-            };
-          });
-          importOperations.finishSingle(operation);
-          return;
-        }
+        let responseHeaders: Record<string, string> | undefined;
 
         // 如果是 url，需要先获取内容
         if (source.type === "url") {
+          if (source.useProxyProviders) validateSourceUrl(source.content);
           const fetched = await fetchUrlContentInBrowser(source.content, {
             userinfoUrl: source.userinfoUrl,
             userinfoUserAgent: source.userinfoUserAgent,
           });
           contentToParse = fetched.content;
+              responseHeaders = fetched.headers;
           prefetchedParseResult = pickUrlFetchParseResult(fetched);
           const header = fetched.headers["subscription-userinfo"];
           if (typeof header === "string" && header.trim()) {
@@ -358,6 +314,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
                     parsing: false,
                     parsed: true,
                     nodeCount: result.nodes.length,
+                    sourceSnapshot: createSourceSnapshot(result.nodes, result.sourceConfig, responseHeaders, result.resolvedHosts, source.sourceSnapshot),
                     subscriptionUserInfo: hasSubscriptionUserInfo(resolvedSubscriptionUserInfo)
                       ? resolvedSubscriptionUserInfo
                       : undefined,
@@ -425,6 +382,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
         string,
         {
           parsed: boolean;
+          sourceSnapshot?: SourceSnapshot;
           nodeCount?: number;
           subscriptionUserInfo?: SubscriptionUserInfo;
           error?: string;
@@ -442,47 +400,18 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           let contentToParse = source.content;
           let subscriptionUserInfo: SubscriptionUserInfo | undefined;
           let prefetchedParseResult: ParseResult | null = null;
-
-          // URL 源的 proxy-providers 模式：不拉取/解析节点，仅更新导入状态（节点由客户端拉取）
-          if (source.type === "url" && source.useProxyProviders) {
-            const rawUrl = source.content.trim();
-            try {
-              const normalizedUrl = tryNormalizeSubscriptionUrlInput(rawUrl);
-              if (!normalizedUrl) {
-                throw new Error("无效的 url 格式");
-              }
-              const parsed = new URL(normalizedUrl);
-              if (!["http:", "https:"].includes(parsed.protocol)) {
-                throw new Error("只支持 HTTP/HTTPS url");
-              }
-            } catch (error) {
-              const baseMessage = error instanceof Error ? error.message : "无效的 url 格式";
-              const message = `${baseMessage}`;
-              const safeUrl = maskUrlForPublicDisplay(rawUrl);
-              allErrors.push(sanitizePublicErrorText(`url ${safeUrl} 解析失败: ${message}`));
-              sourceMeta.set(source.id, { parsed: false, error: message });
-              continue;
-            }
-
-            const currentTag = typeof source.tag === "string" ? source.tag.trim() : "";
-            const currentNameTemplate = typeof source.nameTemplate === "string" ? source.nameTemplate.trim() : "";
-            sourceMeta.set(source.id, {
-              parsed: true,
-              lastParsedContent: tryNormalizeSubscriptionUrlInput(rawUrl) ?? rawUrl,
-              lastParsedTag: currentTag || undefined,
-              lastParsedNameTemplate: currentNameTemplate || undefined,
-            });
-            continue;
-          }
+          let responseHeaders: Record<string, string> | undefined;
 
           // 如果是 url，需要先获取内容
           if (source.type === "url") {
             try {
+              if (source.useProxyProviders) validateSourceUrl(source.content);
               const fetched = await fetchUrlContentInBrowser(source.content, {
                 userinfoUrl: source.userinfoUrl,
                 userinfoUserAgent: source.userinfoUserAgent,
               });
               contentToParse = fetched.content;
+              responseHeaders = fetched.headers;
               prefetchedParseResult = pickUrlFetchParseResult(fetched);
               const header = fetched.headers["subscription-userinfo"];
               if (typeof header === "string" && header.trim()) {
@@ -519,9 +448,10 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
 
           // 解析内容
           const result = prefetchedParseResult ?? parseSubscription(contentToParse);
+          if (result.nodes.length === 0) throw new Error(result.errors[0] ?? "未解析到有效节点");
           const resolvedSubscriptionUserInfo = resolveSubscriptionUserInfo(subscriptionUserInfo, result.nodes);
-          const currentTag = typeof source.tag === "string" ? source.tag.trim() : "";
-          const currentNameTemplate = typeof source.nameTemplate === "string" ? source.nameTemplate.trim() : "";
+          const currentTag = !source.useProxyProviders && typeof source.tag === "string" ? source.tag.trim() : "";
+          const currentNameTemplate = !source.useProxyProviders && typeof source.nameTemplate === "string" ? source.nameTemplate.trim() : "";
           allNodes.push(
             ...prepareSourceParsedNodes(result.nodes, {
               currentTag,
@@ -540,6 +470,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           sourceMeta.set(source.id, {
             parsed: true,
             nodeCount: result.nodes.length,
+            sourceSnapshot: createSourceSnapshot(result.nodes, result.sourceConfig, responseHeaders, result.resolvedHosts, source.sourceSnapshot),
             subscriptionUserInfo: hasSubscriptionUserInfo(resolvedSubscriptionUserInfo)
               ? resolvedSubscriptionUserInfo
               : undefined,
@@ -570,6 +501,19 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
             errorInfo: info,
           });
         }
+      }
+
+      for (const source of sources) {
+        if (sourceMeta.get(source.id)?.parsed || !source.sourceSnapshot) continue;
+        if (get().nodes.some(node => getNodeSourceIds(node).includes(source.id))) continue;
+        allNodes.push(...prepareSourceParsedNodes(source.sourceSnapshot.nodes, { currentTag: source.useProxyProviders ? undefined : source.tag, currentNameTemplate: source.useProxyProviders ? undefined : source.nameTemplate }).map(node => withNodeSourceId(node, source.id)));
+      }
+      const retainedSourceIds = new Set(sources.filter(source => !sourceMeta.get(source.id)?.parsed).map(source => source.id));
+      for (const node of get().nodes) {
+        const ids = getNodeSourceIds(node);
+        const retained = ids.filter(id => retainedSourceIds.has(id));
+        if (retained.length) allNodes.push(mergeNodeSourceIds(node, new Set(retained)));
+        else if (!ids.length) allNodes.push(node);
       }
 
       // 去重节点（基于 originName + 节点内容）
@@ -673,7 +617,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
               parsed: meta.parsed,
               parsing: false,
               ...(typeof meta.nodeCount === "number" ? { nodeCount: meta.nodeCount } : {}),
-              ...(meta.subscriptionUserInfo ? { subscriptionUserInfo: meta.subscriptionUserInfo } : { subscriptionUserInfo: undefined }),
+              ...(meta.parsed ? { subscriptionUserInfo: meta.subscriptionUserInfo, sourceSnapshot: meta.sourceSnapshot } : {}),
               ...(meta.error ? { error: meta.error } : { error: undefined }),
               ...(meta.errorInfo ? { errorInfo: meta.errorInfo } : { errorInfo: undefined }),
               ...(typeof meta.lastParsedContent === "string" && meta.lastParsedContent.trim()

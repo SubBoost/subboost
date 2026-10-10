@@ -1,4 +1,5 @@
 export const SUBSCRIPTION_IMPORT_USER_AGENTS = [
+  "clash.meta",
   "v2rayN/7.20.4",
   "mihomo/1.19.24",
   "clash-verge/v2.5.2",

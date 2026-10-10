@@ -47,7 +47,7 @@ export function prepareRefreshCacheResult(params: {
   const { testUrl, testInterval } = getEffectiveTestOptions(params.config);
   const proxyProviders =
     params.proxyProviders ??
-    buildProxyProvidersFromConfig(params.config, {
+    buildProxyProvidersFromConfig({ ...params.config, sources: params.snapshot.savedSources }, {
       testUrl,
       testInterval,
     });
@@ -63,7 +63,7 @@ export function prepareRefreshCacheResult(params: {
     params.config.nodeNameFilter
   );
 
-  if (params.snapshot.refreshableSourceCount > 0 && params.snapshot.refreshedSourceCount === 0) {
+  if (params.snapshot.refreshableSourceCount > 0 && params.snapshot.refreshedSourceCount === 0 && params.snapshot.nodes.length === 0 && !hasProxyProviders) {
     return {
       ok: false,
       reason: "all_sources_failed",

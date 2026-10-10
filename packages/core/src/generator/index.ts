@@ -1,3 +1,4 @@
+import { mergeSourceClashConfigs, type SourceClashConfig } from "./source-configs";
 /**
  * Clash 配置生成器 - 浏览器端运行
  */
@@ -40,6 +41,7 @@ import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-t
 import { resolveGroupListenerEntries, type GroupListenerTargetResolution } from "./group-listeners";
 
 export interface GenerateOptions {
+  sourceConfigs?: SourceClashConfig[];
   nodes: ParsedNode[];
   proxyProviders?: Record<string, unknown>;
   template?: TemplateType;
@@ -590,7 +592,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     }),
   };
 
-  return clashConfig as unknown as ClashConfig;
+  return mergeSourceClashConfigs(clashConfig, options.sourceConfigs ?? [], uniqueNodes) as unknown as ClashConfig;
 }
 
 /**

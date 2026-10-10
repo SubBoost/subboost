@@ -84,10 +84,8 @@ export function resolveAutomaticRefreshFailureAnalysis(params: {
   snapshot: RefreshNodeSnapshotResult;
   failedAt: Date;
 }): AutomaticRefreshFailureAnalysis {
-  const refreshableSources = params.snapshot.savedSources.filter(
-    (source) => !(source.type === "url" && source.useProxyProviders === true)
-  );
-  const failureState =
+  const refreshableSources = params.snapshot.savedSources;
+  let failureState =
     params.snapshot.failedSourceCount > 0
       ? updateAutoUpdateFailureSourceState({
           previousStateRaw: params.currentState.failureSourceState,
@@ -96,6 +94,11 @@ export function resolveAutomaticRefreshFailureAnalysis(params: {
           failedAt: params.failedAt,
         })
       : null;
+  // Cached output stays usable while upstream sources recover. A failed source
+  // must not stop successful sources from being refreshed on the next cycle.
+  if (failureState && params.snapshot.nodes.length > 0) {
+    failureState = { ...failureState, shouldDisableAutoUpdate: false };
+  }
   const failureReason =
     failureState?.disableSource?.reason ??
     failureState?.stableFailedSources[0]?.reason ??

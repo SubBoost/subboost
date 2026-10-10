@@ -46,6 +46,8 @@ export type SourceImportSuccess = {
   content: string;
   headers: Record<string, string>;
   parsedNodes: ParsedNode[];
+  sourceConfig?: Record<string, unknown>;
+  resolvedHosts?: Record<string, string[]>;
   parseErrors: string[];
   diagnostics?: SubscriptionSnapshotComparison[];
 };
@@ -61,7 +63,7 @@ export type SourceImportFailure = {
 export type SourceImportResult = SourceImportSuccess | SourceImportFailure;
 
 export function buildSourceImportParseResult(
-  result: Pick<SourceImportSuccess, "parsedNodes" | "parseErrors">
+  result: Pick<SourceImportSuccess, "parsedNodes" | "parseErrors" | "sourceConfig" | "resolvedHosts">
 ): ParseResult {
   const nodes = result.parsedNodes;
   const errors = result.parseErrors;
@@ -70,6 +72,8 @@ export function buildSourceImportParseResult(
     errors,
     totalParsed: nodes.length,
     totalFailed: errors.length,
+    ...(result.sourceConfig ? { sourceConfig: result.sourceConfig } : {}),
+    ...(result.resolvedHosts ? { resolvedHosts: result.resolvedHosts } : {}),
   };
 }
 
@@ -264,6 +268,7 @@ export async function importSubscriptionFromUrl(
   const budget = createSubscriptionRequestBudget(timeoutMs);
   const diagnostics: SubscriptionSnapshotComparison[] = [];
   let best: ParsedAttempt | null = null;
+  const sourceConfigs: Record<string, unknown>[] = [];
 
   for (let index = 0; index < userAgents.length; index += 1) {
     const userAgent = userAgents[index];
@@ -274,6 +279,7 @@ export async function importSubscriptionFromUrl(
       maxBytes,
       fetchText: options.fetchText,
     });
+    if (attempt.ok && isUsableParsedAttempt(attempt) && attempt.parsed.sourceConfig) sourceConfigs.push(attempt.parsed.sourceConfig);
     best = pickBetterAttempt(best, attempt, diagnostics);
   }
 
@@ -287,11 +293,27 @@ export async function importSubscriptionFromUrl(
     fetchText: options.fetchText,
   }, url).catch(() => ({}));
 
+  // Profile negotiation may choose richer nodes from a URI-only response. Keep
+  // metadata obtained from a valid YAML response instead of dropping its hosts,
+  // DNS and other sections merely because the winning format has no such fields.
+  const mergeConfig = (left: Record<string, unknown>, right: Record<string, unknown>): Record<string, unknown> => {
+    const merged = structuredClone(left);
+    for (const [key, value] of Object.entries(right)) {
+      const old = merged[key];
+      merged[key] = old && value && typeof old === "object" && typeof value === "object" && !Array.isArray(old) && !Array.isArray(value)
+        ? mergeConfig(old as Record<string, unknown>, value as Record<string, unknown>) : structuredClone(value);
+    }
+    return merged;
+  };
+  let sourceConfig = sourceConfigs.reduce((config, next) => mergeConfig(next, config), {});
+  if (best.parsed.sourceConfig) sourceConfig = mergeConfig(sourceConfig, best.parsed.sourceConfig);
+
   return {
     ok: true,
     content: best.content,
     headers: { ...best.headers, ...supplementalHeaders },
     parsedNodes: best.parsed.nodes,
+    ...(Object.keys(sourceConfig).length ? { sourceConfig } : {}),
     parseErrors: best.parsed.errors,
     diagnostics,
   };

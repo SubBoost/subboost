@@ -1,4 +1,5 @@
 "use client";
+import { normalizeSourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 
 import * as React from "react";
 import type { SubscriptionSource } from "@subboost/ui/store/config-store";
@@ -195,6 +196,7 @@ export function useEditingSubscriptionLoader({
                 tag: typeof tag === "string" && tag.trim() ? tag.trim() : undefined,
                 nameTemplate: typeof nameTemplate === "string" && nameTemplate.trim() ? nameTemplate.trim() : undefined,
                 subscriptionUserInfo: hasSubscriptionUserInfo(subscriptionUserInfo) ? subscriptionUserInfo : undefined,
+                sourceSnapshot: normalizeSourceSnapshot((item as Record<string, unknown>).sourceSnapshot),
                 useProxyProviders: t === "url" && useProxyProviders === true ? true : undefined,
                 userinfoUrl: normalizedUserinfoUrl,
                 userinfoUserAgent:
@@ -216,6 +218,7 @@ export function useEditingSubscriptionLoader({
               tag?: string;
               nameTemplate?: string;
               subscriptionUserInfo?: SubscriptionUserInfo;
+              sourceSnapshot?: unknown;
               useProxyProviders?: boolean;
               userinfoUrl?: string;
               userinfoUserAgent?: string;
@@ -281,6 +284,7 @@ export function useEditingSubscriptionLoader({
               ...(lastParsedContent ? { lastParsedContent } : {}),
               ...(typeof s.tag === "string" && s.tag.trim() ? { tag: s.tag.trim() } : {}),
               ...(typeof s.nameTemplate === "string" && s.nameTemplate.trim() ? { nameTemplate: s.nameTemplate.trim() } : {}),
+              ...(normalizeSourceSnapshot((s as unknown as Record<string, unknown>).sourceSnapshot) ? { sourceSnapshot: normalizeSourceSnapshot((s as unknown as Record<string, unknown>).sourceSnapshot) } : {}),
               ...(hasSubscriptionUserInfo(s.subscriptionUserInfo) ? { subscriptionUserInfo: s.subscriptionUserInfo } : {}),
               ...(s.type === "url" && s.useProxyProviders ? { useProxyProviders: true } : {}),
               ...(s.type === "url" && typeof s.userinfoUrl === "string" && s.userinfoUrl.trim()

@@ -60,7 +60,10 @@ export const PRESET_RELAY_NAMES = [
 // 订阅源类型
 export type SourceType = "url" | "yaml" | "nodes";
 
+import type { SourceSnapshot } from "@subboost/core/subscription/source-snapshot";
+
 export interface SubscriptionSource {
+  sourceSnapshot?: SourceSnapshot;
   id: string;
   type: SourceType;
   content: string;
@@ -153,6 +156,8 @@ export async function fetchUrlContentInBrowser(
             errors: parseErrors,
             totalParsed: parsedNodes.length,
             totalFailed: parseErrors.length,
+            ...(data.parseResult?.sourceConfig ? { sourceConfig: data.parseResult.sourceConfig } : {}),
+            ...(data.parseResult?.resolvedHosts ? { resolvedHosts: data.parseResult.resolvedHosts } : {}),
           }
         : undefined,
     };

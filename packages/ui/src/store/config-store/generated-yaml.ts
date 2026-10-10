@@ -1,3 +1,4 @@
+import { collectSourceConfigs, normalizeSourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 import { generateClashYaml } from "@subboost/core/generator";
 import { stripImportedNodeControlFieldsFromList } from "@subboost/core/subscription/imported-node-controls";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
@@ -10,7 +11,7 @@ function buildProxyProvidersFromSources(
   const out: Record<string, unknown> = {};
 
   for (const source of state.sources) {
-    if (!source || source.type !== "url" || !source.useProxyProviders) continue;
+    if (!source || source.type !== "url" || !source.useProxyProviders || normalizeSourceSnapshot(source.sourceSnapshot)) continue;
     const url = typeof source.content === "string" ? source.content.trim() : "";
     if (!url) continue;
 
@@ -57,6 +58,7 @@ function buildGenerateClashYamlOptions(
 ): GenerateClashYamlOptions {
   return {
     nodes: stripImportedNodeControlFieldsFromList(effectiveNodes),
+    ...(collectSourceConfigs(state.sources).length ? { sourceConfigs: collectSourceConfigs(state.sources) } : {}),
     proxyProviders,
     template: state.template,
     userConfig: {
