@@ -3,6 +3,7 @@ import { isSubscriptionInfoNodeName } from "@subboost/core/subscription/info-nod
 import { stableJsonStringify } from "@subboost/core/node-identity";
 import { isMihomoSupportedProxyNode, sanitizeMihomoProxyNode } from "@subboost/core/mihomo/proxy-sanitizer";
 import { looksLikeClientUpdatePlaceholderNodes } from "@subboost/core/parser/placeholder";
+import { hasUsableSourceConfig } from "@subboost/core/subscription/source-snapshot";
 
 export type SnapshotRelation = "equivalent" | "next-superset" | "current-superset" | "divergent" | "field-conflict";
 export type SubscriptionSnapshotComparison = {
@@ -86,8 +87,9 @@ function covers(left: Snapshot, right: Snapshot): boolean {
   return true;
 }
 
-export function hasUsableSubscriptionSnapshot(parsed: Pick<ParseResult, "nodes" | "errors">): boolean {
-  return !looksLikeClientUpdatePlaceholderNodes(parsed.nodes) && parsed.nodes.some((node) => nodeFields(node) !== null);
+export function hasUsableSubscriptionSnapshot(parsed: Pick<ParseResult, "nodes" | "errors" | "sourceConfig">): boolean {
+  return !looksLikeClientUpdatePlaceholderNodes(parsed.nodes)
+    && (parsed.nodes.some((node) => nodeFields(node) !== null) || hasUsableSourceConfig(parsed.sourceConfig));
 }
 
 export function compareSubscriptionSnapshots(

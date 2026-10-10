@@ -99,6 +99,10 @@ export function mergeSourceClashConfigs(generated: Record<string, unknown>, sour
       dnsSelfAddresses.add("udp://" + listener);
     }
     const metadata = Object.fromEntries(Object.entries(config).filter(([key]) => !["proxies", "proxy-groups", "rules", "proxy-providers", "rule-providers"].includes(key)));
+    if (Array.isArray(metadata.listeners)) {
+      metadata.listeners = metadata.listeners.map(listener => record(listener) && typeof listener.proxy === "string"
+        ? { ...listener, proxy: policy(listener.proxy) ?? "DIRECT" } : listener);
+    }
     base = merge(metadata, base) as Record<string, unknown>;
   }
   const result = merge(base, generated) as Record<string, unknown>;

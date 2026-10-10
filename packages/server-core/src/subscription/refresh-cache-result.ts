@@ -4,6 +4,7 @@ import {
   getEffectiveTestOptions,
 } from "@subboost/core/subscription/config-utils";
 import { buildProxyProvidersFromConfig } from "@subboost/core/subscription/proxy-providers";
+import { collectSourceConfigs, hasUsableSourceConfig } from "@subboost/core/subscription/source-snapshot";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
 import { reconcileNodeNameReferences } from "@subboost/core/subscription/node-name-references";
 import type { ParsedNode } from "@subboost/core/types/node";
@@ -53,7 +54,7 @@ export function prepareRefreshCacheResult(params: {
     });
   const hasProxyProviders = Boolean(
     proxyProviders && Object.keys(proxyProviders).length > 0
-  );
+  ) || collectSourceConfigs(params.snapshot.savedSources).some(source => hasUsableSourceConfig(source.config));
   const common = {
     proxyProviders,
     nodeCount: params.snapshot.nodes.length,

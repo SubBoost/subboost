@@ -1,4 +1,4 @@
-import { createSourceSnapshot, type SourceSnapshot } from "@subboost/core/subscription/source-snapshot";
+import { createSourceSnapshot, hasUsableSourceConfig, type SourceSnapshot } from "@subboost/core/subscription/source-snapshot";
 import type { ParsedNode, ParseResult } from "@subboost/core/types/node";
 import { parseSubscription } from "@subboost/core/parser";
 import { buildNodeContentKey, buildScopedNodeIdentityKey } from "@subboost/core/node-identity";
@@ -267,7 +267,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
         const result = prefetchedParseResult ?? parseSubscription(contentToParse);
         const resolvedSubscriptionUserInfo = resolveSubscriptionUserInfo(subscriptionUserInfo, result.nodes);
 
-        if (result.nodes.length === 0) {
+        if (result.nodes.length === 0 && !hasUsableSourceConfig(result.sourceConfig)) {
           const errorMsg = result.errors[0] ?? "未解析到有效节点";
           throw new Error(errorMsg);
         }
@@ -356,7 +356,6 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
                   ...s,
                   parsing: false,
                   parsed: false,
-                  subscriptionUserInfo: undefined,
                   error: info.message,
                   errorInfo: info,
                 }
@@ -448,7 +447,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
 
           // 解析内容
           const result = prefetchedParseResult ?? parseSubscription(contentToParse);
-          if (result.nodes.length === 0) throw new Error(result.errors[0] ?? "未解析到有效节点");
+          if (result.nodes.length === 0 && !hasUsableSourceConfig(result.sourceConfig)) throw new Error(result.errors[0] ?? "未解析到有效节点");
           const resolvedSubscriptionUserInfo = resolveSubscriptionUserInfo(subscriptionUserInfo, result.nodes);
           const currentTag = !source.useProxyProviders && typeof source.tag === "string" ? source.tag.trim() : "";
           const currentNameTemplate = !source.useProxyProviders && typeof source.nameTemplate === "string" ? source.nameTemplate.trim() : "";

@@ -201,7 +201,7 @@ export function parseClashYaml(content: string): ParseResult {
             );
           }
         }
-      } else {
+      } else if (!("proxy-providers" in config)) {
         // 2) 单个 proxy 对象（用户直接粘贴了一条节点 YAML）
         try {
           const node = normalizeNode(config as unknown as Record<string, unknown>);
@@ -211,19 +211,6 @@ export function parseClashYaml(content: string): ParseResult {
         }
       }
 
-      const proxyProviders = config["proxy-providers"];
-      const hasProxyProviders =
-        proxyProviders &&
-        typeof proxyProviders === "object" &&
-        !Array.isArray(proxyProviders) &&
-        Object.keys(proxyProviders).length > 0;
-
-      // 注意：proxy-providers 需要在服务器端拉取，浏览器端无法直接获取
-      if (hasProxyProviders) {
-        errors.push(
-          "检测到 proxy-providers 配置，由于浏览器限制无法自动拉取，请直接粘贴节点内容"
-        );
-      }
     } else if (Array.isArray(parsed)) {
       // 3) 仅粘贴了 proxies 列表（YAML 顶层为数组）
       for (const proxy of parsed) {

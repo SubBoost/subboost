@@ -8,13 +8,26 @@ export interface SourceSnapshot {
   resolvedHosts?: Record<string, string[]>;
 }
 
+export function hasUsableSourceConfig(config: Record<string, unknown> | undefined): boolean {
+  const providers = config?.["proxy-providers"];
+  if (!providers || typeof providers !== "object" || Array.isArray(providers)) return false;
+  return Object.values(providers).some(provider => {
+    if (!provider || typeof provider !== "object" || Array.isArray(provider)) return false;
+    const value = provider as Record<string, unknown>;
+    return (value.type === "http" && typeof value.url === "string" && /^https?:\/\//.test(value.url))
+      || (value.type === "file" && typeof value.path === "string" && Boolean(value.path.trim()))
+      || (value.type === "inline" && Array.isArray(value.payload) && value.payload.length > 0);
+  });
+}
+
 export function normalizeSourceSnapshot(value: unknown): SourceSnapshot | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
-  if (!Array.isArray(record.nodes) || record.nodes.length === 0) return undefined;
+  if (!Array.isArray(record.nodes)) return undefined;
   if (!record.nodes.every(node => node && typeof node === "object" && typeof node.name === "string" && typeof node.type === "string")) return undefined;
   const config = record.config && typeof record.config === "object" && !Array.isArray(record.config)
     ? record.config as Record<string, unknown> : {};
+  if (record.nodes.length === 0 && !hasUsableSourceConfig(config)) return undefined;
   const headers = record.headers && typeof record.headers === "object" && !Array.isArray(record.headers)
     ? Object.fromEntries(Object.entries(record.headers).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : undefined;
   const resolvedHosts = record.resolvedHosts && typeof record.resolvedHosts === "object" && !Array.isArray(record.resolvedHosts)

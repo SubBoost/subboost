@@ -93,7 +93,7 @@ export function computeGeneratedYamlResult(state: ConfigState): GeneratedYamlRes
 
   try {
     const { effectiveNodes } = resolveNodeNameFilter(state.nodes, state.nodeNameFilter);
-    const hasPreviewContent = effectiveNodes.length > 0 || Boolean(proxyProviders);
+    const hasPreviewContent = effectiveNodes.length > 0 || Boolean(proxyProviders) || collectSourceConfigs(state.sources).length > 0;
     const yaml = generateClashYaml(
       buildGenerateClashYamlOptions(state, proxyProviders, effectiveNodes)
     );

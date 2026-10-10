@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { generateClashYaml } from "@subboost/core/generator";
 import { buildGenerateOptionsFromConfig, getEffectiveTestOptions } from "@subboost/core/subscription/config-utils";
 import { buildProxyProvidersFromConfig } from "@subboost/core/subscription/proxy-providers";
+import { collectSourceConfigs, hasUsableSourceConfig } from "@subboost/core/subscription/source-snapshot";
 import type { SubscriptionResponseInfo } from "@subboost/core/subscription/subscription-response-info";
 import type { ParsedNode } from "@subboost/core/types/node";
 import {
@@ -150,7 +151,7 @@ function assertNodeNameFilterKeepsOutput(
   const options = buildGenerateOptionsFromConfig(config, { nodes });
   const hasProxyProviders = Boolean(
     options.proxyProviders && Object.keys(options.proxyProviders).length > 0
-  );
+  ) || collectSourceConfigs(config.sources).some(source => hasUsableSourceConfig(source.config));
   if (options.nodes.length === 0 && !hasProxyProviders) {
     throw new Error("过滤后没有可用节点");
   }
@@ -214,9 +215,10 @@ export async function createSubscription(ownerId: string, body: unknown): Promis
 
   const urls = normalizeSubscriptionUrlList(body.urls);
   const nodes = validateLocalSubscriptionNodes(body.nodes);
-  if (urls.length === 0 && nodes.length === 0) throw new Error("At least one URL or node is required.");
-
   const config = buildLocalSubscriptionConfig(body);
+  if (urls.length === 0 && nodes.length === 0 && !collectSourceConfigs(config.sources).some(source => hasUsableSourceConfig(source.config))) {
+    throw new Error("At least one URL or node is required.");
+  }
   assertNodeNameFilterKeepsOutput(nodes, config);
   const autoUpdateInterval = normalizeLocalAutoUpdateIntervalSeconds(body.autoUpdateInterval);
   const subscriptionInfo = normalizeSubscriptionInfoForPersistence(body.subscriptionInfo) ?? {};
@@ -267,7 +269,7 @@ export async function updateSubscription(ownerId: string, id: string, body: unkn
 
   if (hasUrls || hasNodes || hasConfig) {
     const nextUrls = hasUrls ? normalizeSubscriptionUrlList(body.urls) : currentSecrets.urls;
-    if (nextUrls.length === 0 && nextNodes.length === 0) {
+    if (nextUrls.length === 0 && nextNodes.length === 0 && !collectSourceConfigs(nextConfig.sources).some(source => hasUsableSourceConfig(source.config))) {
       throw new Error("At least one URL or node is required.");
     }
     assertNodeNameFilterKeepsOutput(nextNodes, nextConfig);
@@ -440,7 +442,7 @@ export async function generateSubscriptionYaml(token: string): Promise<Generated
   const secrets = readSubscriptionSecrets(row);
   const { testUrl, testInterval } = getEffectiveTestOptions(secrets.config);
   const proxyProviders = buildProxyProvidersFromConfig(secrets.config, { testUrl, testInterval });
-  if (secrets.nodes.length === 0 && !proxyProviders) return null;
+  if (secrets.nodes.length === 0 && !proxyProviders && !collectSourceConfigs(secrets.config.sources).some(source => hasUsableSourceConfig(source.config))) return null;
   const yaml = generateClashYaml(
     buildGenerateOptionsFromConfig(secrets.config, {
       nodes: secrets.nodes,

@@ -1,4 +1,4 @@
-import { createSourceSnapshot } from "@subboost/core/subscription/source-snapshot";
+import { createSourceSnapshot, hasUsableSourceConfig } from "@subboost/core/subscription/source-snapshot";
 import { parseSubscription } from "@subboost/core/parser";
 import { stripImportedNodeControlFields } from "@subboost/core/subscription/imported-node-controls";
 import {
@@ -193,14 +193,6 @@ export async function refreshNodeSnapshot(
     });
   };
 
-  const mergeSourceSubscriptionInfo = (sourceId: string, info: SubscriptionUserInfo | undefined) => {
-    updateSourceSubscriptionInfo(sourceId, info);
-    const normalized = normalizeSubscriptionUserInfo(info);
-    if (hasSubscriptionUserInfo(normalized)) {
-      mergeSubscriptionUserInfo(subscriptionInfo, normalized);
-    }
-  };
-
   const shouldFetchSupplementalUserInfoForSource = (source: SavedSource): boolean => {
     return Boolean(source.userinfoUrl || source.userinfoUserAgent);
   };
@@ -219,7 +211,7 @@ export async function refreshNodeSnapshot(
         rawUserInfo,
         fetched.ok ? fetched.nodes : []
       );
-      if (!fetched.ok || fetched.nodes.length === 0) {
+      if (!fetched.ok || (fetched.nodes.length === 0 && !hasUsableSourceConfig(fetched.sourceConfig))) {
         const errorInfo = fetched.errorInfo ?? null;
         const firstParseError =
           Array.isArray(fetched.errors) && typeof fetched.errors[0] === "string"
@@ -239,7 +231,6 @@ export async function refreshNodeSnapshot(
         continue;
       }
       mergeResponseMetadata(fetched.headers);
-      if (hasSubscriptionUserInfo(resolvedUserInfo)) mergeSubscriptionUserInfo(subscriptionInfo, resolvedUserInfo);
       updateSourceSubscriptionInfo(source.id, resolvedUserInfo);
       const resolvedHosts = fetched.resolvedHosts ?? await options.resolveHosts?.(fetched.sourceConfig);
       refreshedSavedSources = refreshedSavedSources.map(item => item.id === source.id
@@ -275,10 +266,7 @@ export async function refreshNodeSnapshot(
     try {
       const parsed = parseSubscription(source.content);
       const resolvedUserInfo = resolveSubscriptionUserInfo(undefined, parsed.nodes);
-      if (hasSubscriptionUserInfo(resolvedUserInfo)) {
-        mergeSubscriptionUserInfo(subscriptionInfo, resolvedUserInfo);
-      }
-      if (parsed.nodes.length === 0) {
+      if (parsed.nodes.length === 0 && !hasUsableSourceConfig(parsed.sourceConfig)) {
         recordFailedSource(source, "未解析到可用节点", { errorCategory: "parse" });
         continue;
       }
@@ -313,33 +301,10 @@ export async function refreshNodeSnapshot(
     }
   }
 
-  if (
-    typeof options.fetchUrlUserInfo === "function" &&
-    usedUrlFetch &&
-    (
-      !hasSubscriptionUserInfo(subscriptionInfo) ||
-      savedSources.some((source) => source.type === "url" && shouldFetchSupplementalUserInfoForSource(source))
-    )
-  ) {
-    for (const source of savedSources) {
-      if (source.type !== "url" || source.useProxyProviders) continue;
-      if (!shouldFetchSupplementalUserInfoForSource(source) && hasSubscriptionUserInfo(subscriptionInfo)) continue;
-      const headers = await options.fetchUrlUserInfo(source);
-      if (!headers) continue;
-      mergeResponseMetadata(headers);
-      const header = headers["subscription-userinfo"];
-      mergeSourceSubscriptionInfo(
-        source.id,
-        header ? resolveSubscriptionUserInfo(parseSubscriptionUserInfo(header)) : undefined
-      );
-    }
-  }
-
   // A failed source retains its successful data and response metadata.
   for (let index = 0; index < refreshedSavedSources.length; index++) {
     const source = refreshedSavedSources[index];
     if (!failedSources.some(failed => failed.id === source.id)) continue;
-    if (source.subscriptionUserInfo) mergeSubscriptionUserInfo(subscriptionInfo, source.subscriptionUserInfo);
     mergeResponseMetadata(source.sourceSnapshot?.headers);
     // A closed upstream retains the original successful response. Its hostname
     // aliases still follow normal DNS changes, independently of subscription fetch.
@@ -362,6 +327,23 @@ export async function refreshNodeSnapshot(
         treatAsNewSource: false, deletedNodes,
       }).nodes;
     }
+  }
+
+  if (options.fetchUrlUserInfo) {
+    for (const source of savedSources) {
+      if (source.type !== "url") continue;
+      const configured = shouldFetchSupplementalUserInfoForSource(source);
+      if (!configured && (source.useProxyProviders || !usedUrlFetch
+        || refreshedSavedSources.some(item => hasSubscriptionUserInfo(item.subscriptionUserInfo)))) continue;
+      const headers = await options.fetchUrlUserInfo(source).catch(() => undefined);
+      if (!headers) continue;
+      mergeResponseMetadata(headers);
+      const info = resolveSubscriptionUserInfo(parseSubscriptionUserInfo(headers["subscription-userinfo"] ?? ""));
+      if (hasSubscriptionUserInfo(info)) updateSourceSubscriptionInfo(source.id, info);
+    }
+  }
+  for (const source of refreshedSavedSources) {
+    if (source.subscriptionUserInfo) mergeSubscriptionUserInfo(subscriptionInfo, source.subscriptionUserInfo);
   }
 
   if (!profileWebPageUrlState.conflicted && profileWebPageUrlState.value) {
