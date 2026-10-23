@@ -187,6 +187,7 @@ export interface UserConfig {
   autoSelectStrategy: "url-test" | "fallback" | "load-balance";
   testUrl: string;
   testInterval: number;
+  sharedHealthChecks?: boolean;
   
   // 规则设置
   ruleProviderBaseUrl: string;
@@ -217,7 +218,8 @@ export interface CustomRule {
   noResolve?: boolean;
 }
 
-export type RuleSetBehavior = "domain" | "ipcidr";
+export type RuleSetBehavior = "domain" | "ipcidr" | "classical";
+export type RuleSetFormat = "mrs" | "yaml" | "text";
 
 export type NodeRegion =
   | "us"
@@ -274,10 +276,13 @@ export interface ProxyGroupAdvancedConfig {
   memberOrder?: ProxyGroupMemberRef[];
 }
 
+export type RuleSetMetadata = Pick<CustomRuleSet, "name" | "path" | "behavior" | "format">;
+
 export interface CustomRuleSet {
   id: string;
   name: string;
   behavior: RuleSetBehavior;
+  format?: RuleSetFormat;
   path: string;
   target: ProxyGroupRuleTarget;
   noResolve?: boolean;

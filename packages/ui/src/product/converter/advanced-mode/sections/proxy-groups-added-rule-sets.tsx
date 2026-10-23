@@ -25,6 +25,9 @@ import {
   type CustomRoutingRuleSetItem,
 } from "@subboost/core/rules/custom-routing-rule-sets";
 import { DEFAULT_RULE_PROVIDER_BASE_URL } from "@subboost/core/rules/metadata";
+import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
+import { resolveRuleSetUrl, useRuleSetOperation } from "./use-rule-set-resolution";
+import type { RuleSetMetadata } from "@subboost/core/types/config";
 import {
   useConfigStore,
   type RuleSetDraft as StoreRuleSetDraft,
@@ -86,6 +89,8 @@ export function ProxyGroupsAddedRuleSets({
 
   const [editingKey, setEditingKey] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<RuleSetDraft | null>(null);
+  const api = useProductApiAdapter();
+  const operation = useRuleSetOperation(JSON.stringify([editingKey, draft, customRuleSets]));
 
   const addedRuleSets = React.useMemo(
     () =>
@@ -235,10 +240,11 @@ export function ProxyGroupsAddedRuleSets({
       return;
     }
 
+    const commit = (metadata: Pick<RuleSetMetadata, "behavior" | "format">) => {
     const nextModuleRule: StoreRuleSetDraft = {
       id: item.id,
       name: item.name,
-      behavior: item.behavior,
+      ...metadata,
       path,
       ...(draft.noResolve ? { noResolve: true } : {}),
     };
@@ -252,6 +258,21 @@ export function ProxyGroupsAddedRuleSets({
     }
 
     cancelEditing();
+    };
+    if (path === item.path) {
+      commit({ behavior: item.behavior, ...(item.format ? { format: item.format } : {}) });
+      return;
+    }
+    operation((signal) => {
+      const fail = (error: unknown) => { if (!signal.aborted) toast({ title: error instanceof Error ? error.message : "规则识别失败", variant: "warning" }); };
+      try {
+        const url = /^https?:\/\//i.test(path) ? path : `${DEFAULT_RULE_PROVIDER_BASE_URL.replace(/\/+$/, "")}/${path}`;
+        const result = resolveRuleSetUrl(url, api.rules, signal);
+        const done = (metadata: RuleSetMetadata) => { if (!signal.aborted) commit({ behavior: metadata.behavior, format: metadata.format ?? "mrs" }); };
+        if (result instanceof Promise) return result.then(done).catch(fail);
+        done(result);
+      } catch (error) { fail(error); }
+    });
   };
 
   if (visibleAddedRuleSets.length === 0) {

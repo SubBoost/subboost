@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
     customRuleBatchImported: vi.fn(),
   },
   toast: vi.fn(),
+  rulesApi: undefined as import("@subboost/ui/product/api-adapter").ProductRulesApi | undefined,
 }));
+vi.mock("@subboost/ui/product/api-adapter", () => ({ useProductApiAdapter: () => ({ rules: mocks.rulesApi }) }));
 
 const stateMock = vi.hoisted(() => ({
   enabled: false,
@@ -106,6 +108,7 @@ function renderDialog(rawText = "", overrides: Record<string, unknown> = {}) {
 describe("ProxyGroupsCustomRulesBatchDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.rulesApi = undefined;
   });
 
   it("renders empty preview and resets text when closed", () => {
@@ -186,5 +189,31 @@ describe("ProxyGroupsCustomRulesBatchDialog", () => {
       ruleCount: 0,
     });
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "无法导入", variant: "warning" }));
+  });
+
+  it.each([false, true])("commits mixed rules only after all URL detections succeed (failure=%s)", async (fail) => {
+    const url = "https://local.subboost.test/rules";
+    let complete!: (value: any) => void;
+    let reject!: (reason: unknown) => void;
+    const detectRuleSet = vi.fn(() => new Promise<any>((resolve, fail) => { complete = resolve; reject = fail; }));
+    mocks.rulesApi = { detectRuleSet };
+    const onImportRuleSets = vi.fn();
+    const { props, setters } = renderDialog(`DOMAIN,example.test,DIRECT\nRULE-SET,${url},Proxy`, { onImportRuleSets });
+    mocks.buttons.at(-1).onClick();
+    mocks.buttons.at(-1).onClick();
+    expect(detectRuleSet).toHaveBeenCalledTimes(1);
+    expect(props.onImport).not.toHaveBeenCalled();
+    if (fail) reject(new Error("无法识别规则文件"));
+    else complete({ name: "rules", path: url, format: "text", behavior: "domain" });
+    await vi.waitFor(() => expect(mocks.toast).toHaveBeenCalled());
+    if (fail) {
+      expect(props.onImport).not.toHaveBeenCalled();
+      expect(onImportRuleSets).not.toHaveBeenCalled();
+      expect(setters[0]).not.toHaveBeenCalled();
+    } else {
+      expect(props.onImport).toHaveBeenCalledOnce();
+      expect(onImportRuleSets).toHaveBeenCalledWith([expect.objectContaining({ path: url, format: "text" })]);
+      expect(props.onOpenChange).toHaveBeenCalledWith(false);
+    }
   });
 });

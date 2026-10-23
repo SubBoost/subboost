@@ -247,7 +247,8 @@ describe("public ProxyGroupsAddedRuleSets extra branches", () => {
     expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("custom-1", "rule-b", {
       id: "rule-b",
       name: "Rule B",
-      behavior: "ipcidr",
+      behavior: "domain",
+      format: "mrs",
       path: "geosite/renamed.mrs",
     });
 
@@ -261,7 +262,8 @@ describe("public ProxyGroupsAddedRuleSets extra branches", () => {
     expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("fallback", "rule-b", {
       id: "rule-b",
       name: "Rule B",
-      behavior: "ipcidr",
+      behavior: "domain",
+      format: "mrs",
       path: "geosite/module.mrs",
     });
   });

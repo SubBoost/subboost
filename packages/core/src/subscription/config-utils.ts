@@ -19,7 +19,7 @@ import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-fil
 import { ensureCustomRuleId } from "@subboost/core/rules/custom-rule-utils";
 import { DEFAULT_SUBBOOST_CONFIG } from "@subboost/core/config/defaults";
 import { normalizeRuleModelFromConfig } from "@subboost/core/rules/rule-model";
-import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
+import { normalizeGroupTestUrl, normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
 import { normalizeProxyGroupTargetRef } from "@subboost/core/proxy-group-targets";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -196,6 +196,7 @@ function normalizeDialerProxyGroups(value: unknown): DialerProxyGroup[] {
       ...(type === "load-balance" ? { strategy: strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY } : {}),
       relayNodes,
       targetNodes,
+      ...(normalizeGroupTestUrl(item.testUrl) ? { testUrl: normalizeGroupTestUrl(item.testUrl) } : {}),
       ...(enabled !== undefined ? { enabled } : {}),
     });
   }
@@ -331,6 +332,7 @@ export function buildGenerateOptionsFromConfig(
     ...(autoSelectStrategy ? { autoSelectStrategy } : {}),
     testUrl,
     testInterval,
+    sharedHealthChecks: config.sharedHealthChecks === true,
     ...(cnIpNoResolve !== undefined ? { cnIpNoResolve } : {}),
     ...(experimentalCnUseCnRuleSet !== undefined ? { experimentalCnUseCnRuleSet } : {}),
     ...(normalizePort(config.mixedPort) !== undefined ? { mixedPort: normalizePort(config.mixedPort) as number } : {}),

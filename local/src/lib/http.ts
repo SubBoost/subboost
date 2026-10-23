@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildApiErrorBody } from "@subboost/server-core/http";
+import type { ReadJsonBodyResult } from "@subboost/server-core/http";
+export { readJsonBody, type ReadJsonBodyResult } from "@subboost/server-core/http";
 
 export type LocalApiErrorCode =
   | "BAD_REQUEST"
@@ -19,53 +21,12 @@ export const LOCAL_JSON_BODY_LIMITS = {
   template: 4 * 1024 * 1024,
 } as const;
 
-export type ReadJsonBodyResult =
-  | { ok: true; value: unknown }
-  | { ok: false; reason: "invalid_json" | "too_large" };
-
 export function json(data: unknown, status = 200): NextResponse {
   return NextResponse.json(data, { status });
 }
 
 export function apiError(error: string, code: LocalApiErrorCode, status: number): NextResponse {
   return NextResponse.json(buildApiErrorBody(error, code), { status });
-}
-
-export async function readJsonBody(request: Request, maxBytes: number): Promise<ReadJsonBodyResult> {
-  const limit = Math.max(1, Math.floor(maxBytes));
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > limit) {
-    return { ok: false, reason: "too_large" };
-  }
-
-  if (!request.body) return { ok: true, value: {} };
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > limit) {
-        await reader.cancel("payload too large").catch(() => undefined);
-        return { ok: false, reason: "too_large" };
-      }
-      chunks.push(value);
-    }
-
-    const bytes = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    if (!text.trim()) return { ok: true, value: {} };
-    return { ok: true, value: JSON.parse(text) };
-  } catch {
-    return { ok: false, reason: "invalid_json" };
-  }
 }
 
 export function jsonBodyError(

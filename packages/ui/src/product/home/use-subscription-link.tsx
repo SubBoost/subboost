@@ -89,6 +89,7 @@ type Options = {
   ruleProviderBaseUrl: string;
   testUrl: string;
   testInterval: number;
+  sharedHealthChecks: boolean;
   cnIpNoResolve: boolean;
   experimentalCnUseCnRuleSet: boolean;
 };
@@ -123,6 +124,7 @@ export function useSubscriptionLink({
   ruleProviderBaseUrl,
   testUrl,
   testInterval,
+  sharedHealthChecks,
   cnIpNoResolve,
   experimentalCnUseCnRuleSet,
 }: Options) {
@@ -399,6 +401,7 @@ export function useSubscriptionLink({
             ruleProviderBaseUrl,
             testUrl,
             testInterval,
+            sharedHealthChecks,
             cnIpNoResolve,
             experimentalCnUseCnRuleSet,
             autoSelectStrategy: "url-test",
@@ -496,6 +499,7 @@ export function useSubscriptionLink({
     subscriptionAdapter,
     template,
     testInterval,
+    sharedHealthChecks,
     testUrl,
     trackSubscriptionMutation,
   ]);

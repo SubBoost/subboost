@@ -21,9 +21,11 @@ import {
   CUSTOM_RULE_TYPES,
 } from "@subboost/core/rules/custom-rule-utils";
 import { useConfigStore } from "@subboost/ui/store/config-store";
-import { allocateRuleSetId, parseManualRuleSetUrl } from "@subboost/core/rules/rule-model";
+import { allocateRuleSetId } from "@subboost/core/rules/rule-model";
+import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
+import { resolveRuleSetUrl, useRuleSetOperation } from "./use-rule-set-resolution";
 import { toast } from "@subboost/ui/components/ui/toaster";
-import type { CustomProxyGroup, CustomRule, ProxyGroupRuleTarget } from "@subboost/core/types/config";
+import type { CustomProxyGroup, CustomRule, ProxyGroupRuleTarget, RuleSetMetadata } from "@subboost/core/types/config";
 import {
   useProductInteractionAdapter,
   type ProductRuleKind,
@@ -130,6 +132,8 @@ export function ProxyGroupsCustomRules() {
   const [editingRuleDraft, setEditingRuleDraft] =
     React.useState<CustomRule | null>(null);
   const interactions = useProductInteractionAdapter();
+  const api = useProductApiAdapter();
+  const runRuleSetOperation = useRuleSetOperation(JSON.stringify([newRuleType, newRuleValue, newRuleTarget, newRuleNoResolve, customRuleSets, customProxyGroups]));
 
   const enabledGroupNames = React.useMemo(() => {
     const names: string[] = [];
@@ -196,17 +200,22 @@ export function ProxyGroupsCustomRules() {
         toast({ title: "请选择规则集使用的代理组", variant: "warning" });
         return;
       }
-      try {
-        const ruleSet = parseManualRuleSetUrl(value);
+      const commit = (ruleSet: RuleSetMetadata) => {
         const id = allocateRuleSetId(ruleSet.name, [
           ...PROXY_GROUP_MODULES.flatMap((module) => module.rules.map((rule) => rule.id)),
           ...customRuleSets.map((rule) => rule.id),
         ]);
         addModuleRules(target.id, [{ ...ruleSet, id, name: id, noResolve: newRuleNoResolve }]);
         setNewRuleValue("");
-      } catch (error) {
-        toast({ title: error instanceof Error ? error.message : "规则集链接无效", variant: "warning" });
-      }
+      };
+      runRuleSetOperation((signal) => {
+        const fail = (error: unknown) => { if (!signal.aborted) toast({ title: error instanceof Error ? error.message : "规则集链接无效", variant: "warning" }); };
+        try {
+          const result = resolveRuleSetUrl(value, api.rules, signal);
+          if (result instanceof Promise) return result.then((ruleSet) => { if (!signal.aborted) commit(ruleSet); }).catch(fail);
+          commit(result);
+        } catch (error) { fail(error); }
+      });
       return;
     }
 

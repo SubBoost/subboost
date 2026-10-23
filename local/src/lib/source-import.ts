@@ -242,6 +242,12 @@ async function fetchTextDirect(
   }
 }
 
+export async function fetchRuleContentDirect(url: string): Promise<SourceImportTransportResult> {
+  const allowUnsafeSubscriptionSources = await getAllowUnsafeSubscriptionSources();
+  return fetchTextDirect({ url, userAgent: SUBSCRIPTION_IMPORT_USER_AGENTS[0], purpose: "content",
+    timeoutMs: 15000, maxBytes: 10 * 1024 * 1024 }, allowUnsafeSubscriptionSources);
+}
+
 export async function importSourceUrlDirect(request: SourceImportRequest): Promise<SourceImportResult> {
   const allowUnsafeSubscriptionSources = await getAllowUnsafeSubscriptionSources();
   return importSubscriptionFromUrl(request, {

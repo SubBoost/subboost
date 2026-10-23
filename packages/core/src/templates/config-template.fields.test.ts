@@ -171,7 +171,7 @@ describe("validateSubBoostTemplateConfig field validation", () => {
           },
         ],
       },
-      "customRuleSets.behavior 无效"
+      "customRuleSets.format 或 behavior 无效"
     );
     expectInvalid(
       {

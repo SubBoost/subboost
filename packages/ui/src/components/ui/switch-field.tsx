@@ -12,6 +12,7 @@ export interface SwitchFieldProps {
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
   density?: "default" | "compact";
+  appearance?: "card" | "plain";
 }
 
 function SwitchField({
@@ -21,6 +22,7 @@ function SwitchField({
   onCheckedChange,
   disabled = false,
   density = "default",
+  appearance = "card",
 }: SwitchFieldProps) {
   const generatedId = React.useId().replaceAll(":", "");
   const controlId = `switch-field-${generatedId}`;
@@ -31,8 +33,10 @@ function SwitchField({
     <Label
       htmlFor={controlId}
       className={cn(
-        "flex w-full items-center justify-between rounded-xl border border-ink/10 bg-ink/5 transition-colors hover:bg-ink/[0.07]",
-        density === "compact" ? "gap-2 rounded-md px-2 py-1" : "gap-4 px-4 py-3",
+        "flex w-full items-center justify-between",
+        appearance === "card" && "rounded-xl border border-ink/10 bg-ink/5 transition-colors hover:bg-ink/[0.07]",
+        appearance === "card" && (density === "compact" ? "rounded-md px-2 py-1" : "px-4 py-3"),
+        density === "compact" ? "gap-2" : "gap-4",
         disabled && "cursor-not-allowed opacity-60"
       )}
     >

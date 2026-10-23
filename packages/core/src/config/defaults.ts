@@ -9,6 +9,7 @@ export const DEFAULT_SUBBOOST_CONFIG = {
   autoSelectStrategy: "url-test",
   testUrl: "https://www.gstatic.com/generate_204",
   testInterval: 300,
+  sharedHealthChecks: false,
   ruleProviderBaseUrl: DEFAULT_RULE_PROVIDER_BASE_URL,
   customRules: [],
   ruleOrder: [],
@@ -27,6 +28,7 @@ export function buildDefaultUserConfig(template: TemplateType): UserConfig {
     autoSelectStrategy: DEFAULT_SUBBOOST_CONFIG.autoSelectStrategy,
     testUrl: DEFAULT_SUBBOOST_CONFIG.testUrl,
     testInterval: DEFAULT_SUBBOOST_CONFIG.testInterval,
+    sharedHealthChecks: DEFAULT_SUBBOOST_CONFIG.sharedHealthChecks,
     ruleProviderBaseUrl: DEFAULT_SUBBOOST_CONFIG.ruleProviderBaseUrl,
     customRules: [...DEFAULT_SUBBOOST_CONFIG.customRules],
     ruleOrder: [...DEFAULT_SUBBOOST_CONFIG.ruleOrder],
@@ -101,6 +103,7 @@ export function buildDefaultSubBoostTemplateConfig(type: TemplateType): SubBoost
     testUrl: DEFAULT_SUBBOOST_CONFIG.testUrl,
     testInterval: DEFAULT_SUBBOOST_CONFIG.testInterval,
     ruleProviderBaseUrl: DEFAULT_SUBBOOST_CONFIG.ruleProviderBaseUrl,
+    sharedHealthChecks: DEFAULT_SUBBOOST_CONFIG.sharedHealthChecks,
   };
 }
 

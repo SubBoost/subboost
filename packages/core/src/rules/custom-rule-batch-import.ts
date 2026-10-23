@@ -1,6 +1,6 @@
-import type { CustomRule, CustomRuleSet } from "@subboost/core/types/config";
+import type { CustomRule, CustomRuleSet, RuleSetMetadata } from "@subboost/core/types/config";
 import { isCustomRuleType } from "./custom-rule-utils";
-import { allocateRuleSetId, parseManualRuleSetUrl } from "./rule-model";
+import { allocateRuleSetId, parseManualRuleSetUrl, parseRuleSetUrl } from "./rule-model";
 
 type ImportRule = Omit<CustomRule, "type"> & { type: CustomRule["type"] | "RULE-SET" };
 
@@ -28,11 +28,14 @@ export type ParseCustomRuleBatchImportOptions = {
   existingRules: CustomRule[];
   existingRuleSets?: CustomRuleSet[];
   reservedRuleSetIds?: string[];
+  allowRemoteRuleSets?: boolean;
+  resolvedRuleSets?: ReadonlyMap<string, RuleSetMetadata>;
 };
 
 export type CustomRuleBatchImportResult = {
   rules: CustomRule[];
   ruleSets: CustomRuleSet[];
+  pendingRuleSetUrls: string[];
   items: CustomRuleBatchImportPreviewItem[];
   readyCount: number;
   skippedCount: number;
@@ -178,6 +181,7 @@ export function parseCustomRuleBatchImport(
   const items: CustomRuleBatchImportPreviewItem[] = [];
   const rules: CustomRule[] = [];
   const ruleSets: CustomRuleSet[] = [];
+  const pendingRuleSetUrls: string[] = [];
   let skippedCount = 0;
   let errorCount = 0;
   let duplicateCount = 0;
@@ -295,9 +299,13 @@ export function parseCustomRuleBatchImport(
       try {
         if (["DIRECT", "REJECT"].includes(target)) throw new Error("请选择规则集使用的代理组");
         if (options.ruleSetTargetOptions && !options.ruleSetTargetOptions.includes(target)) throw new Error(`未知规则集目标：${target}`);
-        const metadata = parseManualRuleSetUrl(draft.value);
-        const id = allocateRuleSetId(metadata.name, usedIds);
-        ruleSet = { ...metadata, id, name: id, target, noResolve: Boolean(draft.noResolve) };
+        const parsed = parseRuleSetUrl(draft.value);
+        const metadata = options.resolvedRuleSets?.get(parsed.path) ??
+          (options.allowRemoteRuleSets && !/\.mrs$/i.test(parsed.pathname) ? null : parseManualRuleSetUrl(draft.value));
+        if (metadata) {
+          const id = allocateRuleSetId(metadata.name, usedIds);
+          ruleSet = { ...metadata, id, name: id, target, noResolve: Boolean(draft.noResolve) };
+        }
       } catch (error) {
         errorCount += 1;
         items.push({ lineNumber, raw: rawLine, status: "error", message: error instanceof Error ? error.message : "规则集链接无效" });
@@ -330,6 +338,8 @@ export function parseCustomRuleBatchImport(
       ruleSets.push(ruleSet);
     } else if (rule.type !== "RULE-SET") {
       rules.push({ ...rule, type: rule.type });
+    } else {
+      pendingRuleSetUrls.push(rule.value);
     }
     items.push({
       lineNumber,
@@ -343,11 +353,12 @@ export function parseCustomRuleBatchImport(
   return {
     rules,
     ruleSets,
+    pendingRuleSetUrls,
     items,
-    readyCount: rules.length + ruleSets.length,
+    readyCount: rules.length + ruleSets.length + pendingRuleSetUrls.length,
     skippedCount,
     errorCount,
     duplicateCount,
-    canImport: rules.length + ruleSets.length > 0 && errorCount === 0 && duplicateCount === 0,
+    canImport: rules.length + ruleSets.length + pendingRuleSetUrls.length > 0 && errorCount === 0 && duplicateCount === 0,
   };
 }

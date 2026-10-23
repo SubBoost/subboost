@@ -135,6 +135,7 @@ function hasMeaningfulConfig(state: ConfigState): boolean {
     state.allowLan !== initialState.allowLan ||
     state.testUrl !== initialState.testUrl ||
     state.testInterval !== initialState.testInterval ||
+    state.sharedHealthChecks !== initialState.sharedHealthChecks ||
     state.ruleProviderBaseUrl !== initialState.ruleProviderBaseUrl ||
     state.cnIpNoResolve !== initialState.cnIpNoResolve ||
     state.experimentalCnUseCnRuleSet !== initialState.experimentalCnUseCnRuleSet ||
@@ -170,6 +171,7 @@ function buildHandoffState(state: ConfigState): Partial<ConfigState> {
     allowLan: state.allowLan,
     testUrl: state.testUrl,
     testInterval: state.testInterval,
+    sharedHealthChecks: state.sharedHealthChecks,
     ruleProviderBaseUrl: state.ruleProviderBaseUrl,
     cnIpNoResolve: state.cnIpNoResolve,
     experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet,
@@ -234,6 +236,7 @@ function normalizeHandoffState(raw: unknown): Partial<ConfigState> | null {
   if (typeof raw.allowLan === "boolean") out.allowLan = raw.allowLan;
   if (typeof raw.testUrl === "string") out.testUrl = raw.testUrl;
   if (typeof raw.testInterval === "number" && Number.isFinite(raw.testInterval)) out.testInterval = raw.testInterval;
+  out.sharedHealthChecks = raw.sharedHealthChecks === true;
   if (typeof raw.ruleProviderBaseUrl === "string") out.ruleProviderBaseUrl = raw.ruleProviderBaseUrl;
   if (typeof raw.cnIpNoResolve === "boolean") out.cnIpNoResolve = raw.cnIpNoResolve;
   if (typeof raw.experimentalCnUseCnRuleSet === "boolean") {

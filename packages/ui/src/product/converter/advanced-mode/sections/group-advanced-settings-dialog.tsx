@@ -12,6 +12,7 @@ import {
 import { FormField } from "@subboost/ui/components/ui/form-field";
 import { Input } from "@subboost/ui/components/ui/input";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
+import { useConfigStore } from "@subboost/ui/store/config-store";
 import {
   DEFAULT_LOAD_BALANCE_STRATEGY,
   type GroupListenerBinding,
@@ -70,17 +71,20 @@ export function GroupAdvancedSettingsDialog({
   const [portInput, setPortInput] = React.useState("");
   const [allowLan, setAllowLan] = React.useState(false);
   const [draftTestUrl, setDraftTestUrl] = React.useState(testUrl ?? "");
+  const sharedHealthChecks = useConfigStore((state) => state.sharedHealthChecks);
+  const [draftSharedHealthChecks, setDraftSharedHealthChecks] = React.useState(sharedHealthChecks);
 
   // 每次打开时从当前配置重建草稿，丢弃上次未保存的修改
   React.useEffect(() => {
     if (!open) return;
     setDraftType(groupType);
     setDraftTestUrl(testUrl ?? "");
+    setDraftSharedHealthChecks(sharedHealthChecks);
     setDraftStrategy(strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY);
     setListenerOn(Boolean(listenerBinding && listenerBinding.enabled !== false));
     setPortInput(listenerBinding ? String(listenerBinding.port) : "");
     setAllowLan(listenerBinding?.allowLan === true);
-  }, [open, groupType, strategy, testUrl, listenerBinding]);
+  }, [open, groupType, strategy, testUrl, listenerBinding, sharedHealthChecks]);
 
   // 开关关闭=暂停（保留配置不生成），端口只需格式合法、无需无冲突（与生成器一致）
   const portCheck = React.useMemo(
@@ -104,6 +108,7 @@ export function GroupAdvancedSettingsDialog({
         ? { port: portCheck.port, enabled: listenerOn, allowLan }
         : null,
     });
+    if (draftType === "url-test") useConfigStore.getState().setSharedHealthChecks(draftSharedHealthChecks);
     onOpenChange(false);
   };
 
@@ -128,15 +133,20 @@ export function GroupAdvancedSettingsDialog({
           </FormField>
 
           {draftType === "url-test" && (
-            <FormField label="测速地址" description="仅用于当前代理组；留空沿用默认测速地址。" error={testUrlError}>
-              <Input value={draftTestUrl} onChange={(event) => setDraftTestUrl(event.target.value)}
-                placeholder="https://www.gstatic.com/generate_204" className="h-8 text-xs" />
-            </FormField>
+            <div className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.025] p-3">
+              <FormField label="测速地址" description="仅用于当前代理组；留空沿用默认测速地址。" error={testUrlError}>
+                <Input value={draftTestUrl} onChange={(event) => setDraftTestUrl(event.target.value)}
+                  placeholder="https://www.gstatic.com/generate_204" className="h-8 text-xs" />
+              </FormField>
+              <SwitchField label="共享健康检查" checked={draftSharedHealthChecks}
+                onCheckedChange={setDraftSharedHealthChecks} appearance="plain" density="compact" />
+            </div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.025] p-3">
             <SwitchField
               label="监听端口"
+              appearance="plain"
               description="为该策略组打开一个 mixed 入站端口，流量固定走此组"
               checked={listenerOn}
               onCheckedChange={setListenerOn}
@@ -144,7 +154,7 @@ export function GroupAdvancedSettingsDialog({
             />
 
             {(listenerOn || portInput.trim() !== "") && (
-              <div className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.025] p-3">
+              <div className="space-y-3">
                 <FormField label="端口" error={portError}>
                   <Input
                     value={portInput}

@@ -23,7 +23,8 @@ export type CustomRoutingRuleSetItem = {
   };
   id: string;
   name: string;
-  behavior: "domain" | "ipcidr";
+  behavior: CustomRuleSet["behavior"];
+  format?: CustomRuleSet["format"];
   path: string;
   target: CustomRoutingRuleSetTarget;
   noResolve?: boolean;
@@ -137,6 +138,7 @@ export function collectCustomRoutingRuleSets({
       id: rule.id,
       name: rule.name || rule.id,
       behavior: rule.behavior,
+      ...(rule.format !== undefined ? { format: rule.format } : {}),
       path: normalizeRuleSetPathInput(rule.path),
       target,
       noResolve: Boolean(rule.noResolve),

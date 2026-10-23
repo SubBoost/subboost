@@ -17,7 +17,9 @@ import {
   type ParseCustomRuleBatchImportOptions,
 } from "@subboost/core/rules/custom-rule-batch-import";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
-import type { CustomRule, CustomRuleSet } from "@subboost/core/types/config";
+import type { CustomRule, CustomRuleSet, RuleSetMetadata } from "@subboost/core/types/config";
+import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
+import { resolveRuleSetUrl, useRuleSetOperation } from "./use-rule-set-resolution";
 
 function getStatusClass(item: CustomRuleBatchImportPreviewItem): string {
   if (item.status === "ready") {
@@ -69,6 +71,8 @@ export function ProxyGroupsCustomRulesBatchDialog({
 }) {
   const [rawText, setRawText] = React.useState("");
   const interactions = useProductInteractionAdapter();
+  const api = useProductApiAdapter();
+  const operation = useRuleSetOperation(JSON.stringify([open, rawText, defaultType, defaultTarget, defaultNoResolve, existingRules, existingRuleSets]));
 
   const importPlan = React.useMemo(
     () =>
@@ -82,6 +86,7 @@ export function ProxyGroupsCustomRulesBatchDialog({
         existingRules,
         existingRuleSets,
         reservedRuleSetIds,
+        allowRemoteRuleSets: true,
       }),
     [
       defaultNoResolve,
@@ -135,8 +140,9 @@ export function ProxyGroupsCustomRulesBatchDialog({
       return;
     }
 
-    if (importPlan.rules.length > 0) onImport(importPlan.rules);
-    if (importPlan.ruleSets.length > 0) onImportRuleSets?.(importPlan.ruleSets);
+    const commit = (plan: typeof importPlan) => {
+    if (plan.rules.length > 0) onImport(plan.rules);
+    if (plan.ruleSets.length > 0) onImportRuleSets?.(plan.ruleSets);
     interactions.customRuleBatchImported?.({
       result: "success",
       ruleCount: importPlan.readyCount,
@@ -146,6 +152,24 @@ export function ProxyGroupsCustomRulesBatchDialog({
       variant: "success",
     });
     close();
+    };
+    if (importPlan.pendingRuleSetUrls.length === 0) { commit(importPlan); return; }
+    operation(async (signal) => {
+      try {
+        const resolvedRuleSets = new Map<string, RuleSetMetadata>();
+        for (const url of new Set(importPlan.pendingRuleSetUrls)) {
+          if (signal.aborted) return;
+          resolvedRuleSets.set(url, await resolveRuleSetUrl(url, api.rules, signal));
+        }
+        if (signal.aborted) return;
+        const plan = parseCustomRuleBatchImport({ text: rawText, defaultType, defaultTarget, defaultNoResolve,
+          targetOptions, ruleSetTargetOptions, existingRules, existingRuleSets, reservedRuleSetIds, resolvedRuleSets });
+        if (!plan.canImport || plan.pendingRuleSetUrls.length) throw new Error("请先修正无效或重复的规则行");
+        commit(plan);
+      } catch (error) {
+        if (!signal.aborted) toast({ title: error instanceof Error ? error.message : "规则识别失败", variant: "warning" });
+      }
+    });
   };
 
   return (

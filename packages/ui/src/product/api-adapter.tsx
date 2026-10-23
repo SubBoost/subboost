@@ -78,6 +78,7 @@ export type CnCandidateRule = {
 };
 
 export type ProductRulesApi = {
+  detectRuleSet?: (request: { url: string; signal?: AbortSignal }) => Promise<import("@subboost/core/types/config").RuleSetMetadata>;
   getTotalRules?: (signal?: AbortSignal) => Promise<number>;
   searchRules?: (request: RulesSearchRequest) => Promise<RulesSearchResponse>;
   loadCnCandidateRules?: (request: CnCandidateRulesRequest) => Promise<CnCandidateRule[]>;
@@ -92,6 +93,7 @@ export type ProductApiAdapter = {
 };
 
 export type RulesProductApiOptions = {
+  ruleDetectionEndpoint?: string;
   rulesSearchEndpoint?: string;
   cnCandidatesEndpoint?: string;
   fetchImpl?: typeof fetch;
@@ -103,6 +105,11 @@ export function createRulesProductApi(options: RulesProductApiOptions = {}): Pro
   const fetchImpl: typeof fetch = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
 
   return {
+    detectRuleSet: async ({ url, signal }) => readJsonResponse(
+      await fetchImpl(options.ruleDetectionEndpoint ?? "/api/rules/detect", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }), signal, cache: "no-store",
+      }),
+    ),
     getTotalRules: async (signal) => {
       const params = new URLSearchParams({ keyword: "", page: "1", size: "1" });
       const data = await readJsonResponse<{ totalRules?: number }>(

@@ -169,6 +169,7 @@ export function createTemplateActions(
           mixedPort: typeof config.mixedPort === "number" ? config.mixedPort : state.mixedPort,
           allowLan: typeof config.allowLan === "boolean" ? config.allowLan : state.allowLan,
           testUrl: typeof config.testUrl === "string" ? config.testUrl : state.testUrl,
+          sharedHealthChecks: config.sharedHealthChecks === true,
           testInterval:
             typeof config.testInterval === "number" ? config.testInterval : state.testInterval,
           ruleProviderBaseUrl:
