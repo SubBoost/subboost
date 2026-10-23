@@ -4,7 +4,7 @@ import {
   type DashboardSurfaceAdapter,
 } from "@subboost/ui/dashboard/subscription-dashboard-surface";
 import { readJsonResponse } from "@subboost/ui/product/client-response";
-import type { RefreshSubscriptionResponse, Subscription } from "@subboost/ui/dashboard/dashboard-types";
+import type { RefreshSubscriptionResponse, Subscription, SubscriptionLink } from "@subboost/ui/dashboard/dashboard-types";
 import { LOCAL_AUTO_UPDATE_POLICY } from "@local/lib/auto-update-policy";
 
 function resolveLocalDashboardDownloadUrl(subscription: Subscription): string {
@@ -48,6 +48,14 @@ const localDashboardAdapter: DashboardSurfaceAdapter = {
       body: JSON.stringify(payload),
     });
     await readJsonResponse<{ error?: string }>(response, "保存失败");
+  },
+  resetSubscriptionLink: async (id, token) => {
+    const response = await fetch(`/api/subscriptions/${encodeURIComponent(id)}/reset-link`, {
+      method: "POST",
+      headers: { "If-Match": `"${token}"` },
+    });
+    const data = await readJsonResponse<{ subscription: SubscriptionLink }>(response, "重置订阅链接失败");
+    return data.subscription;
   },
   resolveDownloadUrl: resolveLocalDashboardDownloadUrl,
 };

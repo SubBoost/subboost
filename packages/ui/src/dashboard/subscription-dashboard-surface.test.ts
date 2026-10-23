@@ -53,7 +53,7 @@ vi.mock("lucide-react", () => ({
   Download: () => null,
   ExternalLink: () => null,
   FileCode: () => null,
-  MoreVertical: () => null,
+  Pencil: () => null,
   Plus: () => null,
   RefreshCw: () => null,
   Settings: () => null,
@@ -533,6 +533,32 @@ describe("SubscriptionDashboardSurface", () => {
       "Failed to delete subscription:",
       expect.objectContaining({ message: "delete failed" })
     );
+  });
+
+  it("confirms link rotation, guards duplicate clicks and preserves unsaved settings", async () => {
+    const link = { id: subscription.id, token: "rotated", subscriptionUrl: "https://local.subboost.test/new" };
+    const adapter = createAdapter({ resetSubscriptionLink: vi.fn(async () => link) });
+    renderSurface(adapter, { 0: [subscription], 1: false, 4: true, 5: subscription, 6: "Unsaved name" });
+    mocks.confirmDialog.mockResolvedValueOnce(false);
+    await mocks.captures.settingsDialog.onResetLink();
+    expect(adapter.resetSubscriptionLink).not.toHaveBeenCalled();
+    mocks.confirmDialog.mockResolvedValueOnce(true);
+    const first = mocks.captures.settingsDialog.onResetLink();
+    await mocks.captures.settingsDialog.onResetLink();
+    await first;
+    expect(adapter.resetSubscriptionLink).toHaveBeenCalledExactlyOnceWith(subscription.id, subscription.token);
+    expect((stateMock.setters[0] as any).lastValue[0]).toEqual({ ...subscription, ...link });
+    expect((stateMock.setters[5] as any).lastValue).toEqual({ ...subscription, ...link });
+    expect(stateMock.setters[6]).not.toHaveBeenCalled();
+  });
+
+  it("retains the current link when reset fails", async () => {
+    const adapter = createAdapter({ resetSubscriptionLink: vi.fn(async () => { throw new Error("reset failed"); }) });
+    renderSurface(adapter, { 0: [subscription], 1: false, 4: true, 5: subscription });
+    mocks.confirmDialog.mockResolvedValueOnce(true);
+    await mocks.captures.settingsDialog.onResetLink();
+    expect(stateMock.setters[0]).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
   });
 
   it("validates and saves subscription settings", async () => {

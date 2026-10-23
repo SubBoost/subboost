@@ -37,3 +37,5 @@ export interface RefreshSubscriptionResponse {
   attemptedUrlFetch?: boolean;
   usedUrlFetch?: boolean;
 }
+
+export type SubscriptionLink = Pick<Subscription, "id" | "token" | "subscriptionUrl">;

@@ -10,6 +10,7 @@ import {
   getSubscription,
   listSubscriptions,
   refreshSubscription,
+  resetSubscriptionLink,
   updateSubscription,
   type SubscriptionRow,
 } from "./subscription-service";
@@ -98,6 +99,27 @@ vi.mock("./source-import", () => ({
   importSourceUrlDirect: mocks.importSourceUrlDirect,
   fetchSourceUserInfoHeadersDirect: mocks.fetchSourceUserInfoHeadersDirect,
 }));
+
+describe("subscription link rotation", () => {
+  it("uses an atomic owner and old-token comparison and updates no other fields", async () => {
+    mocks.getAppUrl.mockReturnValue("https://local.subboost.test");
+    mocks.prisma.subscription.updateMany.mockResolvedValueOnce({ count: 1 });
+    const result = await resetSubscriptionLink("owner-1", "sub-1", "old");
+    expect(result.status).toBe("updated");
+    expect(result.subscription?.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(mocks.prisma.subscription.updateMany).toHaveBeenLastCalledWith({
+      where: { id: "sub-1", ownerId: "owner-1", token: "old" }, data: { token: result.subscription?.token },
+    });
+    expect(result.subscription?.subscriptionUrl).toContain(result.subscription?.token);
+  });
+
+  it("distinguishes a stale link from a subscription not owned by this account", async () => {
+    mocks.prisma.subscription.updateMany.mockResolvedValue({ count: 0 });
+    mocks.prisma.subscription.findFirst.mockResolvedValueOnce({ id: "sub-1" }).mockResolvedValueOnce(null);
+    await expect(resetSubscriptionLink("owner-1", "sub-1", "old")).resolves.toEqual({ status: "stale" });
+    await expect(resetSubscriptionLink("other", "sub-1", "old")).resolves.toEqual({ status: "not_found" });
+  });
+});
 
 function node(name = "Node") {
   return {

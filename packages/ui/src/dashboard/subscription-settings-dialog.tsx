@@ -40,6 +40,8 @@ type Props = {
   setAutoUpdateHours: (value: number) => void;
   savingSettings: boolean;
   onSave: () => void;
+  onResetLink?: () => void;
+  resettingLink?: boolean;
   userIsAdmin: boolean;
   autoUpdatePolicy?: AutoUpdateIntervalPolicy;
 };
@@ -58,14 +60,17 @@ export function SubscriptionSettingsDialog({
   setAutoUpdateHours,
   savingSettings,
   onSave,
+  onResetLink,
+  resettingLink = false,
   userIsAdmin,
   autoUpdatePolicy,
 }: Props) {
   const policy = autoUpdatePolicy ?? resolveAutoUpdateIntervalPolicy(userIsAdmin);
+  const busy = savingSettings || resettingLink;
   const quotaWarning = subscription ? buildNodeQuotaWarning(subscription.autoUpdateState) : null;
   const quotaDisabled = subscription ? isNodeQuotaAutoUpdateDisabled(subscription.autoUpdateState) : false;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>订阅设置</DialogTitle>
@@ -75,12 +80,13 @@ export function SubscriptionSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <FormField label="订阅名称">
+          <FormField label="订阅名称" className="grid-cols-[auto_minmax(0,1fr)] items-center">
             <Input
               value={settingsName}
               onChange={(e) => setSettingsName(e.target.value)}
               maxLength={100}
               placeholder="例如：我的配置"
+              disabled={busy}
             />
           </FormField>
 
@@ -95,14 +101,16 @@ export function SubscriptionSettingsDialog({
               checked={smartNodeMatchingEnabled}
               onCheckedChange={setSmartNodeMatchingEnabled}
               aria-label="更新时智能匹配节点"
+              disabled={busy}
             />
           </div>
 
           <SwitchField
             label="启用自动更新"
-            description="开启后服务器会按间隔刷新缓存"
+            appearance="plain"
             checked={autoUpdateEnabled}
             onCheckedChange={setAutoUpdateEnabled}
+            disabled={busy}
           />
 
           {!autoUpdateEnabled && subscription?.autoUpdateState.disabledAt && subscription.autoUpdateState.disabledReason && (
@@ -120,25 +128,29 @@ export function SubscriptionSettingsDialog({
           )}
 
           {autoUpdateEnabled && (
-            <FormField label="自动更新间隔（小时）">
+            <FormField label="自动更新间隔（小时）" className="grid-cols-[auto_minmax(0,1fr)] items-center">
               <Input
                 type="number"
                 min={policy.minHours}
                 step={policy.stepHours}
                 value={autoUpdateHours}
                 onChange={(e) => setAutoUpdateHours(Number(e.target.value))}
+                disabled={busy}
               />
             </FormField>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={savingSettings}>
-            取消
-          </Button>
-          <Button onClick={onSave} disabled={savingSettings}>
-            {savingSettings ? "保存中..." : "保存"}
-          </Button>
+        <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2 sm:justify-between">
+          {onResetLink && (
+            <Button variant="ghost" className="text-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={onResetLink} disabled={busy}>
+              {resettingLink ? "重置中..." : "重置订阅链接"}
+            </Button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>取消</Button>
+            <Button onClick={onSave} disabled={busy}>{savingSettings ? "保存中..." : "保存"}</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
