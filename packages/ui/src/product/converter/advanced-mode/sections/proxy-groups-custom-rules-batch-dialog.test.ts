@@ -216,4 +216,20 @@ describe("ProxyGroupsCustomRulesBatchDialog", () => {
       expect(props.onOpenChange).toHaveBeenCalledWith(false);
     }
   });
+
+  it.each([
+    { format: "unknown", behavior: "domain" }, { format: "mrs", behavior: "domain" },
+    { format: "text", behavior: "unknown" }, { behavior: "domain" },
+  ])("retains the draft when detection returns invalid metadata: %j", async (metadata) => {
+    mocks.rulesApi = { detectRuleSet: vi.fn().mockResolvedValue(metadata) };
+    const onImportRuleSets = vi.fn();
+    const { props, setters } = renderDialog("https://local.subboost.test/rules", {
+      defaultType: "RULE-SET", onImportRuleSets,
+    });
+    mocks.buttons.at(-1).onClick();
+    await vi.waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "无法识别规则文件" })));
+    expect(onImportRuleSets).not.toHaveBeenCalled();
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    expect(setters[0]).not.toHaveBeenCalled();
+  });
 });

@@ -32,4 +32,10 @@ describe("rule detection request boundary", () => {
     const invalid = await handleRuleDetection(request(body), async () => "<html>error</html>");
     expect(invalid.status).toBe(422);
   });
+  it.each([null, 1, "url", [], {}, { url: 1 }])("rejects malformed JSON inputs before transport: %j", async (value) => {
+    const fetchContent = vi.fn();
+    const response = await handleRuleDetection(request(JSON.stringify(value)), fetchContent);
+    expect(response.status).toBe(400);
+    expect(fetchContent).not.toHaveBeenCalled();
+  });
 });

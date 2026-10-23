@@ -36,4 +36,13 @@ describe("local reset subscription link route", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(mocks.reset).toHaveBeenCalledWith("owner-1", "sub-1", "a".repeat(43));
   });
+
+  it("rejects missing preconditions and invalid subscription IDs without rotating", async () => {
+    const missing = new Request("http://local.subboost.test/api/subscriptions/sub-1/reset-link", { method: "POST" });
+    expect((await POST(missing, context)).status).toBe(400);
+    for (const id of ["", "x".repeat(129)]) {
+      expect((await POST(request(), { params: Promise.resolve({ id }) })).status).toBe(400);
+    }
+    expect(mocks.reset).not.toHaveBeenCalled();
+  });
 });

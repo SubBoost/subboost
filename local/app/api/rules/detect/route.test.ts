@@ -31,4 +31,8 @@ describe("local rule detection", () => {
     expect(response.status).toBe(422);
     expect(await response.text()).not.toContain("private");
   });
+  it("rejects a transport success without a body", async () => {
+    mocks.fetch.mockResolvedValueOnce({ ok: true });
+    expect((await POST(request())).status).toBe(422);
+  });
 });

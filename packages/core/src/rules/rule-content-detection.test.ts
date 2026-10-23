@@ -32,4 +32,26 @@ describe("remote rule content detection", () => {
   it("recognizes a quoted YAML payload key", () => {
     expect(detectRuleContent('"payload":\n  - +.example.test')).toEqual({ format: "yaml", behavior: "domain" });
   });
+
+  it.each([
+    "IP-CIDR6,2001:db8::/32,no-resolve", "GEOIP,CN,no-resolve", "GEOSITE,category-ads-all",
+    "DOMAIN,example.test", "DOMAIN-KEYWORD,example", "PROCESS-NAME,Example App.exe", "SRC-PORT,0/65535/80-443",
+  ])("accepts supported classical rule semantics: %s", (rule) => {
+    expect(detectRuleContent(rule)).toEqual({ format: "text", behavior: "classical" });
+  });
+
+  it.each([
+    "DOMAIN,", "DOMAIN,example.test,no-resolve", "DOMAIN,example.test,DIRECT,extra",
+    "GEOIP,bad/value", "GEOSITE,bad value", "DOMAIN-KEYWORD,bad/value", "SRC-PORT,1-2-3",
+    "203.00.113.0/24", "2001:db8::invalid/32", "203.0.113.0/", "payload: ['']",
+    "'not a payload'", "---\nnull", "[example.test]", "{}", "payload: example.test",
+    `${"a".repeat(64)}.test`, `${"a.".repeat(127)}test`, "payload: ['example.test', 'bad value']",
+  ])("rejects invalid rule values and YAML shapes: %s", (rule) => {
+    expect(() => detectRuleContent(rule)).toThrow();
+  });
+
+  it("rejects excessive valid text and YAML entries", () => {
+    expect(() => detectRuleContent("example.test\n".repeat(100001))).toThrow();
+    expect(() => detectRuleContent(`payload:\n${" - example.test\n".repeat(100010)}`)).toThrow();
+  });
 });

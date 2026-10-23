@@ -40,4 +40,31 @@ describe("shared health checks", () => {
       "proxy-providers": { subboost_shared_1: remote } });
     expect(result["proxy-providers"]).toMatchObject({ subboost_shared_1: remote, subboost_shared_2: { type: "inline" } });
   });
+
+  it.each([
+    {}, { proxies: {}, "proxy-groups": {} }, { proxies: nodes },
+    { "proxy-groups": [group("one"), group("two")] },
+  ])("leaves configs without eligible groups intact: %j", (config) => {
+    expect(shareHealthChecks(config)).toBe(config);
+  });
+
+  it.each([
+    { type: "select" }, { url: undefined }, { proxies: [] }, { proxies: ["A", "A"] },
+    { proxies: [42] }, { interval: "300" }, { interval: 0.5 }, { interval: -1 },
+    { "exclude-filter": "A" }, { "include-all": false },
+  ])("does not share unsupported group contracts: %j", (extra) => {
+    const config = { proxies: nodes, "proxy-groups": [group("one", extra), group("two", extra)] };
+    expect(shareHealthChecks(config)).toBe(config);
+  });
+
+  it("preserves effective defaults, expected status and unrelated groups", () => {
+    const extra = { interval: 0, timeout: 1000, "expected-status": "204" };
+    const untouched = group("manual", { type: "select" });
+    const result = shareHealthChecks({ proxies: nodes,
+      "proxy-groups": [group("one", extra), group("two", extra), untouched] });
+    expect(result["proxy-providers"]).toMatchObject({ subboost_shared_1: {
+      "health-check": { interval: 300, timeout: 1000, "expected-status": "204" },
+    } });
+    expect((result["proxy-groups"] as unknown[])[2]).toBe(untouched);
+  });
 });

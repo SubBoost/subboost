@@ -224,6 +224,20 @@ describe("local app pages and adapters", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/templates?id=tpl%201", { method: "DELETE" });
   });
 
+  it("rotates the dashboard link with its current token and propagates rejection", async () => {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetchMock);
+    renderToStaticMarkup(React.createElement(DashboardPage));
+    const link = { id: "sub 1", token: "new", subscriptionUrl: "https://local.subboost.test/sub/new" };
+    mocks.readJsonResponse.mockResolvedValueOnce({ subscription: link });
+    await expect(mocks.dashboardAdapter.resetSubscriptionLink("sub 1", "old")).resolves.toEqual(link);
+    expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201/reset-link", {
+      method: "POST", headers: { "If-Match": '"old"' },
+    });
+    mocks.readJsonResponse.mockRejectedValueOnce(new Error("stale link"));
+    await expect(mocks.dashboardAdapter.resetSubscriptionLink("sub 1", "old")).rejects.toThrow("stale link");
+  });
+
   it("renders local settings for anonymous and authenticated states", async () => {
     let html = renderToStaticMarkup(React.createElement(SettingsPage));
     expect(html).toContain("未登录");
