@@ -237,7 +237,7 @@ export function ProxyGroupsModuleCard({
     <div className="overflow-hidden rounded border border-ink/10 bg-ink/5">
       <div
         className={cn(
-          "relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-2 py-2",
+          "relative grid grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-2 py-2",
           hasExpandedContent && !isEditing && "cursor-pointer"
         )}
       >
@@ -358,7 +358,7 @@ export function ProxyGroupsModuleCard({
         </div>
 
         {!isEditing && (
-          <div className="pointer-events-none relative z-10 flex shrink-0 items-center justify-end gap-2">
+          <div className="pointer-events-none relative z-10 col-start-2 sm:col-start-auto flex shrink-0 items-center justify-end gap-2">
             <Switch
               aria-label={`启用 ${display.full} 分流组`}
               checked={isEnabled}

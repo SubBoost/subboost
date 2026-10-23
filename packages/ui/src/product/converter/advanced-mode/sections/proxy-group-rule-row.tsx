@@ -122,7 +122,7 @@ export function ProxyGroupRuleSetRow({
   name: string;
   path: string;
   source: Exclude<RuleSource, "manual">;
-  behavior: "domain" | "ipcidr";
+  behavior: "domain" | "ipcidr" | "classical";
   noResolve?: boolean;
   state?: ProxyGroupRuleRowState;
   actions?: React.ReactNode;
@@ -302,8 +302,8 @@ function RuleSourceBadge({ source }: { source: RuleSource }) {
   );
 }
 
-function RuleBehaviorBadge({ behavior }: { behavior: "domain" | "ipcidr" }) {
-  return <RuleTextBadge>{behavior === "ipcidr" ? "IP" : "域名"}</RuleTextBadge>;
+function RuleBehaviorBadge({ behavior }: { behavior: "domain" | "ipcidr" | "classical" }) {
+  return <RuleTextBadge>{behavior === "ipcidr" ? "IP" : behavior === "classical" ? "综合" : "域名"}</RuleTextBadge>;
 }
 
 function RuleTextBadge({ children }: { children: React.ReactNode }) {
