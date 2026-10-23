@@ -228,7 +228,7 @@ describe("local app pages and adapters", () => {
     const fetchMock = vi.fn(async () => Response.json({}));
     vi.stubGlobal("fetch", fetchMock);
     renderToStaticMarkup(React.createElement(DashboardPage));
-    const link = { id: "sub 1", token: "new", subscriptionUrl: "https://local.subboost.test/sub/new" };
+    const link = { id: "sub 1", token: "rotated", subscriptionUrl: "https://local.subboost.test/sub/rotated" };
     mocks.readJsonResponse.mockResolvedValueOnce({ subscription: link });
     await expect(mocks.dashboardAdapter.resetSubscriptionLink("sub 1", "old")).resolves.toEqual(link);
     expect(fetchMock).toHaveBeenCalledWith("/api/subscriptions/sub%201/reset-link", {
