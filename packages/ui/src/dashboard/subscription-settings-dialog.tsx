@@ -80,7 +80,7 @@ export function SubscriptionSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <FormField label="订阅名称" className="grid-cols-[auto_minmax(0,1fr)] items-center">
+          <FormField label="订阅名称" className="grid-cols-[9rem_minmax(0,1fr)] items-center">
             <Input
               value={settingsName}
               onChange={(e) => setSettingsName(e.target.value)}
@@ -128,7 +128,7 @@ export function SubscriptionSettingsDialog({
           )}
 
           {autoUpdateEnabled && (
-            <FormField label="自动更新间隔（小时）" className="grid-cols-[auto_minmax(0,1fr)] items-center">
+            <FormField label="自动更新间隔（小时）" className="grid-cols-[9rem_minmax(0,1fr)] items-center">
               <Input
                 type="number"
                 min={policy.minHours}
@@ -143,7 +143,7 @@ export function SubscriptionSettingsDialog({
 
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2 sm:justify-between">
           {onResetLink && (
-            <Button variant="ghost" className="text-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={onResetLink} disabled={busy}>
+            <Button variant="outline" className="border-red-400/60 text-red-400 hover:border-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={onResetLink} disabled={busy}>
               {resettingLink ? "重置中..." : "重置订阅链接"}
             </Button>
           )}
