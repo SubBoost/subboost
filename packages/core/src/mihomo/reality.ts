@@ -1,3 +1,7 @@
+export function isRealityPublicKey(value: string): boolean {
+  return /^[A-Za-z0-9_-]{43}$/.test(value);
+}
+
 export function normalizeRealityShortId(input: unknown): string | null {
   const raw = (() => {
     if (typeof input === "string") return input;

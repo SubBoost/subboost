@@ -1,18 +1,16 @@
 import type { ParsedNode } from "@subboost/core/types/node";
 import { splitWsPathEarlyData } from "@subboost/core/parser/ws-early-data";
 import { isMihomoEchQueryServerName, isStandardBase64String } from "./ech";
-import { normalizeRealityShortId } from "./reality";
+import { isRealityPublicKey, normalizeRealityShortId } from "./reality";
+import { isVlessMlkemEncryption } from "./vless-encryption";
 import { normalizeXhttpFields } from "./xhttp";
 import { normalizeProtocolFields } from "./protocol-fields";
 import { normalizeCertificateFingerprint } from "./certificate-fingerprint";
 import { getNodeEndpointError } from "../node-endpoint";
 import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "./string-scalar";
 
-const REALITY_PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const WIREGUARD_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
 const SSH_SERVER_FINGERPRINT_PATTERN = /^SHA256:[A-Za-z0-9+/]{43}=?$/;
-const VLESS_ENCRYPTION_PATTERN =
-  /^mlkem768x25519plus\.(?:native|xorpub|random)\.(?:1rtt|0rtt)\.[A-Za-z0-9+/=_-]+(?:\.[A-Za-z0-9+/=_-]+)*$/;
 const BOOLEAN_PROXY_FIELDS = new Set([
   "udp",
   "tls",
@@ -158,7 +156,7 @@ export { isStandardBase64String } from "./ech";
 
 export function normalizeMihomoRealityPublicKey(input: unknown): string | null {
   const value = normalizeString(input);
-  if (!value || !REALITY_PUBLIC_KEY_PATTERN.test(value)) return null;
+  if (!value || !isRealityPublicKey(value)) return null;
   return value;
 }
 
@@ -401,7 +399,7 @@ function sanitizeVlessEncryption(value: unknown): unknown {
   if (!encryption) return undefined;
   if (encryption === "none") return encryption;
   if (!encryption.startsWith("mlkem768x25519plus")) return encryption;
-  return VLESS_ENCRYPTION_PATTERN.test(encryption) ? encryption : undefined;
+  return isVlessMlkemEncryption(encryption) ? encryption : undefined;
 }
 
 export function normalizeMihomoVlessForGeneration(node: Record<string, unknown>): Record<string, unknown> {

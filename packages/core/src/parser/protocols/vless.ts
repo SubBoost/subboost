@@ -9,7 +9,8 @@
 import { decodeBase64 } from "../base64";
 import type { VLESSNode, XHttpDownloadSettings, XHttpOpts, XHttpReuseSettings } from "@subboost/core/types/node";
 import { buildMihomoEchOptsFromShareValue } from "@subboost/core/mihomo/ech";
-import { normalizeRealityShortId } from "@subboost/core/mihomo/reality";
+import { isRealityPublicKey, normalizeRealityShortId } from "@subboost/core/mihomo/reality";
+import { isVlessMlkemEncryption } from "@subboost/core/mihomo/vless-encryption";
 import { splitWsPathEarlyData } from "../ws-early-data";
 import { parseUrlWithNeutralScheme, safeDecodeFormUrlEncoded, safeDecodeURIComponent } from "./url-decode";
 import { parseJsonObject, parseJsonStringMap } from "../json-utils";
@@ -353,9 +354,13 @@ export function parseVLESS(uri: string): VLESSNode {
 
   if (security === "reality") {
     const normalizedShortId = normalizeRealityShortId(sid);
-    const supportX25519Mlkem768 = parseBoolish(pickQueryValue(params, [
+    const supportKeys = [
       "support-x25519mlkem768", "support_x25519mlkem768", "supportX25519MLKEM768",
-    ]));
+    ];
+    const explicitSupport = supportKeys.some((key) => params.has(key));
+    const supportX25519Mlkem768 = explicitSupport
+      ? parseBoolish(pickQueryValue(params, supportKeys))
+      : isRealityPublicKey(pbk) && isVlessMlkemEncryption(encryption) ? true : undefined;
     const realityOpts: Record<string, unknown> = {
       ...(pbk ? { "public-key": pbk } : {}),
       ...(normalizedShortId ? { "short-id": normalizedShortId } : {}),
