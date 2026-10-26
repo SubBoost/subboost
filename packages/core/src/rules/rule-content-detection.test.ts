@@ -19,6 +19,7 @@ describe("remote rule content detection", () => {
     "203.0.113.0/24/", "203.0.113.0/24//garbage", "IP-CIDR,203.0.113.0/24/", "payload: ['203.0.113.0/24/']",
     "IP-CIDR,2001:db8::/32", "IP-CIDR6,203.0.113.0/24", "DOMAIN,example.test,DIRECT", "GEOIP,CN,REJECT",
     "DST-PORT,65536", "SRC-PORT,90-80", "RULE-SET,other", "SUB-RULE,other", "UNKNOWN,example.test",
+    "DOMAIN-REGEX,^local$", "NETWORK,tcp", "AND,((NETWORK,tcp))",
     "https://example.test/rules", "foo..example.test", "<html>", "\0example.test", "payload:\n  - 'example.test\n    extra'",
   ])("rejects unsupported or malformed content: %s", (text) => {
     expect(() => detectRuleContent(text)).toThrow();

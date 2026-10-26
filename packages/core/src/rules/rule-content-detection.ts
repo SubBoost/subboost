@@ -51,6 +51,7 @@ function validClassical(value: string): boolean {
     case "DOMAIN-KEYWORD": return !/[\s/:<>\[\]{}]/.test(pattern);
     case "PROCESS-NAME": return !/[\r\n\0]/.test(pattern);
   }
+  return false;
 }
 
 export function detectRuleContent(content: string): { format: "yaml" | "text"; behavior: RuleSetBehavior } {
