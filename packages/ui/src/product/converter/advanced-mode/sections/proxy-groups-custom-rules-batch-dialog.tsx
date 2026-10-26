@@ -204,14 +204,17 @@ export function ProxyGroupsCustomRulesBatchDialog({
               onChange={(event) => setRawText(event.target.value)}
               placeholder={defaultType === "RULE-SET" ? "https://example.com/geosite/udemy.mrs" : [
                 "DOMAIN-SUFFIX,example.com,🚀 节点选择",
-                "IP-CIDR,1.1.1.0/24,DIRECT,no-resolve",
+                "IP-CIDR,203.0.113.0/24,DIRECT,no-resolve",
                 "GEOSITE,google",
+                "AND,((PROCESS-NAME,tailscaled),(NETWORK,UDP)),DIRECT",
                 "github.com",
               ].join("\n")}
               className="min-h-[180px] resize-y font-mono text-xs"
             />
             <div className="text-[10px] leading-4 text-fg-40">
               每行一条；缺少目标时使用当前目标，纯值行使用当前类型、目标和 no-resolve 设置。
+              正则与逻辑规则有目标时放在最后一列；no-resolve 仅对目标 IP 规则及规则集生效。
+              {'正则含歧义的字面逗号时，类型和值分别用双引号包裹，如："DOMAIN-REGEX","^local,subboost$"；只写这两列会使用当前目标。'}
             </div>
           </div>
 

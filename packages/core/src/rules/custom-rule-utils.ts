@@ -1,23 +1,6 @@
 import type { CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 
-export const CUSTOM_RULE_TYPES = [
-  "DOMAIN",
-  "DOMAIN-SUFFIX",
-  "DOMAIN-KEYWORD",
-  "IP-CIDR",
-  "IP-CIDR6",
-  "GEOIP",
-  "GEOSITE",
-  "PROCESS-NAME",
-  "DST-PORT",
-  "SRC-PORT",
-] as const satisfies readonly CustomRule["type"][];
-
-const customRuleTypeSet = new Set<string>(CUSTOM_RULE_TYPES);
-
-export function isCustomRuleType(value: string): value is CustomRule["type"] {
-  return customRuleTypeSet.has(value);
-}
+export { CUSTOM_RULE_TYPES, isCustomRuleType } from "./custom-rule-types";
 
 function toTrimmedString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

@@ -176,7 +176,7 @@ describe("custom rule batch import", () => {
         "DOMAIN,existing.com,PROXY",
         "DOMAIN,batch.com,PROXY",
         "DOMAIN,batch.com,PROXY",
-        "\"DOMAIN-SUFFIX\",\"quoted,domain\",\"DIRECT\"",
+        "\"DOMAIN-REGEX\",\"quoted,domain\",\"DIRECT\"",
         "\"DOMAIN\",\"a\"\"b.com\",\"PROXY\"",
       ].join("\r\n"),
       defaultType: "DOMAIN-SUFFIX",
@@ -210,10 +210,10 @@ describe("custom rule batch import", () => {
       "ready",
     ]);
     expect(result.rules).toEqual([
-      expect.objectContaining({ type: "DOMAIN-SUFFIX", value: "example.org", target: "PROXY", noResolve: true }),
-      expect.objectContaining({ type: "DOMAIN", value: "example.com", target: "PROXY", noResolve: true }),
+      expect.objectContaining({ type: "DOMAIN-SUFFIX", value: "example.org", target: "PROXY", noResolve: false }),
+      expect.objectContaining({ type: "DOMAIN", value: "example.com", target: "PROXY", noResolve: false }),
       expect.objectContaining({ type: "DOMAIN", value: "batch.com", target: "PROXY", noResolve: false }),
-      expect.objectContaining({ type: "DOMAIN-SUFFIX", value: "quoted,domain", target: "DIRECT", noResolve: false }),
+      expect.objectContaining({ type: "DOMAIN-REGEX", value: "quoted,domain", target: "DIRECT", noResolve: false }),
       expect.objectContaining({ type: "DOMAIN", value: "a\"b.com", target: "PROXY", noResolve: false }),
     ]);
   });
@@ -242,7 +242,7 @@ describe("custom rule batch import", () => {
 
     expect(ready.items.map((item) => item.status)).toEqual(["ready", "ready"]);
     expect(ready.rules).toEqual([
-      expect.objectContaining({ type: "DOMAIN", value: "example.com", target: "PROXY", noResolve: true }),
+      expect.objectContaining({ type: "DOMAIN", value: "example.com", target: "PROXY", noResolve: false }),
       expect.objectContaining({ type: "DOMAIN-SUFFIX", value: "example.org", target: "PROXY", noResolve: false }),
     ]);
     expect(ready.canImport).toBe(true);
@@ -278,7 +278,7 @@ describe("custom rule batch import", () => {
         type: "DOMAIN",
         value: "two-column.example",
         target: "PROXY",
-        noResolve: true,
+        noResolve: false,
       }),
     ]);
   });

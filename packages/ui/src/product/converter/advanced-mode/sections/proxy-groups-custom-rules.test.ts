@@ -121,19 +121,8 @@ vi.mock("@subboost/core/proxy-group-name", () => ({
     override?: string,
   ) => override || module.name,
 }));
-vi.mock("@subboost/core/rules/custom-rule-utils", () => ({
-  CUSTOM_RULE_TYPES: [
-    "DOMAIN",
-    "DOMAIN-SUFFIX",
-    "DOMAIN-KEYWORD",
-    "IP-CIDR",
-    "IP-CIDR6",
-    "GEOIP",
-    "GEOSITE",
-    "PROCESS-NAME",
-    "DST-PORT",
-    "SRC-PORT",
-  ],
+vi.mock("@subboost/core/rules/custom-rule-utils", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@subboost/core/rules/custom-rule-utils")>(),
   createCustomRuleId: mocks.createCustomRuleId,
 }));
 vi.mock("@subboost/ui/store/config-store", () => ({
@@ -151,6 +140,7 @@ vi.mock("./proxy-groups-custom-rules-batch-dialog", () => ({
 }));
 
 import { ProxyGroupsCustomRules } from "./proxy-groups-custom-rules";
+import { CUSTOM_RULE_TYPES, getCustomRuleDefinition, supportsNoResolve } from "@subboost/core/rules/custom-rule-types";
 import {
   RULE_ADD_ROW_FRAME_CLASS,
   RULE_EDIT_ACTIONS_CLASS,
@@ -431,7 +421,7 @@ describe("ProxyGroupsCustomRules", () => {
         type,
         value: "value",
         target: "DIRECT",
-        noResolve: true,
+        noResolve: supportsNoResolve(type),
       });
       expect(mocks.interactions.ruleAdded).toHaveBeenCalledWith({
         source: "manual",
@@ -529,7 +519,7 @@ describe("ProxyGroupsCustomRules", () => {
       type: "DOMAIN",
       value: "edited.com",
       target: { kind: "custom", id: "custom-1" },
-      noResolve: true,
+      noResolve: false,
     });
     expect(setters[5]).toHaveBeenCalledWith(null);
     expect(setters[6]).toHaveBeenCalledWith(null);
@@ -649,6 +639,33 @@ describe("ProxyGroupsCustomRules", () => {
     mocks.captures.buttons
       .find((props) => props.title === "保存规则")
       .onClick();
+    expect(mocks.store.updateCustomRule).not.toHaveBeenCalled();
+  });
+
+  it.each(CUSTOM_RULE_TYPES)("adds and edits %s using its example and applicable parameters", (type) => {
+    const value = getCustomRuleDefinition(type).example;
+    renderRules({ 0: type, 1: value, 2: "DIRECT", 3: true });
+    expect(mocks.captures.inputs[0].placeholder).toContain(value);
+    expect(mocks.captures.switches[0].disabled).toBe(!supportsNoResolve(type));
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(mocks.store.addCustomRule).toHaveBeenCalledWith(expect.objectContaining({ type, value, noResolve: supportsNoResolve(type) }));
+    const rule = { id: "edit", type, value, target: "DIRECT", noResolve: true };
+    mocks.store.customRules = [rule];
+    renderRules({ 5: "edit", 6: rule });
+    expect(mocks.captures.switches[1].disabled).toBe(!supportsNoResolve(type));
+    mocks.captures.buttons.find((button) => button.title === "保存规则").onClick();
+    expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("edit", expect.objectContaining({ type, value, noResolve: supportsNoResolve(type) }));
+  });
+
+  it("keeps malformed logic drafts visible and reports the failure", () => {
+    renderRules({ 0: "AND", 1: "((UNKNOWN,x))", 2: "DIRECT" });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    expect(mocks.store.addCustomRule).not.toHaveBeenCalled();
+    const rule = { id: "edit", type: "AND", value: "broken", target: "DIRECT" };
+    mocks.store.customRules = [rule];
+    renderRules({ 5: "edit", 6: rule });
+    mocks.captures.buttons.find((button) => button.title === "保存规则").onClick();
     expect(mocks.store.updateCustomRule).not.toHaveBeenCalled();
   });
 

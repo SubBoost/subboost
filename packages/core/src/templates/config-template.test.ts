@@ -161,7 +161,7 @@ describe("validateSubBoostTemplateConfig", () => {
     expect(result.config.customRules[0]).toMatchObject({
       id: "custom-rule-a",
       value: "example.com",
-      noResolve: true,
+      noResolve: false,
       target: { kind: "module", id: "select" },
     });
     expect(result.config.dialerProxyGroups[0]).toMatchObject({

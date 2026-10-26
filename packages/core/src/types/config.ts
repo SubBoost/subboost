@@ -212,7 +212,7 @@ export interface UserConfig {
 
 export interface CustomRule {
   id: string;
-  type: "DOMAIN" | "DOMAIN-SUFFIX" | "DOMAIN-KEYWORD" | "IP-CIDR" | "IP-CIDR6" | "GEOIP" | "GEOSITE" | "PROCESS-NAME" | "DST-PORT" | "SRC-PORT";
+  type: import("../rules/custom-rule-types").CustomRuleType;
   value: string;
   target: ProxyGroupRuleTarget;
   noResolve?: boolean;

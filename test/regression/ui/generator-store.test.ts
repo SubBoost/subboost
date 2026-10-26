@@ -136,7 +136,7 @@ describe("public generator and refresh branch coverage", () => {
         "rules:",
         "-",
         "- DOMAIN,example.com,Proxy",
-        "- DOMAIN-SUFFIX,\"quoted,example.com\",Proxy,no-resolve",
+        "- \"DOMAIN-REGEX\",\"quoted,example.com\",Proxy",
         "- DOMAIN,example.com,Proxy",
         "DOMAIN,existing.example.com,Proxy",
         "DOMAIN,bad.example.com,Missing",
@@ -162,8 +162,8 @@ describe("public generator and refresh branch coverage", () => {
     expect(importResult.rules).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ value: "example.com", noResolve: false }),
-        expect.objectContaining({ value: "quoted,example.com", noResolve: true }),
-        expect.objectContaining({ value: "simple.example.com", target: "Fallback", noResolve: true }),
+        expect.objectContaining({ value: "quoted,example.com", noResolve: false }),
+        expect.objectContaining({ value: "simple.example.com", target: "Fallback", noResolve: false }),
       ]),
     );
 

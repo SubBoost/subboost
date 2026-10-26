@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseCustomRuleBatchImport, type ParseCustomRuleBatchImportOptions } from "./custom-rule-batch-import";
 import { CUSTOM_RULE_TYPES } from "./custom-rule-utils";
+import { isLogicRuleType } from "./custom-rule-value";
+import { supportsNoResolve } from "./custom-rule-types";
 import { allocateRuleSetId } from "./rule-model";
 
 const url = "https://local.subboost.test/geosite/udemy.mrs";
@@ -10,10 +12,10 @@ function parse(text: string, overrides: Partial<ParseCustomRuleBatchImportOption
 }
 
 describe("batch import current selections", () => {
-  it.each(CUSTOM_RULE_TYPES)("inherits the selected %s type, target and no-resolve for plain values", (defaultType) => {
+  it.each(CUSTOM_RULE_TYPES.filter((type) => !isLogicRuleType(type)))("inherits the selected %s type, target and no-resolve for plain values", (defaultType) => {
     const result = parse("value", { defaultType });
     expect(result.canImport).toBe(true);
-    expect(result.rules).toEqual([{ id: "", type: defaultType, value: "value", target: "Proxy", noResolve: true }]);
+    expect(result.rules).toEqual([{ id: "", type: defaultType, value: "value", target: "Proxy", noResolve: supportsNoResolve(defaultType) }]);
   });
   it("creates named providers for plain URLs and explicit RULE-SET rows, including empty target columns", () => {
     const result = parse(`${url}\nRULE-SET,${url}?v=2,\nRULE-SET,${url}?v=3,Other,no-resolve`, { reservedRuleSetIds: ["udemy"] });
@@ -40,6 +42,18 @@ describe("batch import current selections", () => {
     expect(parse("RULE-SET,unknown")).toMatchObject({ canImport: false, errorCount: 1 });
     expect(parse(url, { ruleSetTargetOptions: ["Other"] })).toMatchObject({ canImport: false, errorCount: 1 });
     expect(parse("value", { defaultType: "DOMAIN", defaultTarget: "" })).toMatchObject({ canImport: false, errorCount: 1 });
+  });
+  it("keeps logic rule payloads intact across comma columns and validates them", () => {
+    const line = "AND,((PROCESS-NAME,tailscaled),(NETWORK,UDP),(SRC-PORT,41641)),DIRECT";
+    const result = parse(`${line}\n- OR, ((DOMAIN,a.com), (NETWORK,UDP)), Other`);
+    expect(result.canImport).toBe(true);
+    expect(result.rules).toEqual([
+      { id: "", type: "AND", value: "((PROCESS-NAME,tailscaled),(NETWORK,UDP),(SRC-PORT,41641))", target: "DIRECT", noResolve: false },
+      { id: "", type: "OR", value: "((DOMAIN,a.com),(NETWORK,UDP))", target: "Other", noResolve: false },
+    ]);
+    expect(parse("((DOMAIN,a.com),(NETWORK,UDP))", { defaultType: "AND" }).rules[0]).toMatchObject({ type: "AND", noResolve: false });
+    expect(parse("AND,(DOMAIN,a.com),DIRECT")).toMatchObject({ canImport: false, errorCount: 1 });
+    expect(parse("NOT,((DOMAIN,a.com),(DOMAIN,b.com)),DIRECT").items[0]?.message).toContain("NOT");
   });
   it("allocates readable unique IDs and removes unsafe filename characters", () => {
     expect(allocateRuleSetId("udemy", ["udemy", "udemy-2"])).toBe("udemy-3");

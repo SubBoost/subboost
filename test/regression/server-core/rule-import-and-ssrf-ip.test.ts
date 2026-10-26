@@ -37,8 +37,8 @@ describe("public rule and SSRF edge branch coverage", () => {
     ]);
     expect(result.rules).toEqual([
       expect.objectContaining({ type: "DOMAIN", value: "three-column.example.com", noResolve: false }),
-      expect.objectContaining({ type: "DOMAIN", value: "two-column.example.com", noResolve: true }),
-      expect.objectContaining({ type: "DOMAIN-SUFFIX", value: "one-column.example.com", noResolve: true }),
+      expect.objectContaining({ type: "DOMAIN", value: "two-column.example.com", noResolve: false }),
+      expect.objectContaining({ type: "DOMAIN-SUFFIX", value: "one-column.example.com", noResolve: false }),
     ]);
   });
 

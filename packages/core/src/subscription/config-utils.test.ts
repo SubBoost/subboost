@@ -124,7 +124,7 @@ describe("subscription config utils", () => {
       type: "DOMAIN-SUFFIX",
       value: "example.com",
       target: "DIRECT",
-      noResolve: true,
+      noResolve: false,
     });
     expect(options.customProxyGroups?.[0]).toMatchObject({
       id: "media",

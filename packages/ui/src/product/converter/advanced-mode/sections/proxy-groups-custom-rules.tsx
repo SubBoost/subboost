@@ -5,6 +5,7 @@ import { ArrowRight, Check, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
 import { IconButton } from "@subboost/ui/components/ui/icon-button";
 import { Input } from "@subboost/ui/components/ui/input";
+import { FormField } from "@subboost/ui/components/ui/form-field";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,8 @@ import {
   createCustomRuleId,
   CUSTOM_RULE_TYPES,
 } from "@subboost/core/rules/custom-rule-utils";
+import { normalizeCustomRuleValue } from "@subboost/core/rules/custom-rule-value";
+import { getCustomRuleDefinition, supportsNoResolve } from "@subboost/core/rules/custom-rule-types";
 import { useConfigStore } from "@subboost/ui/store/config-store";
 import { allocateRuleSetId } from "@subboost/core/rules/rule-model";
 import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
@@ -44,48 +47,48 @@ import {
   RULE_TYPE_BADGE_CLASS,
 } from "./proxy-groups-rule-editor-layout";
 
-const CUSTOM_RULE_TYPE_LABELS: Record<CustomRule["type"], string> = {
-  DOMAIN: "域名 (DOMAIN)",
-  "DOMAIN-SUFFIX": "域名后缀 (DOMAIN-SUFFIX)",
-  "DOMAIN-KEYWORD": "域名关键词 (DOMAIN-KEYWORD)",
-  "IP-CIDR": "IP 段 (IP-CIDR)",
-  "IP-CIDR6": "IPv6 段 (IP-CIDR6)",
-  GEOIP: "GeoIP (GEOIP)",
-  GEOSITE: "GeoSite (GEOSITE)",
-  "PROCESS-NAME": "进程名 (PROCESS-NAME)",
-  "DST-PORT": "目标端口 (DST-PORT)",
-  "SRC-PORT": "源端口 (SRC-PORT)",
-};
-
-const CUSTOM_RULE_TYPE_SHORT_LABELS: Record<CustomRule["type"], string> = {
-  DOMAIN: "域名",
-  "DOMAIN-SUFFIX": "域名后缀",
-  "DOMAIN-KEYWORD": "域名关键词",
-  "IP-CIDR": "IP 段",
-  "IP-CIDR6": "IPv6 段",
-  GEOIP: "GeoIP",
-  GEOSITE: "GeoSite",
-  "PROCESS-NAME": "进程名",
-  "DST-PORT": "目标端口",
-  "SRC-PORT": "源端口",
-};
-
 const CUSTOM_RULE_TYPE_OPTIONS = CUSTOM_RULE_TYPES.map((value) => ({
   value,
-  label: CUSTOM_RULE_TYPE_LABELS[value],
+  label: `${getCustomRuleDefinition(value).label} (${value})`,
 }));
+
+function getRuleTypeLabel(type: CustomRule["type"]): string {
+  const definition = getCustomRuleDefinition(type);
+  return definition.shortLabel ?? definition.label;
+}
 
 function getProductRuleKind(type: CustomRule["type"]): ProductRuleKind {
   if (type.startsWith("DOMAIN")) return "domain";
-  if (type.startsWith("IP-CIDR")) return "ipcidr";
-  if (type === "GEOIP" || type === "GEOSITE") return "geo";
-  if (type === "PROCESS-NAME") return "process";
-  if (type === "DST-PORT" || type === "SRC-PORT") return "port";
+  if (type.includes("GEO")) return "geo";
+  if (type.includes("IP-")) return "ipcidr";
+  if (type.startsWith("PROCESS-")) return "process";
+  if (type.endsWith("-PORT")) return "port";
   return "unknown";
 }
 
 function isIpCidrRuleType(type: CustomRule["type"]): boolean {
   return type === "IP-CIDR" || type === "IP-CIDR6";
+}
+
+function getRuleValuePlaceholder(type: CustomRule["type"] | "RULE-SET"): string {
+  if (type === "RULE-SET") return "规则集链接 (https://…/geosite/udemy.mrs)";
+  return `值 (如: ${getCustomRuleDefinition(type).example})`;
+}
+
+function RuleValueInput({ type, value, onChange }: {
+  type: CustomRule["type"] | "RULE-SET"; value: string; onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <FormField label="规则值" className="min-w-0 flex-[1_1_4.5rem] gap-0 [&>label]:sr-only">
+      <Input value={value} onChange={onChange} placeholder={getRuleValuePlaceholder(type)} className="h-7 min-w-0 text-xs" />
+    </FormField>
+  );
+}
+
+function RuleTypeHint({ type }: { type: CustomRule["type"] | "RULE-SET" }) {
+  if (type === "RULE-SET") return null;
+  const hint = getCustomRuleDefinition(type).hint;
+  return hint ? <p className="mt-1 text-[10px] text-fg-50">{hint}</p> : null;
 }
 
 function getTargetOptions(enabledGroupNames: string[], selected?: string) {
@@ -219,12 +222,17 @@ export function ProxyGroupsCustomRules() {
       return;
     }
 
+    const normalizedValue = normalizeCustomRuleValue(addedRuleType, value);
+    if (!normalizedValue.ok) {
+      toast({ title: normalizedValue.error, variant: "warning" });
+      return;
+    }
     addCustomRule({
       id: createCustomRuleId(),
       type: addedRuleType,
-      value,
+      value: normalizedValue.value,
       target: toStableRuleTarget(newRuleTarget, moduleNames, customProxyGroups),
-      noResolve: newRuleNoResolve,
+      noResolve: newRuleNoResolve && supportsNoResolve(addedRuleType),
     });
     interactions.ruleAdded?.({
       source: "manual",
@@ -261,12 +269,17 @@ export function ProxyGroupsCustomRules() {
     if (!editingRuleId || !editingRuleDraft) return;
     const value = editingRuleDraft.value.trim();
     if (!value || !editingRuleDraft.target) return;
+    const normalizedValue = normalizeCustomRuleValue(editingRuleDraft.type, value);
+    if (!normalizedValue.ok) {
+      toast({ title: normalizedValue.error, variant: "warning" });
+      return;
+    }
 
     updateCustomRule(editingRuleId, {
       type: editingRuleDraft.type,
-      value,
+      value: normalizedValue.value,
       target: toStableRuleTarget(resolveTargetName(editingRuleDraft.target), moduleNames, customProxyGroups),
-      noResolve: Boolean(editingRuleDraft.noResolve),
+      noResolve: Boolean(editingRuleDraft.noResolve) && supportsNoResolve(editingRuleDraft.type),
     });
     cancelEditingRule();
   };
@@ -324,8 +337,8 @@ export function ProxyGroupsCustomRules() {
               onValueChange={handleNewRuleTypeChange}
             >
               <SelectTrigger className="h-7 w-[112px] max-w-full shrink-0 text-xs">
-                <span className="truncate">
-                  {newRuleType === "RULE-SET" ? "规则集" : CUSTOM_RULE_TYPE_SHORT_LABELS[newRuleType]}
+                <span className="whitespace-normal text-left leading-tight">
+                  {newRuleType === "RULE-SET" ? "规则集" : getRuleTypeLabel(newRuleType)}
                 </span>
               </SelectTrigger>
               <SelectContent>
@@ -341,11 +354,10 @@ export function ProxyGroupsCustomRules() {
                 ))}
               </SelectContent>
             </Select>
-            <Input
+            <RuleValueInput
+              type={newRuleType}
               value={newRuleValue}
               onChange={(e) => setNewRuleValue(e.target.value)}
-              placeholder={newRuleType === "RULE-SET" ? "规则集链接 (https://…/geosite/udemy.mrs)" : "值 (如: google.com)"}
-              className="h-7 min-w-0 flex-[1_1_4.5rem] text-xs"
             />
           </div>
           <div className={RULE_EDIT_TRAILING_CONTROLS_CLASS}>
@@ -364,7 +376,8 @@ export function ProxyGroupsCustomRules() {
             <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink/10 bg-ink/5 px-2">
               <Switch
                 aria-label="新规则不解析域名"
-                checked={newRuleNoResolve}
+                checked={newRuleNoResolve && supportsNoResolve(newRuleType)}
+                disabled={!supportsNoResolve(newRuleType)}
                 onCheckedChange={setNewRuleNoResolve}
               />
               <span className="proxy-group-rule-no-resolve-label text-[10px] text-fg-50">no-resolve</span>
@@ -381,6 +394,7 @@ export function ProxyGroupsCustomRules() {
             </Button>
           </div>
         </div>
+        <RuleTypeHint type={newRuleType} />
       </div>
 
       {customRules.length > 0 && (
@@ -414,17 +428,15 @@ export function ProxyGroupsCustomRules() {
                         onValueChange={(v) =>
                           setEditingRuleDraft((prev) =>
                             prev
-                              ? { ...prev, type: v as CustomRule["type"] }
+                              ? { ...prev, type: v as CustomRule["type"], noResolve: Boolean(prev.noResolve) && supportsNoResolve(v) }
                               : prev,
                           )
                         }
                       >
                         <SelectTrigger className="h-7 w-[112px] max-w-full shrink-0 text-xs">
-                          <span className="truncate">
+                          <span className="whitespace-normal text-left leading-tight">
                             {
-                              CUSTOM_RULE_TYPE_SHORT_LABELS[
-                                editingRuleDraft.type
-                              ]
+                              getRuleTypeLabel(editingRuleDraft.type)
                             }
                           </span>
                         </SelectTrigger>
@@ -440,14 +452,14 @@ export function ProxyGroupsCustomRules() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Input
+                      <RuleValueInput
+                        type={editingRuleDraft.type}
                         value={editingRuleDraft.value}
                         onChange={(e) =>
                           setEditingRuleDraft((prev) =>
                             prev ? { ...prev, value: e.target.value } : prev,
                           )
                         }
-                        className="h-7 min-w-0 flex-[1_1_4.5rem] text-xs"
                       />
                     </div>
                     <div className={RULE_EDIT_TRAILING_CONTROLS_CLASS}>
@@ -479,7 +491,8 @@ export function ProxyGroupsCustomRules() {
                       <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-ink/10 bg-ink/5 px-2">
                         <Switch
                           aria-label="编辑规则时不解析域名"
-                          checked={Boolean(editingRuleDraft.noResolve)}
+                          checked={Boolean(editingRuleDraft.noResolve) && supportsNoResolve(editingRuleDraft.type)}
+                          disabled={!supportsNoResolve(editingRuleDraft.type)}
                           onCheckedChange={(noResolve) =>
                             setEditingRuleDraft((prev) =>
                               prev ? { ...prev, noResolve } : prev,
@@ -528,6 +541,7 @@ export function ProxyGroupsCustomRules() {
                       </div>
                     </div>
                   </div>
+                  <RuleTypeHint type={editingRuleDraft.type} />
                 </div>
               );
             }
@@ -543,19 +557,19 @@ export function ProxyGroupsCustomRules() {
                   {rule.type}
                 </span>
                 <span
-                  className="min-w-0 max-w-[16rem] truncate text-fg-75"
+                  className="min-w-0 break-all text-fg-75"
                   title={rule.value}
                 >
                   {rule.value}
                 </span>
-                {rule.noResolve && (
+                {rule.noResolve && supportsNoResolve(rule.type) && (
                   <span className="rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-45">
                     no-resolve
                   </span>
                 )}
                 <ArrowRight className="h-3 w-3 shrink-0 text-fg-35" />
                 <span
-                  className="max-w-[11rem] truncate rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-70"
+                  className="min-w-0 break-words rounded border border-ink/10 bg-ink/5 px-1.5 py-0.5 text-fg-70"
                   title={ruleTargetName}
                 >
                   {ruleTargetName}

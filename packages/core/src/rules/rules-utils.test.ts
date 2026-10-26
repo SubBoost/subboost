@@ -68,7 +68,7 @@ describe("custom rule helpers", () => {
       text: [
         "# comment",
         "single.example.com",
-        'DOMAIN-SUFFIX,"quoted,example.com",Proxy,no-resolve',
+        '"DOMAIN-REGEX","quoted,example.com",Proxy',
         "BAD,value,DIRECT",
         "DOMAIN,exists.com,DIRECT",
         "DOMAIN,dup.com,DIRECT",
@@ -98,10 +98,10 @@ describe("custom rule helpers", () => {
       "error",
     ]);
     expect(result.rules[1]).toMatchObject({
-      type: "DOMAIN-SUFFIX",
+      type: "DOMAIN-REGEX",
       value: "quoted,example.com",
       target: "Proxy",
-      noResolve: true,
+      noResolve: false,
     });
   });
 

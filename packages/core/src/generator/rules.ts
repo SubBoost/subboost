@@ -1,6 +1,7 @@
 import type { BuiltinRuleEdits, CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 import type { CustomProxyGroup } from "@subboost/core/types/config";
 import { getCustomRuleOrderKey } from "@subboost/core/rules/custom-rule-utils";
+import { supportsNoResolve } from "@subboost/core/rules/custom-rule-types";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { isDisabledCustomProxyGroupTarget, resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { PROXY_GROUP_MODULES, type ProxyGroupModule, type ProxyGroupRule } from "./proxy-group-modules";
@@ -166,7 +167,7 @@ function buildCustomRuleEntry(
   resolvePolicyTarget: (target: string) => string = (target) => target,
   literalTargetNames?: readonly string[]
 ): GeneratedRuleEntry {
-  const noResolve = Boolean(rule.noResolve) && (rule.type === "IP-CIDR" || rule.type === "IP-CIDR6");
+  const noResolve = Boolean(rule.noResolve) && supportsNoResolve(rule.type);
   const target = resolvePolicyTarget(resolveProxyGroupTargetName(rule.target, { moduleNames, customProxyGroups, literalTargetNames }));
   let text = `${rule.type},${rule.value},${target}`;
   if (noResolve) text += ",no-resolve";
