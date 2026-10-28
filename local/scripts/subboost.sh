@@ -236,12 +236,18 @@ create_verified_dump() {
     return 1
   fi
   set +e
-  sudo_do cat "$partial" | compose exec -T db pg_restore --list >/dev/null
+  sudo_do cat "$partial" | (
+    compose exec -T db pg_restore --list >/dev/null
+    restore_status=$?
+    # pg_restore --list may finish before consuming the complete archive.
+    cat >/dev/null || exit 1
+    exit "$restore_status"
+  )
   verify_status=("${PIPESTATUS[@]}")
   set -e
   if (( verify_status[0] != 0 || verify_status[1] != 0 )); then
     sudo_do rm -f -- "$partial"
-    say "Backup verification failed: read=${verify_status[0]} pg_restore=${verify_status[1]}"
+    say "Backup verification failed: read=${verify_status[0]} verify=${verify_status[1]}"
     return 1
   fi
   sudo_do mv "$partial" "$output"
