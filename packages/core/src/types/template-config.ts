@@ -42,5 +42,6 @@ export type SubBoostTemplateConfig = {
   allowLan: boolean;
   testUrl: string;
   testInterval: number;
+  sharedHealthChecks?: boolean;
   ruleProviderBaseUrl: string;
 };

@@ -78,8 +78,8 @@ describe("config store persistence", () => {
     });
   });
 
-  it("defaults missing or malformed node-name filter data without a storage-version bump", () => {
-    expect(CONFIG_DRAFT_STORAGE_VERSION).toBe(11);
+  it("defaults missing or malformed node-name filter data", () => {
+    expect(CONFIG_DRAFT_STORAGE_VERSION).toBe(12);
     expect(normalizePersistedConfigState({}).nodeNameFilter).toEqual(
       DEFAULT_NODE_NAME_FILTER_CONFIG
     );
@@ -91,6 +91,13 @@ describe("config store persistence", () => {
         },
       }).nodeNameFilter
     ).toEqual(DEFAULT_NODE_NAME_FILTER_CONFIG);
+  });
+
+  it("migrates the previous draft without losing settings and defaults sharing off", () => {
+    const storage = { getItem: () => JSON.stringify({ version: 11, state: { testInterval: 600 } }), setItem: () => undefined };
+    expect(prepareConfigDraftScope(storage, "user-1").state).toMatchObject({ testInterval: 600, sharedHealthChecks: false });
+    expect(normalizePersistedConfigState({ sharedHealthChecks: "true" }).sharedHealthChecks).toBe(false);
+    expect(normalizePersistedConfigState({ sharedHealthChecks: true }).sharedHealthChecks).toBe(true);
   });
 
   it("restores the filter only from the current draft envelope", () => {

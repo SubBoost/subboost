@@ -9,6 +9,7 @@ type SettingsActions = Pick<
   | "setAllowLan"
   | "setTestUrl"
   | "setTestInterval"
+  | "setSharedHealthChecks"
   | "setRuleProviderBaseUrl"
   | "setNodeNameFilter"
   | "setProxyGroupAdvancedModeEnabled"
@@ -40,6 +41,10 @@ export function createSettingsActions(
 
     setTestInterval: (interval: number) => {
       setAndGenerateConfig(() => ({ testInterval: interval }));
+    },
+
+    setSharedHealthChecks: (enabled: boolean) => {
+      setAndGenerateConfig(() => ({ sharedHealthChecks: enabled === true }));
     },
 
     setRuleProviderBaseUrl: (url: string) => {

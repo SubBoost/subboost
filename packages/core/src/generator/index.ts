@@ -34,6 +34,7 @@ import type {
 } from "@subboost/core/types/config";
 import type { DialerProxyGroup } from "@subboost/core/types/template-config";
 import { collectDnsPolicyEntries, configToYaml } from "./yaml";
+import { shareHealthChecks } from "./shared-health-checks";
 import { isMihomoSupportedProxyNode, normalizeMihomoVlessForGeneration } from "../mihomo/proxy-sanitizer";
 import { getValidDialerRelayGroupNames } from "../subscription/dialer-relay-group-names";
 import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-targets";
@@ -590,7 +591,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     }),
   };
 
-  return clashConfig as unknown as ClashConfig;
+  return (config.sharedHealthChecks === true ? shareHealthChecks(clashConfig) : clashConfig) as unknown as ClashConfig;
 }
 
 /**

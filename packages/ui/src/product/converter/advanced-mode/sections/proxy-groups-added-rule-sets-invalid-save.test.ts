@@ -199,4 +199,14 @@ describe("ProxyGroupsAddedRuleSets invalid saves", () => {
       expect.objectContaining({ path: "" }),
     );
   });
+
+  it.each(["text", "yaml"])("replaces stale %s metadata when an edited URL becomes mrs", (format) => {
+    renderEditing({ ...moduleItem, path: "https://local.subboost.test/rules", format } as typeof moduleItem, {
+      path: "https://local.subboost.test/geoip/replacement.mrs", targetValue: "module:auto", noResolve: true,
+    });
+    clickSave();
+    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("auto", "rule-a", expect.objectContaining({
+      path: "https://local.subboost.test/geoip/replacement.mrs", format: "mrs", behavior: "ipcidr",
+    }));
+  });
 });

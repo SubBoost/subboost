@@ -519,9 +519,9 @@ export function generateRuleProviders(options: ProxyGroupGenerateOptions): Recor
       type: "http",
       behavior: ruleSet.behavior,
       url: buildRuleSetUrlFromPath(ruleSet.path, ruleProviderBaseUrl),
-      path: `./ruleset/${ruleSet.id}.mrs`,
+      path: `./ruleset/${ruleSet.id}.${ruleSet.format === "text" ? "txt" : ruleSet.format ?? "mrs"}`,
       interval: 86400,
-      format: "mrs",
+      format: ruleSet.format ?? "mrs",
     };
   }
 

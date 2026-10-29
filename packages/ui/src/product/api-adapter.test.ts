@@ -2,6 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 import { createRulesProductApi } from "./api-adapter";
 
 describe("createRulesProductApi", () => {
+  it.each([undefined, "/custom/detect"])("posts rule detection to the configured endpoint: %s", async (endpoint) => {
+    const metadata = { name: "rules", path: "https://local.subboost.test/rules", format: "text", behavior: "domain" };
+    const fetchImpl = vi.fn(async () => Response.json(metadata));
+    const signal = new AbortController().signal;
+    const api = createRulesProductApi({ ruleDetectionEndpoint: endpoint, fetchImpl });
+    expect(await api.detectRuleSet?.({ url: metadata.path, signal })).toEqual(metadata);
+    expect(fetchImpl).toHaveBeenCalledWith(endpoint ?? "/api/rules/detect", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: metadata.path }), signal, cache: "no-store",
+    });
+  });
+
+  it("surfaces rule detection failures", async () => {
+    const api = createRulesProductApi({ fetchImpl: vi.fn(async () => Response.json({ error: "unsupported" }, { status: 422 })) });
+    await expect(api.detectRuleSet?.({ url: "https://local.subboost.test/rules" })).rejects.toThrow("unsupported");
+  });
+
   it("uses the default rules endpoints and preserves response fallbacks", async () => {
     const calls: Array<{ url: URL; init?: RequestInit }> = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

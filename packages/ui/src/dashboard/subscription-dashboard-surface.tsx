@@ -11,7 +11,7 @@ import {
   Download,
   ExternalLink,
   FileCode,
-  MoreVertical,
+  Pencil,
   Plus,
   RefreshCw,
   Settings,
@@ -42,7 +42,7 @@ import {
   isNodeQuotaAutoUpdateDisabled,
 } from "@subboost/ui/dashboard/dashboard-auto-update-warning";
 import { SubscriptionSettingsDialog } from "@subboost/ui/dashboard/subscription-settings-dialog";
-import type { RefreshSubscriptionResponse, Subscription } from "@subboost/ui/dashboard/dashboard-types";
+import type { RefreshSubscriptionResponse, Subscription, SubscriptionLink } from "@subboost/ui/dashboard/dashboard-types";
 
 type UpdateSettingsPayload = {
   name: string;
@@ -63,6 +63,7 @@ export type DashboardSurfaceAdapter = {
   deleteSubscription: (id: string) => Promise<void>;
   refreshSubscription: (id: string) => Promise<RefreshSubscriptionResponse>;
   updateSubscriptionSettings: (id: string, payload: UpdateSettingsPayload) => Promise<void>;
+  resetSubscriptionLink?: (id: string, token: string) => Promise<SubscriptionLink>;
   resolveDownloadUrl?: (subscription: Subscription) => string;
   renderAnnouncement?: (context: { user: User }) => React.ReactNode;
   renderHeaderActions?: (context: { user: User }) => React.ReactNode;
@@ -116,6 +117,8 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
   );
   const [autoUpdateHours, setAutoUpdateHours] = React.useState<number>(autoUpdatePolicy.defaultHours);
   const [savingSettings, setSavingSettings] = React.useState(false);
+  const [resettingLink, setResettingLink] = React.useState(false);
+  const resetLinkPending = React.useRef(false);
 
   React.useEffect(() => {
     void fetchUser();
@@ -245,7 +248,7 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
   };
 
   const saveSubscriptionSettings = async () => {
-    if (!settingsSub || savingSettings) return;
+    if (!settingsSub || savingSettings || resetLinkPending.current) return;
 
     const name = settingsName.trim();
     if (!name || name.length > 100) {
@@ -305,6 +308,31 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
       toast({ title: error instanceof Error ? error.message : "保存失败，请稍后重试", variant: "destructive" });
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const resetSubscriptionLink = async () => {
+    if (!settingsSub || !adapter.resetSubscriptionLink || savingSettings || resetLinkPending.current) return;
+    resetLinkPending.current = true;
+    setResettingLink(true);
+    try {
+      const confirmed = await confirmDialog({
+        title: "重置订阅链接？",
+        description: "旧链接会立即失效。重置后，请在代理软件中换成新链接。",
+        confirmText: "重置链接",
+        variant: "destructive",
+      });
+      if (!confirmed) return;
+      const link = await adapter.resetSubscriptionLink(settingsSub.id, settingsSub.token);
+      setSubscriptions((items) => items.map((item) => item.id === link.id ? { ...item, ...link } : item));
+      setSettingsSub((item) => item?.id === link.id ? { ...item, ...link } : item);
+      setCopiedId(null);
+      toast({ title: "订阅链接已重置", description: "请重新复制链接并更新代理软件中的订阅。" });
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "重置失败，请稍后重试", variant: "destructive" });
+    } finally {
+      resetLinkPending.current = false;
+      setResettingLink(false);
     }
   };
 
@@ -396,6 +424,8 @@ export function SubscriptionDashboardSurface({ adapter }: Props) {
         setAutoUpdateHours={setAutoUpdateHours}
         savingSettings={savingSettings}
         onSave={saveSubscriptionSettings}
+        onResetLink={adapter.resetSubscriptionLink ? resetSubscriptionLink : undefined}
+        resettingLink={resettingLink}
         userIsAdmin={user?.isAdmin === true}
         autoUpdatePolicy={autoUpdatePolicy}
       />
@@ -522,10 +552,9 @@ function SubscriptionRow({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
-        <SubscriptionQrButton url={sub.subscriptionUrl} />
         <Button asChild variant="ghost" size="sm" className="gap-0 sm:gap-2" title="回到首页编辑该订阅（更新后链接不变）">
           <Link href={editHref}>
-            <Settings className="h-4 w-4" />
+            <Pencil className="h-4 w-4" />
             <span className="hidden sm:inline">编辑</span>
           </Link>
         </Button>
@@ -536,7 +565,7 @@ function SubscriptionRow({
           className="gap-0 sm:gap-2"
           title="订阅设置（改名 / 自动更新）"
         >
-          <MoreVertical className="h-4 w-4" />
+          <Settings className="h-4 w-4" />
           <span className="hidden sm:inline">设置</span>
         </Button>
         <Button
@@ -569,6 +598,7 @@ function SubscriptionRow({
             </>
           )}
         </Button>
+        <SubscriptionQrButton url={sub.subscriptionUrl} />
         <Button
           variant="ghost"
           size="sm"

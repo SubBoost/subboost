@@ -179,6 +179,22 @@ describe("protocol import through persistence and generation", () => {
       yaml.load(generateClashYaml({ nodes: parsed.nodes, userConfig: { dnsYaml: "" } })));
   });
 
+  it.each(["plain", "base64", "base64url"] as const)("retains automatic Reality compatibility through %s import and persistence", (format) => {
+    const encryption = "mlkem768x25519plus.native.0rtt.valid_token";
+    const link = `vless://11111111-1111-4111-8111-111111111111@local.subboost.test:443?security=reality&pbk=${"A".repeat(43)}&encryption=${encryption}&fp=firefox`;
+    const content = format === "plain" ? link : Buffer.from(link).toString(format);
+    const parsed = parseSubscription(content);
+    expect(parsed.errors).toEqual([]);
+    const saved = JSON.parse(JSON.stringify(validateSubscriptionNodeList(parsed.nodes)));
+    const output = yaml.load(generateClashYaml({ nodes: validateSubscriptionNodeList(saved) })) as { proxies: Record<string, unknown>[] };
+    expect(output.proxies).toHaveLength(1);
+    expect(output.proxies[0]).toMatchObject({
+      encryption,
+      "client-fingerprint": "firefox",
+      "reality-opts": { "support-x25519mlkem768": true },
+    });
+  });
+
   it("retains Gecko, ECH and packet sizes for Hysteria2", () => {
     expect(generated("hy2://demo@local.subboost.test:443?obfs=gecko&obfs-password=padding&obfs-min-packet-size=100&obfs-max-packet-size=200&ech=QUJDRA%3D%3D").proxies[0])
       .toMatchObject({ obfs: "gecko", "obfs-password": "padding", "obfs-min-packet-size": 100,

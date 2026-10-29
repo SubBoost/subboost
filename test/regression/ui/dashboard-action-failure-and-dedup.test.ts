@@ -56,6 +56,7 @@ vi.mock("lucide-react", () => ({
   ExternalLink: () => null,
   FileCode: () => null,
   MoreVertical: () => null,
+  Pencil: () => null,
   Plus: () => null,
   RefreshCw: () => null,
   Settings: () => null,

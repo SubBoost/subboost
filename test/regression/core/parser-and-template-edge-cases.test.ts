@@ -227,7 +227,7 @@ describe("public core extra branch coverage", () => {
     expectInvalid({ customRuleSets: [123] }, "customRuleSets 只能包含对象");
     expectInvalid({ customRuleSets: [{ id: "", name: "Rule", behavior: "domain", path: "https://rules.example.com/a.mrs", target: "DIRECT" }] }, "customRuleSets.id 不能为空");
     expectInvalid({ customRuleSets: [{ id: "r", name: "", behavior: "domain", path: "https://rules.example.com/a.mrs", target: "DIRECT" }] }, "customRuleSets.name 不能为空");
-    expectInvalid({ customRuleSets: [{ id: "r", name: "Rule", behavior: "bad", path: "https://rules.example.com/a.mrs", target: "DIRECT" }] }, "customRuleSets.behavior 无效");
+    expectInvalid({ customRuleSets: [{ id: "r", name: "Rule", behavior: "bad", path: "https://rules.example.com/a.mrs", target: "DIRECT" }] }, "customRuleSets.format 或 behavior 无效");
     expectInvalid({ customRuleSets: [{ id: "r", name: "Rule", behavior: "domain", path: "ftp://rules.example.com/a.mrs", target: "DIRECT" }] }, "customRuleSets.path 无效");
     expectInvalid({ customRuleSets: [{ id: "r", name: "Rule", behavior: "domain", path: "https://rules.example.com/a.mrs", target: "DIRECT", noResolve: "yes" }] }, "customRuleSets.noResolve 必须是布尔值");
 

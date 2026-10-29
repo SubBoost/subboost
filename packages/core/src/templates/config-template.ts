@@ -8,6 +8,7 @@ import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-ad
 import { normalizeProxyGroupTargetRef } from "@subboost/core/proxy-group-targets";
 import {
   isValidRuleSetPathOrUrl,
+  isValidRuleSetFormatBehavior,
   normalizeRuleModelFromConfig,
   normalizeRuleSetPathInput,
 } from "@subboost/core/rules/rule-model";
@@ -96,6 +97,8 @@ export function validateSubBoostTemplateConfig(value: unknown): ValidationResult
   if (!testUrl.ok) return testUrl;
   const testInterval = parsePositiveInteger(value.testInterval, "testInterval");
   if (!testInterval.ok) return testInterval;
+  const sharedHealthChecks = parseOptionalBoolean(value.sharedHealthChecks, "sharedHealthChecks");
+  if (!sharedHealthChecks.ok) return sharedHealthChecks;
   const ruleProviderBaseUrl = parseHttpUrlString(value.ruleProviderBaseUrl, "ruleProviderBaseUrl");
   if (!ruleProviderBaseUrl.ok) return ruleProviderBaseUrl;
   const cnIpNoResolve = parseOptionalBoolean(value.cnIpNoResolve, "cnIpNoResolve");
@@ -147,6 +150,7 @@ export function validateSubBoostTemplateConfig(value: unknown): ValidationResult
       allowLan: allowLan.value,
       testUrl: testUrl.value,
       testInterval: testInterval.value,
+      sharedHealthChecks: sharedHealthChecks.value ?? false,
       ruleProviderBaseUrl: ruleProviderBaseUrl.value,
     },
   };
@@ -393,7 +397,7 @@ function parseCustomRuleSets(value: unknown): { ok: true; value: true } | { ok: 
     if (!id.ok) return id;
     const name = parseRequiredString(item.name, "customRuleSets.name");
     if (!name.ok) return name;
-    if (item.behavior !== "domain" && item.behavior !== "ipcidr") return invalid("customRuleSets.behavior 无效");
+    if (!isValidRuleSetFormatBehavior(item.format, item.behavior)) return invalid("customRuleSets.format 或 behavior 无效");
     const path = parseRequiredString(item.path, "customRuleSets.path");
     if (!path.ok) return path;
     const normalizedPath = normalizeRuleSetPathInput(path.value);

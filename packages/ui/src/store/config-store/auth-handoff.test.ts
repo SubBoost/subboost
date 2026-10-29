@@ -293,6 +293,7 @@ describe("auth config handoff", () => {
 
     expect(consumed).toEqual({
       nodeNameFilter: { enabled: false, excludeRegexes: [] },
+      sharedHealthChecks: false,
       deletedNodeNames: ["Gone"],
       deletedNodes: [{ originName: "Gone" }],
       enabledProxyGroups: ["select"],
@@ -357,6 +358,7 @@ describe("auth config handoff", () => {
 
     expect(consumed).toEqual({
       sources: [{ id: "source-1", type: "url", content: "https://example.com/sub" }],
+      sharedHealthChecks: false,
       nodeNameFilter: { enabled: false, excludeRegexes: [] },
     });
   });

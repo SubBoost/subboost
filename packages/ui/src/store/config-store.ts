@@ -19,6 +19,7 @@ import { createHistoryActions } from "./config-store/actions/history-actions";
 import {
   CONFIG_DRAFT_GUEST_STORAGE_NAME,
   CONFIG_DRAFT_STORAGE_VERSION,
+  isCompatibleConfigDraftVersion,
   createSafeConfigDraftStorage,
   normalizePersistedConfigState,
   partializeConfigState,
@@ -86,7 +87,7 @@ export const useConfigStore = create<ConfigState & ConfigActions>()(
       storage: createJSONStorage<Partial<ConfigState>>(() => configDraftStorage),
       migrate: (persistedState, version) =>
         normalizePersistedConfigState(persistedState, {
-          discardDraft: version !== CONFIG_DRAFT_STORAGE_VERSION,
+          discardDraft: !isCompatibleConfigDraftVersion(version),
         }),
       partialize: partializeConfigState,
     }

@@ -129,7 +129,8 @@ export function NodeManagementAutoProcessingDialog({
 
         <FormField
           label="保留正则"
-          labelAction={<span className="mr-px pr-4"><Switch aria-label="启用保留正则" checked={includeEnabled} onCheckedChange={setIncludeEnabled} /></span>}
+          className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3"
+          labelAction={<Switch aria-label="启用保留正则" checked={includeEnabled} onCheckedChange={setIncludeEnabled} />}
           description="每行一条，匹配任意一条即可保留。"
           descriptionPlacement="before-control"
         >
@@ -144,7 +145,8 @@ export function NodeManagementAutoProcessingDialog({
 
         <FormField
           label="排除正则"
-          labelAction={<span className="mr-px pr-4"><Switch aria-label="启用排除正则" checked={excludeEnabled} onCheckedChange={setExcludeEnabled} /></span>}
+          className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3"
+          labelAction={<Switch aria-label="启用排除正则" checked={excludeEnabled} onCheckedChange={setExcludeEnabled} />}
           description="每行一条，命中节点会被全局排除。"
           descriptionPlacement="before-control"
           error={validationMessage}

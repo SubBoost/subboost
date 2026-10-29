@@ -14,7 +14,7 @@ import type { ProxyGroupGroupType } from "@subboost/core/types/config";
 export interface ProxyGroupRule {
   id: string;
   name: string;
-  behavior: "domain" | "ipcidr";
+  behavior: "domain" | "ipcidr" | "classical";
   path: string;
   noResolve?: boolean;
 }
@@ -158,7 +158,7 @@ export const PROXY_GROUP_MODULES: ProxyGroupModule[] = [
     name: "Ⓜ️ 微软服务",
     emoji: "Ⓜ️",
     category: "service",
-    description: "Microsoft 365、Azure、Bing",
+    description: "Microsoft 365、OneDrive、Bing",
     groupType: "select",
     rules: [
       { id: "microsoft", name: "Microsoft", behavior: "domain", path: "geosite/microsoft.mrs" },
@@ -396,7 +396,7 @@ export const PROXY_GROUP_MODULES: ProxyGroupModule[] = [
     name: "💾 网盘存储",
     emoji: "💾",
     category: "tech",
-    description: "Dropbox、Box、Notion 等",
+    description: "Dropbox、Notion",
     groupType: "select",
     rules: [
       { id: "dropbox", name: "Dropbox", behavior: "domain", path: "geosite/dropbox.mrs" },
@@ -478,7 +478,7 @@ export const PROXY_GROUP_MODULES: ProxyGroupModule[] = [
     name: "🛒 海淘购物",
     emoji: "🛒",
     category: "other",
-    description: "Amazon、eBay、Shopify 等",
+    description: "Amazon、eBay",
     groupType: "select",
     rules: [
       { id: "amazon", name: "Amazon", behavior: "domain", path: "geosite/amazon.mrs" },

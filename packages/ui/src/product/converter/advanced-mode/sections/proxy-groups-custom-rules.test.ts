@@ -10,13 +10,16 @@ const mocks = vi.hoisted(() => ({
   },
   createCustomRuleId: vi.fn(),
   toast: vi.fn(),
+  rulesApi: undefined as import("@subboost/ui/product/api-adapter").ProductRulesApi | undefined,
 }));
+vi.mock("@subboost/ui/product/api-adapter", () => ({ useProductApiAdapter: () => ({ rules: mocks.rulesApi }) }));
 
 const stateMock = vi.hoisted(() => ({
   callIndex: 0,
   enabled: false,
   overrides: {} as Record<number, unknown>,
   runEffects: false,
+  cleanups: [] as Array<() => void>,
   setters: [] as Array<ReturnType<typeof vi.fn>>,
 }));
 
@@ -26,7 +29,8 @@ vi.mock("react", async (importOriginal) => {
     ...actual,
     useEffect: (effect: React.EffectCallback, deps?: React.DependencyList) => {
       if (stateMock.enabled && stateMock.runEffects) {
-        effect();
+        const cleanup = effect();
+        if (cleanup) stateMock.cleanups.push(cleanup);
         return;
       }
       return actual.useEffect(effect, deps);
@@ -187,6 +191,7 @@ function renderNode(node: React.ReactNode) {
 describe("ProxyGroupsCustomRules", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.rulesApi = undefined;
     mocks.captures = {
       batchDialogs: [],
       buttons: [],
@@ -221,6 +226,47 @@ describe("ProxyGroupsCustomRules", () => {
     expect(mocks.store.addCustomRule).not.toHaveBeenCalled();
     expect(setters[1]).toHaveBeenCalledWith("");
     expect(mocks.captures.batchDialogs[0].defaultType).toBe("RULE-SET");
+  });
+
+  it("detects remote text/yaml once and preserves input until successful completion", async () => {
+    const url = "https://local.subboost.test/remote.txt";
+    let resolve!: (value: any) => void;
+    const detectRuleSet = vi.fn(() => new Promise<any>((done) => { resolve = done; }));
+    mocks.rulesApi = { detectRuleSet };
+    const { setters } = renderRules({ 0: "RULE-SET", 1: url, 2: "Custom Group" });
+    const add = mocks.captures.buttons.find((button) => button.children === "添加规则").onClick;
+    add(); add();
+    expect(detectRuleSet).toHaveBeenCalledTimes(1);
+    expect(setters[1]).not.toHaveBeenCalled();
+    resolve({ name: "remote", path: url, format: "yaml", behavior: "classical" });
+    await vi.waitFor(() => expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [expect.objectContaining({ path: url, format: "yaml", behavior: "classical" })]));
+    expect(setters[1]).toHaveBeenCalledWith("");
+  });
+
+  it("keeps the URL when remote detection fails", async () => {
+    mocks.rulesApi = { detectRuleSet: vi.fn().mockRejectedValue(new Error("无法识别规则文件")) };
+    const { setters } = renderRules({ 0: "RULE-SET", 1: "https://local.subboost.test/error", 2: "Custom Group" });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    await vi.waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "无法识别规则文件" })));
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+    expect(setters[1]).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late detection result after the draft effect is cleaned up", async () => {
+    const url = "https://local.subboost.test/pending";
+    let resolve!: (value: any) => void;
+    const detectRuleSet = vi.fn(() => new Promise<any>((done) => { resolve = done; }));
+    mocks.rulesApi = { detectRuleSet };
+    stateMock.cleanups = [];
+    const { setters } = renderRules({ 0: "RULE-SET", 1: url, 2: "Custom Group" }, { runEffects: true });
+    mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
+    for (const cleanup of stateMock.cleanups) cleanup();
+    expect((detectRuleSet.mock.calls[0] as any)[0].signal.aborted).toBe(true);
+    resolve({ name: "pending", path: url, format: "text", behavior: "domain" });
+    await new Promise((done) => setTimeout(done, 0));
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+    expect(setters[1]).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
   });
 
   it("suffixes existing provider names and imports provider batches into their selected group", () => {

@@ -2,7 +2,7 @@ import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 import { buildModuleNameMap, normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { normalizeProxyGroupRuleTarget, normalizeProxyGroupTargetRef } from "@subboost/core/proxy-group-targets";
-import { isValidRuleSetPathOrUrl, normalizeRuleSetPathInput } from "@subboost/core/rules/rule-model";
+import { isValidRuleSetFormatBehavior, isValidRuleSetPathOrUrl, normalizeRuleSetPathInput } from "@subboost/core/rules/rule-model";
 import type {
   BuiltinRuleEdits,
   CustomProxyGroup,
@@ -22,11 +22,13 @@ export function normalizeRuleSetDraft(rule: RuleSetDraft): RuleSetDraft | null {
   if (!id || !path || !isValidRuleSetPathOrUrl(path)) return null;
   const behavior: RuleSetBehavior = rule.behavior === "ipcidr" || path.toLowerCase().startsWith("geoip/")
     ? "ipcidr"
-    : "domain";
+    : rule.behavior;
+  if (!isValidRuleSetFormatBehavior(rule.format, behavior)) return null;
   return {
     id,
     name: typeof rule.name === "string" && rule.name.trim() ? rule.name.trim() : id,
     behavior,
+    ...(rule.format !== undefined ? { format: rule.format } : {}),
     path,
     ...(rule.noResolve || behavior === "ipcidr" ? { noResolve: true } : {}),
   };

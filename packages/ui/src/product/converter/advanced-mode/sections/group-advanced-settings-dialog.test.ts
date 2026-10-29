@@ -74,7 +74,16 @@ vi.mock("./proxy-group-type-menu", () => ({
   },
 }));
 
+vi.mock("@subboost/ui/store/config-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@subboost/ui/store/config-store")>();
+  return { ...actual, useConfigStore: Object.assign(
+    (selector: (state: ReturnType<typeof actual.useConfigStore.getState>) => unknown) => selector(actual.useConfigStore.getState()),
+    actual.useConfigStore
+  ) };
+});
+
 import { GroupAdvancedSettingsDialog } from "./group-advanced-settings-dialog";
+import { useConfigStore } from "@subboost/ui/store/config-store";
 
 const TARGET = { kind: "module" as const, id: "auto" };
 const CONFLICT_STATE = {
@@ -118,6 +127,22 @@ function renderDialog(overrides: Record<number, unknown> = {}, props: Record<str
 }
 
 describe("GroupAdvancedSettingsDialog", () => {
+  it("shares one saved switch value across automatic groups and cancels drafts", () => {
+    useConfigStore.setState({ sharedHealthChecks: false });
+    renderDialog({ 0: "url-test", 6: true });
+    const toggle = mocks.captures.switchFields.find((field) => field.label === "共享健康检查");
+    expect(toggle.checked).toBe(true);
+    expect(toggle.description).toBeUndefined();
+    mocks.captures.buttons.find((button) => button.children === "取消").onClick();
+    expect(useConfigStore.getState().sharedHealthChecks).toBe(false);
+    mocks.captures.buttons.find((button) => button.children === "保存").onClick();
+    expect(useConfigStore.getState().sharedHealthChecks).toBe(true);
+    renderDialog({ 0: "url-test" }, { groupName: "另一组" });
+    expect(mocks.captures.switchFields.find((field) => field.label === "共享健康检查").checked).toBe(true);
+    renderDialog({ 0: "select" });
+    expect(mocks.captures.switchFields.some((field) => field.label === "共享健康检查")).toBe(false);
+    useConfigStore.setState({ sharedHealthChecks: false });
+  });
   it("saves the group's test URL and rejects invalid input", () => {
     const onSave = vi.fn();
     renderDialog({ 0: "url-test", 5: " https://local.subboost.test/204 " }, { onSave });

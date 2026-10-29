@@ -62,25 +62,37 @@ export function allocateRuleSetId(name: string, usedIds: Iterable<string>): stri
   return id;
 }
 
-/** Metadata for the existing MRS provider model, without changing the supplied URL. */
-export function parseManualRuleSetUrl(input: string): Pick<CustomRuleSet, "name" | "path" | "behavior"> {
+export function parseRuleSetUrl(input: string): { name: string; path: string; pathname: string } {
   const path = input.trim();
   let url: URL;
   try { url = new URL(path); } catch { throw new Error("请输入有效的规则集 HTTP/HTTPS 链接"); }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+  if (path.length > 8192 || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
     throw new Error("请输入有效的规则集 HTTP/HTTPS 链接");
   }
   let pathname: string;
   try { pathname = decodeURIComponent(url.pathname); } catch { throw new Error("规则集链接的文件名编码无效"); }
   const filename = pathname.split("/").pop() ?? "";
+  return { name: filename.replace(/\.(mrs|yaml|yml|txt|list)$/i, "") || url.hostname, path, pathname };
+}
+
+/** Metadata for the existing MRS provider model, without changing the supplied URL. */
+export function parseManualRuleSetUrl(input: string): Pick<CustomRuleSet, "name" | "path" | "behavior"> {
+  const { name, path, pathname } = parseRuleSetUrl(input);
+  const filename = pathname.split("/").pop() ?? "";
   if (!/^.+\.mrs$/i.test(filename)) throw new Error("目前支持 .mrs 格式的规则集链接");
   const behavior = /\/geoip\//i.test(pathname) ? "ipcidr" : /\/geosite\//i.test(pathname) ? "domain" : null;
   if (!behavior) throw new Error("链接需包含 geosite 或 geoip 路径，以便自动识别规则集类型");
-  return { name: filename.slice(0, -4), path, behavior };
+  return { name, path, behavior };
+}
+
+export function isValidRuleSetFormatBehavior(format: unknown, behavior: unknown): boolean {
+  const effectiveFormat = format === undefined ? "mrs" : format;
+  return ["mrs", "yaml", "text"].includes(effectiveFormat as string) &&
+    (behavior === "domain" || behavior === "ipcidr" || (behavior === "classical" && effectiveFormat !== "mrs"));
 }
 
 function normalizeBehavior(value: unknown): RuleSetBehavior | null {
-  if (value === "domain" || value === "ipcidr") return value;
+  if (value === "domain" || value === "ipcidr" || value === "classical") return value;
   return null;
 }
 
@@ -91,6 +103,7 @@ function normalizeCustomRuleSet(item: unknown): CustomRuleSet | null {
   const path = normalizeRuleSetPathInput(rawPath);
   const target = normalizeProxyGroupTargetRef(item.target) ?? toTrimmedString(item.target);
   const behavior = normalizeBehavior(item.behavior);
+  if (!isValidRuleSetFormatBehavior(item.format, behavior)) return null;
   if (!id || !behavior || !path || !target || !isValidRuleSetPathOrUrl(path)) return null;
   const name = toTrimmedString(item.name) || id;
   const noResolve = typeof item.noResolve === "boolean" ? item.noResolve : undefined;
@@ -98,6 +111,7 @@ function normalizeCustomRuleSet(item: unknown): CustomRuleSet | null {
     id,
     name,
     behavior,
+    ...(item.format !== undefined ? { format: item.format as CustomRuleSet["format"] } : {}),
     path,
     target,
     ...(noResolve !== undefined ? { noResolve } : {}),
