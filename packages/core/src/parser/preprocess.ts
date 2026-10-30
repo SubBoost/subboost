@@ -2,7 +2,7 @@ import { decodeBase64, encodeBase64 } from "./base64";
 import { tryParseJson } from "../json";
 import { looksLikePlatformConfigContent } from "./platform/parse-platform-config";
 import { isClashYamlContent } from "./content-parsers";
-import { checkSubscriptionInput, checkSubscriptionItems, MAX_SUBSCRIPTION_OUTPUT_LENGTH, SubscriptionParseLimitError } from "./limits";
+import { addSubscriptionError, boundSubscriptionError, checkSubscriptionInput, checkSubscriptionItems, MAX_SUBSCRIPTION_OUTPUT_LENGTH, SubscriptionParseLimitError } from "./limits";
 
 export interface PreprocessSubscriptionContentResult {
   content: string;
@@ -18,7 +18,7 @@ interface SubscriptionPreprocessor {
 
 function mergeUniqueErrors(errors: string[]): string[] {
   return Array.from(
-    new Set(errors.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim()))
+    new Set(errors.filter((item) => typeof item === "string" && item.trim()).map((item) => boundSubscriptionError(item.trim())))
   );
 }
 
@@ -299,9 +299,9 @@ function preprocess(content: string): PreprocessSubscriptionContentResult {
 
     const next = matched.parse(current);
     if (!next.content) {
-      errors.push(
+      addSubscriptionError(errors,
         matched.name === "ssd"
-          ? `SSD 订阅预处理失败: ${next.error || "未知错误"}`
+          ? `SSD 订阅预处理失败: ${boundSubscriptionError(next.error || "未知错误")}`
           : next.error || `${matched.name} 预处理失败`
       );
       return { content: "", errors: mergeUniqueErrors(errors), applied };

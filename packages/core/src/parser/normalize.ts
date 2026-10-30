@@ -2,7 +2,7 @@ import { buildNodeContentKey } from "@subboost/core/node-identity";
 import { isSubscriptionInfoNodeName } from "@subboost/core/subscription/info-node-name";
 import type { ParsedNode, ParseResult } from "@subboost/core/types/node";
 import { canonicalizeParsedNode } from "./canonical-fields";
-import { MAX_SUBSCRIPTION_ERRORS, SubscriptionParseLimitError } from "./limits";
+import { boundSubscriptionError, MAX_SUBSCRIPTION_ERRORS, SubscriptionParseLimitError } from "./limits";
 import {
   CLIENT_UPDATE_PLACEHOLDER_ERROR,
   filterClientUpdatePlaceholderNodes,
@@ -18,14 +18,13 @@ export type ParseErrorCategory =
   | "unknown";
 
 function mergeUniqueErrors(...parts: string[][]): string[] {
-  return Array.from(
-    new Set(
-      parts
-        .flatMap((items) => items)
-        .filter((item) => typeof item === "string" && item.trim())
-        .map((item) => item.trim())
-    )
-  );
+  const unique = new Set<string>();
+  for (const items of parts) for (const item of items) {
+    if (typeof item !== "string" || !item.trim()) continue;
+    unique.add(boundSubscriptionError(item.trim()));
+    if (unique.size > MAX_SUBSCRIPTION_ERRORS) throw new SubscriptionParseLimitError("解析错误数量超过上限");
+  }
+  return Array.from(unique);
 }
 
 export function inferParseErrorCategory(error: string): ParseErrorCategory {

@@ -3,6 +3,7 @@
  */
 
 import { loadSubscriptionYaml } from "./yaml-scalars";
+import { YAMLException } from "js-yaml";
 import type { BaseNode, ParsedNode, ParseResult, UnknownNodeType, XHttpOpts } from "@subboost/core/types/node";
 import { normalizeRealityShortId } from "@subboost/core/mihomo/reality";
 import { canonicalizeParsedNode } from "./canonical-fields";
@@ -11,7 +12,7 @@ import { normalizeSsPlugin } from "./protocols/ss";
 import { splitWsPathEarlyData } from "./ws-early-data";
 import { getNodeEndpointError } from "../node-endpoint";
 import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "../mihomo/string-scalar";
-import { addSubscriptionError, checkSubscriptionInput, checkSubscriptionItems, MAX_SUBSCRIPTION_OUTPUT_LENGTH, SubscriptionParseLimitError } from "./limits";
+import { addSubscriptionError, boundSubscriptionError, checkSubscriptionInput, checkSubscriptionItems, MAX_SUBSCRIPTION_ERROR_LENGTH, MAX_SUBSCRIPTION_OUTPUT_LENGTH, SubscriptionParseLimitError } from "./limits";
 
 interface ClashConfig {
   proxies?: Record<string, unknown>[];
@@ -20,6 +21,16 @@ interface ClashConfig {
   rules?: string[];
   dns?: unknown;
   [key: string]: unknown;
+}
+
+function formatYamlParseError(error: unknown): string {
+  const prefix = "YAML 解析错误: ";
+  if (error instanceof YAMLException) {
+    const position = error.mark ? ` (line ${error.mark.line + 1}, column ${error.mark.column + 1})` : "";
+    const reason = boundSubscriptionError(error.reason || "未知错误", MAX_SUBSCRIPTION_ERROR_LENGTH - prefix.length - position.length);
+    return `${prefix}${reason}${position}`;
+  }
+  return `${prefix}${boundSubscriptionError(error instanceof Error ? error.message : "未知错误", MAX_SUBSCRIPTION_ERROR_LENGTH - prefix.length)}`;
 }
 
 function applyWsEarlyDataInPlace(node: Record<string, unknown>) {
@@ -289,7 +300,7 @@ export function parseClashYaml(content: string): ParseResult {
     }
     return {
       nodes: [],
-      errors: [`YAML 解析错误: ${e instanceof Error ? e.message : "未知错误"}`],
+      errors: [formatYamlParseError(e)],
       totalParsed: 0,
       totalFailed: 1,
     };

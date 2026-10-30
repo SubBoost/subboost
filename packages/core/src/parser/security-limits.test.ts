@@ -3,6 +3,7 @@ import { parseClashYaml, parseSubscription } from "./index";
 import { encodeBase64 } from "./base64";
 import { MAX_SUBSCRIPTION_ERRORS, MAX_SUBSCRIPTION_ITEMS } from "./limits";
 import { preprocessSubscriptionContent } from "./preprocess";
+import { normalizeParseErrors } from "./normalize";
 
 function expectLimited(result: ReturnType<typeof parseSubscription>) {
   expect(result.nodes).toEqual([]);
@@ -11,6 +12,17 @@ function expectLimited(result: ReturnType<typeof parseSubscription>) {
 }
 
 describe("subscription parsing resource limits", () => {
+  it("bounds long YAML exceptions while preserving the reason and position", () => {
+    const content = `proxies: [*${"g".repeat(1_000_000)}]`;
+    for (const result of [parseClashYaml(content), parseSubscription(content)]) {
+      expect(result.nodes).toEqual([]);
+      expect(result.errors[0]).toContain("unidentified alias");
+      expect(result.errors[0]).toMatch(/line 1, column \d+/);
+      expect(result.errors.every((error) => error.length <= 512)).toBe(true);
+    }
+    expect(normalizeParseErrors(["x".repeat(1_000_000)])[0].length).toBeLessThanOrEqual(512);
+  });
+
   it("rejects self and indirect YAML cycles without retrying another format", () => {
     const cases = [
       'proxies: [{name: cycle, type: reject, extra: &x {self: *x}}]',

@@ -3,6 +3,7 @@ export const MAX_SUBSCRIPTION_CONTENT_LENGTH = 10 * 1024 * 1024;
 export const MAX_SUBSCRIPTION_OUTPUT_LENGTH = 16 * 1024 * 1024;
 export const MAX_SUBSCRIPTION_ITEMS = 10_000;
 export const MAX_SUBSCRIPTION_ERRORS = 100;
+export const MAX_SUBSCRIPTION_ERROR_LENGTH = 512;
 export const MAX_SUBSCRIPTION_LINES = 200_000;
 export const MAX_YAML_EXPANDED_NODES = 250_000;
 export const MAX_YAML_EXPANDED_TEXT = 32 * 1024 * 1024;
@@ -12,9 +13,13 @@ const LIMIT_PREFIX = "订阅解析受限:";
 
 export class SubscriptionParseLimitError extends Error {
   constructor(reason: string) {
-    super(`${LIMIT_PREFIX} ${reason}`);
+    super(boundSubscriptionError(`${LIMIT_PREFIX} ${reason}`));
     this.name = "SubscriptionParseLimitError";
   }
+}
+
+export function boundSubscriptionError(message: string, maxLength = MAX_SUBSCRIPTION_ERROR_LENGTH): string {
+  return message.length > maxLength ? `${message.slice(0, maxLength - 1)}…` : message;
 }
 
 export function isSubscriptionParseLimitMessage(message: string): boolean {
@@ -40,5 +45,5 @@ export function checkSubscriptionItems(count: number): void {
 
 export function addSubscriptionError(errors: string[], error: string): void {
   if (errors.length >= MAX_SUBSCRIPTION_ERRORS) throw new SubscriptionParseLimitError("解析错误数量超过上限");
-  errors.push(error);
+  errors.push(boundSubscriptionError(error));
 }
