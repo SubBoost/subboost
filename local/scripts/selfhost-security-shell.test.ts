@@ -5,12 +5,16 @@ import { describe, expect, it } from "vitest";
 
 const publicRoot = path.resolve(__dirname, "../..");
 
+function shellTimeout(defaultMs: number): number {
+  return process.platform === "win32" ? 120_000 : defaultMs;
+}
+
 function runBash(script: string) {
   return spawnSync("bash", ["-lc", 'exec "$BASH" -s'], {
     cwd: publicRoot,
     encoding: "utf8",
     input: script,
-    timeout: 30_000,
+    timeout: shellTimeout(30_000),
     env: { ...process.env, LC_ALL: "C.UTF-8" },
   });
 }
@@ -154,7 +158,7 @@ describe("self-host access and temporary workspace", () => {
     expect(result.stdout).toContain("SUBBOOST_BIND_ADDRESS=127.0.0.1");
     expect(result.stdout).toContain("APP_URL=http://127.0.0.1:31000");
     expect(result.stdout).toContain("ssh -L 31000:127.0.0.1:31000");
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it("uses the configured HTTPS proxy URL without appending the internal port", () => {
     for (const url of ["https://local.subboost.test", "https://local.subboost.test:8443"]) {
@@ -164,7 +168,7 @@ describe("self-host access and temporary workspace", () => {
       expect(result.stdout).toContain("SUBBOOST_BIND_ADDRESS=127.0.0.1");
       expect(result.stderr).toContain("安装器不会配置 TLS");
     }
-  }, 40_000);
+  }, shellTimeout(40_000));
 
   it("keeps explicit trusted-network HTTP available and warns about plaintext", () => {
     const result = installScenario("export SUBBOOST_ACCESS_MODE=public-http APP_URL=http://local.subboost.test");
@@ -172,7 +176,7 @@ describe("self-host access and temporary workspace", () => {
     expect(result.stdout).toContain("SUBBOOST_BIND_ADDRESS=\n");
     expect(result.stdout).toContain("APP_URL=http://local.subboost.test:31000");
     expect(result.stderr).toContain("HTTP 未加密");
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it("rejects an external URL in default SSH mode and malformed proxy URLs", () => {
     const noChoice = installScenario("export APP_URL=http://local.subboost.test");
@@ -181,7 +185,7 @@ describe("self-host access and temporary workspace", () => {
     const invalidProxy = installScenario("export SUBBOOST_ACCESS_MODE=https APP_URL=https://local.subboost.test/path");
     expect(invalidProxy.status).not.toBe(0);
     expect(invalidProxy.stderr).toContain("请输入有效的 HTTPS 地址");
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it("rejects URL ports outside the valid range", () => {
     for (const options of [
@@ -476,7 +480,7 @@ describe("self-host access and temporary workspace", () => {
     const result = installScenario("", "27.5.1");
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toContain("Docker Engine 28 以下");
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it.each(["install", "manager"])("ignores precreated %s PID paths and uses a private temporary directory", (kind) => {
     const filename = kind === "install" ? "install.sh" : "subboost.sh";
@@ -552,7 +556,7 @@ ENV
       [ -z "$(find "$TMPDIR" -mindepth 1 -print -quit)" ]
     `);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it.each(["install.sh", "subboost.sh"])("does not clean a replaced %s workspace", (script) => {
     const result = runBash(`
@@ -574,7 +578,7 @@ ENV
       [ "$(cat "$TMPDIR"/subboost-*/sentinel)" = preserve ]
     `);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it.each(["install.sh", "subboost.sh"])("uses BSD stat when GNU stat is unavailable for %s", (script) => {
     const result = runBash(`
@@ -598,7 +602,7 @@ ENV
       [ "$(grep -c -- -f "$base/stat-calls")" -ge 2 ]
     `);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it("cleans the staged environment when the actual manager entry is interrupted", () => {
     const result = runBash(`
@@ -647,5 +651,5 @@ SH
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain("stopped-before-docker");
     expect(result.stderr).toContain(scenario === "different" ? "does not match" : "secure manager update aborted");
-  }, 20_000);
+  }, shellTimeout(20_000));
 });
