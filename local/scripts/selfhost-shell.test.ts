@@ -242,6 +242,7 @@ ENV
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       cat > "$home/.env" <<'ENV'
 SUBBOOST_IMAGE=image
 POSTGRES_DB=subboost
@@ -322,6 +323,7 @@ ENV
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       release_dir="$home/release"
       mkdir -p "$release_dir" "$home/bin"
       cat > "$release_dir/release.json" <<'JSON'
@@ -407,6 +409,7 @@ ENV
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       release_dir="$home/release"
       mkdir -p "$release_dir" "$home/bin"
       cat > "$release_dir/release.json" <<'JSON'
@@ -512,6 +515,7 @@ ENV
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       mkdir -p "$home/bin"
       cat > "$home/.env" <<'ENV'
 SUBBOOST_RELEASE_URL=https://github.com/SubBoost/subboost/releases/download/v2.4.0/release.json
@@ -605,6 +609,7 @@ JSON
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       export SUBBOOST_SCRIPT_SOURCE_ONLY=1
       export SUBBOOST_HOME="$home"
       source local/scripts/subboost.sh

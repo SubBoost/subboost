@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 DEFAULT_HOME="/opt/subboost"
 DEFAULT_BIN="/usr/local/bin/subboost"
@@ -18,8 +19,8 @@ SUBBOOST_DRY_RUN="${SUBBOOST_DRY_RUN:-0}"
 
 ENV_FILE="$SUBBOOST_HOME/.env"
 COMPOSE_FILE="$SUBBOOST_HOME/docker-compose.yml"
-TMP_DIR="${TMPDIR:-/tmp}/subboost-install.$$"
-RELEASE_FILE="$TMP_DIR/release.json"
+TMP_DIR=""
+RELEASE_FILE=""
 
 say() {
   printf '%s\n' "$*"
@@ -179,8 +180,14 @@ resolve_url() {
   esac
 }
 
+prepare_temp_directory() {
+  if [ -z "$TMP_DIR" ]; then
+    TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/subboost-install.XXXXXXXXXX")" || die "Cannot create private temporary directory."
+  fi
+}
 fetch_release_manifest() {
-  mkdir -p "$TMP_DIR"
+  prepare_temp_directory
+  RELEASE_FILE="$TMP_DIR/release.json"
   if download_to_temp "$SUBBOOST_RELEASE_URL" "$RELEASE_FILE" 2>/dev/null; then
     return 0
   fi
@@ -298,10 +305,10 @@ env_value() {
 }
 
 write_env_value() {
+  prepare_temp_directory
   local key="$1"
   local value="$2"
   local tmp="$TMP_DIR/env"
-  mkdir -p "$TMP_DIR"
   if [ -f "$ENV_FILE" ]; then
     read_env_file | awk -v key="$key" 'index($0, key "=") != 1 { print }' > "$tmp"
   else
@@ -337,31 +344,6 @@ url_has_port() {
   printf '%s' "$1" | grep -Eq '^https?://\[[^]]+\]:[0-9]+($|/)|^https?://[^/]+:[0-9]+($|/)'
 }
 
-url_without_port() {
-  local url
-  url="$(ensure_scheme "$1")"
-  url="${url%/}"
-  if printf '%s' "$url" | grep -Eq '^https?://\[[^]]+\]:[0-9]+$'; then
-    printf '%s\n' "$url" | sed -E 's#^(https?://\[[^]]+\]):[0-9]+$#\1#'
-  elif printf '%s' "$url" | grep -Eq '^https?://[^/]+:[0-9]+$'; then
-    printf '%s\n' "$url" | sed -E 's#^(https?://[^/:]+):[0-9]+$#\1#'
-  else
-    printf '%s\n' "$url"
-  fi
-}
-
-normalize_app_url() {
-  local url
-  local port="$2"
-  url="$(ensure_scheme "$1")"
-  url="${url%/}"
-  if url_has_port "$url" || [ "$port" = "80" ] || [ "$port" = "443" ]; then
-    printf '%s\n' "$url"
-  else
-    printf '%s:%s\n' "$url" "$port"
-  fi
-}
-
 detect_public_host() {
   local detected=""
   detected="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
@@ -373,10 +355,10 @@ detect_public_host() {
 }
 
 install_docker_engine() {
+  prepare_temp_directory
   confirm_or_quit "Docker is missing. Press Enter to install Docker automatically, or type q to exit: "
   require_curl
   local script="$TMP_DIR/get-docker.sh"
-  mkdir -p "$TMP_DIR"
   curl -fsSL https://get.docker.com -o "$script"
   run_root sh "$script"
   if command -v systemctl >/dev/null 2>&1; then
@@ -600,7 +582,6 @@ main() {
   COMPOSE_FILE="$TMP_DIR/candidate-compose.yml"
   local candidate_manager="$TMP_DIR/candidate-manager"
   local volumes_before="$TMP_DIR/volumes.before"
-  umask 077
   : > "$ENV_FILE"
   download_to_temp "$compose_url" "$COMPOSE_FILE"
   download_to_temp "$manager_url" "$candidate_manager"
@@ -620,7 +601,7 @@ main() {
   ensure_env_value CRON_SECRET "$(random_hex 32)"
   ensure_env_value LOCAL_SETUP_TOKEN "$(random_hex 32)"
 
-  local db_name db_user db_pass database_url current_url current_port default_host default_url input_url selected_port final_url recommended_port
+  local db_name db_user db_pass database_url current_url current_port selected_port final_url recommended_port access_mode binding
   db_name="$(env_value POSTGRES_DB)"
   db_user="$(env_value POSTGRES_USER)"
   db_pass="$(env_value POSTGRES_PASSWORD)"
@@ -630,17 +611,42 @@ main() {
   current_port="${SUBBOOST_PORT:-$(env_value SUBBOOST_PORT || true)}"
   current_url="${APP_URL:-$(env_value APP_URL || true)}"
 
-  default_host="$(detect_public_host)"
-  if [ -n "$current_url" ]; then
-    default_url="$(url_without_port "$current_url")"
-  else
-    default_url="http://$default_host"
-  fi
   recommended_port="$(recommended_port_from "$current_port")"
-  input_url="$(prompt "请输入 SubBoost 访问地址，直接回车会自动填入服务器 ip [$default_url]: " "$default_url")"
   selected_port="$(prompt_for_port "$recommended_port")"
-  final_url="$(normalize_app_url "$(url_without_port "$input_url")" "$selected_port")"
+  access_mode="${SUBBOOST_ACCESS_MODE:-$(prompt '访问方式 [ssh/https/public-http]，默认 ssh: ' 'ssh')}"
+  binding="127.0.0.1"
+  case "$access_mode" in
+    ssh)
+      final_url="${current_url:-http://127.0.0.1:$selected_port}"
+      case "$final_url" in "http://127.0.0.1:$selected_port"|"http://localhost:$selected_port") ;; *) die "SSH 模式的 APP_URL 必须是本机地址和所选端口。" ;; esac
+      ;;
+    https)
+      final_url="${current_url:-$(prompt '输入已配置 HTTPS 的反向代理地址（例如 https://local.subboost.test）: ' '')}"
+      final_url="${final_url%/}"
+      [[ "$final_url" =~ ^https://([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?$ ]] || die "请输入有效的 HTTPS 地址，不能包含路径。"
+      warn "请自行配置 HTTPS 证书和反向代理，将请求转发到 http://127.0.0.1:$selected_port；安装器不会配置 TLS。"
+      ;;
+    public-http)
+      final_url="${current_url:-$(prompt '输入服务器地址（HTTP）: ' "http://$(detect_public_host)")}"
+      final_url="$(ensure_scheme "${final_url%/}")"
+      [[ "$final_url" =~ ^http://([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?$ ]] || die "请输入有效的 HTTP 地址，不能包含路径。"
+      if ! url_has_port "$final_url"; then final_url="$final_url:$selected_port"; fi
+      binding=""
+      warn "HTTP 未加密，设置令牌、密码和会话可能被网络上的其他人读取；只在可信网络使用。"
+      ;;
+    *) die "访问方式须为 ssh、https 或 public-http。" ;;
+  esac
+  if [ "$access_mode" != "public-http" ]; then
+    local docker_version docker_major
+    docker_version="$(docker_cmd version --format '{{.Server.Version}}' 2>/dev/null || true)"
+    docker_major="${docker_version%%.*}"
+    if [[ "$docker_major" =~ ^[0-9]+$ ]] && (( docker_major < 28 )); then
+      warn "Docker Engine 28 以下的本机端口可能被同一局域网的其他主机访问；请升级 Docker 或隔离网络。"
+    fi
+  fi
+  export SUBBOOST_PORT="$selected_port" SUBBOOST_BIND_ADDRESS="$binding" APP_URL="$final_url"
   set_env_value SUBBOOST_PORT "$selected_port"
+  set_env_value SUBBOOST_BIND_ADDRESS "$binding"
   set_env_value APP_URL "$final_url"
 
   compose config >/dev/null
@@ -668,6 +674,7 @@ main() {
   say ""
   say "SubBoost 已启动。"
   say "访问地址: $(env_value APP_URL)"
+  if [ "$access_mode" = "ssh" ]; then say "从远程电脑访问前运行: ssh -L $selected_port:127.0.0.1:$selected_port <用户名>@<服务器地址>"; fi
   say "首次初始化链接: $(env_value APP_URL)/login#setup-token=$(env_value LOCAL_SETUP_TOKEN)"
   say "请通过上面的链接创建第一个管理员；初始化成功后页面会清除令牌片段。"
   say "管理命令: subboost"
@@ -675,7 +682,8 @@ main() {
 }
 
 if [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ]; then
-  trap 'rm -rf "$TMP_DIR"' EXIT
+  trap '[ -z "$TMP_DIR" ] || rm -rf -- "$TMP_DIR"' EXIT
+  trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
   DOCKER_RUNNER="docker"
   main "$@"
 fi

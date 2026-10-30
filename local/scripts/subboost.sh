@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 DEFAULT_HOME="/opt/subboost"
 DEFAULT_STABLE_RELEASE_URL="https://github.com/SubBoost/subboost/releases/latest/download/release.json"
@@ -8,7 +9,7 @@ SUBBOOST_HOME="${SUBBOOST_HOME:-$DEFAULT_HOME}"
 ENV_FILE="$SUBBOOST_HOME/.env"
 COMPOSE_FILE="$SUBBOOST_HOME/docker-compose.yml"
 BACKUP_DIR="$SUBBOOST_HOME/backups"
-TMP_DIR="${TMPDIR:-/tmp}/subboost-manager.$$"
+TMP_DIR=""
 
 say() {
   printf '%s\n' "$*"
@@ -93,6 +94,11 @@ load_env() {
   set +a
 }
 
+prepare_temp_directory() {
+  if [ -z "$TMP_DIR" ]; then
+    TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/subboost-manager.XXXXXXXXXX")" || die "Cannot create private temporary directory."
+  fi
+}
 download_to_temp() {
   local url="$1"
   local output="$2"
@@ -144,10 +150,10 @@ read_env_file() {
 }
 
 write_env_value() {
+  prepare_temp_directory
   local key="$1"
   local value="$2"
   local tmp="$TMP_DIR/env"
-  mkdir -p "$TMP_DIR"
   read_env_file | awk -F= -v key="$key" '$1 != key { print }' > "$tmp"
   printf '%s=%s\n' "$key" "$value" >> "$tmp"
   install_secret_file "$tmp" "$ENV_FILE"
@@ -211,11 +217,11 @@ activate_staged_file() {
 }
 
 install_file_from_url() {
+  prepare_temp_directory
   local url="$1"
   local destination="$2"
   local mode="$3"
   local tmp="$TMP_DIR/download"
-  mkdir -p "$TMP_DIR"
   download_to_temp "$url" "$tmp"
   sudo_do install -m "$mode" "$tmp" "$destination"
 }
@@ -391,6 +397,7 @@ status_cmd() {
 
 update_cmd() {
   load_env
+  prepare_temp_directory
   local release_url="${SUBBOOST_RELEASE_URL:-}"
   local release_file="$TMP_DIR/release.json"
   local candidate_env="$TMP_DIR/candidate.env"
@@ -404,7 +411,6 @@ update_cmd() {
   local app_id old_image_id rollback_tag old_image_ref update_error restore_error db_ready
   local manager_present=0 old_manager_present=0
   local -a restore_status
-  mkdir -p "$TMP_DIR"
   if is_official_fixed_release_url "$release_url"; then
     say "Detected old fixed release update source; switching updates to stable latest."
     release_url="$DEFAULT_STABLE_RELEASE_URL"
@@ -417,7 +423,11 @@ update_cmd() {
     download_to_temp "$compose_url" "$candidate_compose"
     download_to_temp "$manager_url" "$candidate_manager"
     [ -s "$candidate_manager" ] && bash -n "$candidate_manager" || die "Candidate manager is invalid."
+    if [ "${SUBBOOST_REQUIRE_MANAGER_UPDATE:-0}" = "1" ]; then
+      cmp -s "$candidate_manager" "$0" || die "The release manager does not match the downloaded manager; update aborted."
+    fi
   else
+    [ "${SUBBOOST_REQUIRE_MANAGER_UPDATE:-0}" != "1" ] || die "Release manifest unavailable; secure manager update aborted."
     say "Release manifest unavailable; updating current image and compose only."
     cp "$COMPOSE_FILE" "$candidate_compose"
     if [ -f "${SUBBOOST_BIN:-/usr/local/bin/subboost}" ]; then
@@ -655,7 +665,8 @@ main() {
 }
 
 if [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ]; then
-  trap 'rm -rf "$TMP_DIR"' EXIT
+  trap '[ -z "$TMP_DIR" ] || rm -rf -- "$TMP_DIR"' EXIT
+  trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
   DOCKER_RUNNER=""
   main "$@"
 fi

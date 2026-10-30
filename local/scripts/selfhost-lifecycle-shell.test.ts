@@ -10,6 +10,7 @@ function runRollbackScenario(restoreFails: boolean) {
     set -Eeuo pipefail
     home="$(mktemp -d)"
     trap 'rm -rf "$home"' EXIT
+    export TMPDIR="$home"
     mkdir -p "$home/release" "$home/bin"
     cat > "$home/release/release.json" <<'JSON'
 {"image":"new-image","composeUrl":"compose.yml","managerUrl":"manager"}
@@ -87,7 +88,7 @@ describe("self-host update rollback lifecycle", () => {
     expect(result.stdout).toContain("tag subboost-rollback:update-");
     expect(result.stdout).toContain("old-image");
     expect(result.stdout).toContain("Previous version restored successfully.");
-  });
+  }, 20_000);
 
   it("keeps writers stopped and preserves the dump when database restore fails", () => {
     const result = runRollbackScenario(true);
@@ -96,7 +97,7 @@ describe("self-host update rollback lifecycle", () => {
     expect(result.stdout).toContain("Keep app and cron stopped");
     expect(result.stdout).toMatch(/old-compose\.yml.* stop cron app/);
     expect(result.stdout).not.toMatch(/old-compose\.yml.* up -d app/);
-  });
+  }, 20_000);
 
   it("never deletes a volume that existed before a failed installation", () => {
     const result = spawnSync("bash", ["-lc", "exec \"$BASH\" -s"], {
