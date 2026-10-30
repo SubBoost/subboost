@@ -32,12 +32,19 @@ import {
   type RuleSearchType,
   type VerifiedRuleSetInfo,
 } from "./types";
+import { checkRuleListLineCount, fetchRuleText, LIST_BYTES, TREE_BYTES } from "./transport";
 
 export * from "./types";
 
 const DEFAULT_USER_AGENT = "SubBoost";
 const REMOTE_ONLY_SAMPLE_SIZE = 50;
 const GEOSITE_PATH_PREFIX = "geosite/";
+const MAX_DISCOVERIES = 16;
+const MAX_DISCOVERY_CACHE = 64;
+const MAX_LIST_INFLIGHT = 64;
+const MAX_LIST_CACHE = 128;
+const MAX_LIST_CACHE_BYTES = 16 * 1024 * 1024;
+const MAX_DISCOVERY_BYTES = 8 * 1024 * 1024;
 
 function getNow(options: RuleCatalogServiceOptions): number {
   return options.now?.() ?? Date.now();
@@ -134,11 +141,8 @@ async function fetchGitTree(
   const { owner, repo } = RULE_PROVIDER_CONFIG.github;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${treeSha}${recursive ? "?recursive=1" : ""}`;
-  const response = await fetchImpl(url, { headers: buildGitHubHeaders(options) });
-  if (!response.ok) {
-    throw new Error(`GitHub API ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as GitTreeResponse;
+  const body = await fetchRuleText(fetchImpl, url, buildGitHubHeaders(options), TREE_BYTES, (status) => `GitHub API ${status}`);
+  return JSON.parse(body) as GitTreeResponse;
 }
 
 async function resolveGeoTreeSha(options: RuleCatalogServiceOptions): Promise<string | null> {
@@ -338,6 +342,9 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
   let indexInflight: Promise<RemoteRuleIndex> | null = null;
   const discoveryCache = new Map<string, CnRuleCandidateDiscovery>();
   const discoveryInflight = new Map<string, Promise<CnRuleCandidateDiscovery>>();
+  const listCache = new Map<string, { lines: string[]; bytes: number; expiresAt: number }>();
+  const listInflight = new Map<string, Promise<{ lines: string[]; bytes: number }>>();
+  let listCacheBytes = 0;
 
   async function fetchRemoteRuleIndex(): Promise<RemoteRuleIndex> {
     const geoSha = await resolveGeoTreeSha(options);
@@ -458,21 +465,47 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
     };
   }
 
-  async function fetchRuleList(ruleId: string): Promise<string[]> {
-    const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-    const response = await fetchImpl(buildRuleListUrl(ruleId), {
-      headers: {
+  function fetchRuleList(ruleId: string, force: boolean): Promise<{ lines: string[]; bytes: number }> {
+    const cached = listCache.get(ruleId);
+    if (!force && cached && getNow(options) < cached.expiresAt) {
+      listCache.delete(ruleId);
+      listCache.set(ruleId, cached);
+      return Promise.resolve(cached);
+    }
+    const existing = listInflight.get(ruleId);
+    if (existing) return existing;
+    if (listInflight.size >= MAX_LIST_INFLIGHT) return Promise.reject(new Error("Rule list capacity exceeded"));
+    const next = fetchRuleText(
+      options.fetchImpl ?? globalThis.fetch,
+      buildRuleListUrl(ruleId),
+      {
         Accept: "text/plain,*/*",
         "User-Agent": options.userAgent ?? DEFAULT_USER_AGENT,
       },
-    });
-    if (!response.ok) {
-      throw new Error(`Rule list ${ruleId} returned ${response.status}`);
-    }
-    return normalizeRuleListLines((await response.text()).split(/\r?\n/));
+      LIST_BYTES,
+      (status) => `Rule list ${ruleId} returned ${status}`,
+    ).then((body) => {
+      checkRuleListLineCount(body);
+      const lines = normalizeRuleListLines(body.split(/\r?\n/));
+      const bytes = body.length * 2 + lines.length * 64;
+      const previous = listCache.get(ruleId);
+      if (previous) { listCacheBytes -= previous.bytes; listCache.delete(ruleId); }
+      if (bytes <= MAX_LIST_CACHE_BYTES) {
+        while (listCache.size >= MAX_LIST_CACHE || listCacheBytes + bytes > MAX_LIST_CACHE_BYTES) {
+          const oldest = listCache.keys().next().value as string;
+          listCacheBytes -= listCache.get(oldest)!.bytes;
+          listCache.delete(oldest);
+        }
+        listCache.set(ruleId, { lines, bytes, expiresAt: toExpiresAt(getNow(options), options) });
+        listCacheBytes += bytes;
+      }
+      return { lines, bytes };
+    }).finally(() => { listInflight.delete(ruleId); });
+    listInflight.set(ruleId, next);
+    return next;
   }
 
-  async function fetchCnDiscovery(parents: CnCandidateParent[]): Promise<CnRuleCandidateDiscovery> {
+  async function fetchCnDiscovery(parents: CnCandidateParent[], force: boolean): Promise<CnRuleCandidateDiscovery> {
     const now = getNow(options);
     if (parents.length === 0) {
       return {
@@ -504,15 +537,34 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
       }
     }
 
-    const [geolocationCnLines, fetchedSources] = await Promise.all([
-      geositeNames.has("geolocation-cn") ? fetchRuleList("geolocation-cn") : Promise.resolve([]),
-      Promise.all(
-        sourcesToFetch.map(async (source) => ({
-          ...source,
-          lines: await fetchRuleList(source.id),
-        }))
-      ),
-    ]);
+    const ids = ["geolocation-cn", ...sourcesToFetch.map((source) => source.id)];
+    if (!geositeNames.has("geolocation-cn")) ids[0] = "";
+    const uniqueIds = [...new Set(ids.filter(Boolean))];
+    const lists = new Map<string, { lines: string[]; bytes: number }>();
+    let cursor = 0;
+    let uniqueBytes = 0;
+    let failed = false;
+    async function worker() {
+      try {
+        while (!failed && cursor < uniqueIds.length) {
+          const id = uniqueIds[cursor++];
+          const list = await fetchRuleList(id, force);
+          uniqueBytes += list.bytes;
+          if (uniqueBytes > MAX_DISCOVERY_BYTES) throw new Error("Rule discovery is too large");
+          lists.set(id, list);
+        }
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+    const settled = await Promise.allSettled(Array.from({ length: Math.min(4, uniqueIds.length) }, worker));
+    const failure = settled.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    const totalBytes = ids.reduce((sum, id) => sum + (lists.get(id)?.bytes ?? 0), 0);
+    if (totalBytes > MAX_DISCOVERY_BYTES) throw new Error("Rule discovery is too large");
+    const geolocationCnLines = lists.get(ids[0])?.lines ?? [];
+    const fetchedSources = sourcesToFetch.map((source) => ({ ...source, lines: lists.get(source.id)!.lines }));
     const allItems = buildCnRuleCandidatesFromSources(fetchedSources, geolocationCnLines);
     const fetchedAt = getNow(options);
     return {
@@ -544,9 +596,16 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
 
     const existing = discoveryInflight.get(cacheKey);
     if (existing) return existing;
+    if (discoveryInflight.size >= MAX_DISCOVERIES) {
+      const cached = discoveryCache.get(cacheKey);
+      if (cached) return { ...cached, source: "stale" };
+      throw new RuleIndexUnavailableError("Rule discovery capacity exceeded");
+    }
 
-    const next = fetchCnDiscovery(parents)
+    const next = fetchCnDiscovery(parents, params.force ?? false)
       .then((result) => {
+        discoveryCache.delete(cacheKey);
+        if (discoveryCache.size >= MAX_DISCOVERY_CACHE) discoveryCache.delete(discoveryCache.keys().next().value as string);
         discoveryCache.set(cacheKey, result);
         return result;
       })
