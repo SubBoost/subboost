@@ -237,7 +237,7 @@ describe("local source import transport", () => {
     expect(mocks.requestPinnedText).not.toHaveBeenCalled();
   });
 
-  it("revalidates and pins every redirect target independently", async () => {
+  it("revalidates each redirect and rejects unsafe or unresolved targets", async () => {
     mocks.lookup
       .mockResolvedValueOnce([{ address: "93.184.216.34" }])
       .mockResolvedValueOnce([{ address: "1.1.1.1" }]);
@@ -262,6 +262,28 @@ describe("local source import transport", () => {
       url: "https://cdn.example.net/sub",
       addresses: ["1.1.1.1"],
     }));
+
+    const previouslyValidatedAddress = mocks.requestPinnedText.mock.calls[0][0].addresses[0];
+    mocks.lookup.mockResolvedValueOnce([{ address: previouslyValidatedAddress }]);
+    mocks.requestPinnedText.mockResolvedValueOnce({
+      status: 302, headers: { location: "http://127.0.0.1/private" }, content: "",
+    });
+    await expect(runTransport("https://local.subboost.test/sub")).resolves.toMatchObject({
+      ok: false, errorInfo: { category: "security" },
+    });
+    expect(mocks.requestPinnedText).toHaveBeenCalledTimes(3);
+
+    mocks.lookup
+      .mockResolvedValueOnce([{ address: previouslyValidatedAddress }])
+      .mockRejectedValueOnce(new Error("dns down"));
+    mocks.requestPinnedText.mockResolvedValueOnce({
+      status: 302, headers: { location: "https://next.local.subboost.test/sub" }, content: "",
+    });
+    await expect(runTransport("https://local.subboost.test/sub")).resolves.toMatchObject({
+      ok: false, errorInfo: { category: "network" },
+    });
+    expect(mocks.requestPinnedText).toHaveBeenCalledTimes(4);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("keeps blocking fake-ip DNS answers when DoH confirms an unsafe target", async () => {
@@ -325,17 +347,20 @@ describe("local source import transport", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it("allows fetch attempts when DNS lookup fails without private records", async () => {
-    mocks.lookup.mockRejectedValueOnce(new Error("dns down"));
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(response("ss://node", { status: 200 }));
+  it.each(["failure", "empty", "invalid"])("stops safe-mode requests when DNS returns %s", async (result) => {
+    if (result === "empty") mocks.lookup.mockResolvedValueOnce([]);
+    else if (result === "invalid") mocks.lookup.mockResolvedValueOnce([{ address: "not-an-ip" }]);
+    else mocks.lookup.mockRejectedValueOnce(new Error("dns down"));
 
-    await expect(runTransport("https://example.com/sub")).resolves.toMatchObject({
-      ok: true,
-      content: "ss://node",
+    await expect(runTransport("https://local.subboost.test/sub")).resolves.toMatchObject({
+      ok: false, errorInfo: { category: "network" },
     });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mocks.requestPinnedText).not.toHaveBeenCalled();
   });
 
   it("follows redirects and returns text plus normalized headers", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce(
         response("", {
@@ -375,6 +400,7 @@ describe("local source import transport", () => {
   });
 
   it("reports HTTP failures and oversized responses with public reasons", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(response("bad", { status: 503 }));
 
     await expect(runTransport("https://example.com/sub")).resolves.toMatchObject({
@@ -416,6 +442,7 @@ describe("local source import transport", () => {
   });
 
   it("handles redirect loops, missing locations, and thrown fetch errors", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     vi.mocked(globalThis.fetch).mockImplementation(async () => (
       response("", { status: 302, headers: { location: "/next" } })
     ));
@@ -439,12 +466,6 @@ describe("local source import transport", () => {
       error: "network down",
       publicReason: "network down",
     });
-
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(response("", { status: 302, headers: { location: "http://127.0.0.1/private" } }));
-    await expect(runTransport("https://example.com/private-redirect")).resolves.toMatchObject({
-      ok: false,
-      publicReason: "禁止访问本机或内网地址",
-    });
   });
 
   it("applies the enabled high-risk setting to redirect targets", async () => {
@@ -461,6 +482,7 @@ describe("local source import transport", () => {
   });
 
   it("returns userinfo headers with HEAD and skips when no userinfo URL is configured", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     await expect(fetchSourceUserInfoHeadersDirect({})).resolves.toBeUndefined();
 
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(

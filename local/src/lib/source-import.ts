@@ -108,9 +108,7 @@ async function validatePublicFetchTarget(
 
   const records = await lookup(hostname, { all: true, verbatim: true }).catch(() => null);
   if (!records || records.length === 0) {
-    // Compatibility fallback documented for local: if DNS validation cannot
-    // obtain any address, let the runtime resolver make the connection.
-    return { ok: true, addresses: null };
+    return { ok: false, failure: toFailure("DNS 暂时不可用，请稍后再试") };
   }
   const addresses = normalizeResolvedIpAddresses(records.map((record) => record.address));
   const finalAddresses = shouldRecheckFakeIpDnsAnswers(addresses)
@@ -120,11 +118,14 @@ async function validatePublicFetchTarget(
       )
     : addresses;
   const addressesToCheck = finalAddresses.length > 0 ? finalAddresses : addresses;
+  if (addressesToCheck.length === 0 || addressesToCheck.some((address) => !isIP(address))) {
+    return { ok: false, failure: toFailure("DNS 暂时不可用，请稍后再试") };
+  }
   if (addressesToCheck.some((address) => isPrivateOrReservedIp(address))) {
     return { ok: false, failure: toSecurityFailure("禁止访问本机或内网地址") };
   }
 
-  return { ok: true, addresses: addressesToCheck.length > 0 ? addressesToCheck : null };
+  return { ok: true, addresses: addressesToCheck };
 }
 
 async function readFetchBodyLimited(response: Response, maxBytes: number): Promise<string> {
