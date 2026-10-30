@@ -51,13 +51,22 @@ describe("local rate limits", () => {
     delete process.env.TRUST_PROXY_HEADERS;
   });
 
-  it("caps in-memory buckets at 10,000 by evicting the earliest expiry", () => {
-    for (let index = 0; index < 10_000; index += 1) {
-      consumeLocalRateLimit("bounded", String(index), { limit: 1, windowMs: 60_000, now: 1_000 });
+  it("fails closed at capacity without evicting active buckets", () => {
+    for (let index = 0; index < 2_048; index += 1) {
+      expect(consumeLocalRateLimit("bounded", String(index), { limit: 1, windowMs: 60_000, now: 1_000 }).allowed).toBe(true);
     }
-    consumeLocalRateLimit("bounded", "overflow", { limit: 1, windowMs: 60_000, now: 1_000 });
+    expect(consumeLocalRateLimit("bounded", "overflow", { limit: 1, windowMs: 60_000, now: 1_000 }).allowed).toBe(false);
 
-    expect(consumeLocalRateLimit("bounded", "0", { limit: 1, windowMs: 60_000, now: 1_001 }).allowed).toBe(true);
-    expect(consumeLocalRateLimit("bounded", "9999", { limit: 1, windowMs: 60_000, now: 1_001 }).allowed).toBe(false);
+    expect(consumeLocalRateLimit("bounded", "0", { limit: 1, windowMs: 60_000, now: 1_001 }).allowed).toBe(false);
+    expect(consumeLocalRateLimit("bounded", "2047", { limit: 1, windowMs: 60_000, now: 1_001 }).allowed).toBe(false);
+    expect(consumeLocalRateLimit("bounded", "overflow", { limit: 1, windowMs: 60_000, now: 61_000 }).allowed).toBe(true);
+  });
+
+  it("keeps login protection separate when subscription identities fill their capacity", () => {
+    consumeLocalRateLimit("auth-login-client", "client", { limit: 1, windowMs: 60_000, now: 0 });
+    for (let index = 0; index < 10_001; index += 1) {
+      consumeLocalRateLimit("subscription-yaml-token", String(index), { limit: 1, windowMs: 60_000, now: 1 });
+    }
+    expect(consumeLocalRateLimit("auth-login-client", "client", { limit: 1, windowMs: 60_000, now: 2 }).allowed).toBe(false);
   });
 });

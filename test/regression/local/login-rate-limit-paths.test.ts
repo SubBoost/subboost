@@ -72,7 +72,7 @@ describe("local login layered rate limits", () => {
     );
   });
 
-  it("checks the username bucket after an allowed trusted-client attempt", async () => {
+  it("checks a client-specific username bucket after an allowed trusted-client attempt", async () => {
     mocks.getTrustedClientRateLimitKey.mockReturnValue("client-hash");
     mocks.consumeLocalRateLimit
       .mockReturnValueOnce({ allowed: true, retryAfterSeconds: 0 })
@@ -83,21 +83,20 @@ describe("local login layered rate limits", () => {
     expect(response.status).toBe(429);
     expect(mocks.consumeLocalRateLimit).toHaveBeenNthCalledWith(
       2,
-      "auth-login-username",
-      "hash:admin",
+      "auth-login-client-username",
+      "hash:client-hash:admin",
       { limit: 8, windowMs: 15 * 60 * 1000 },
     );
     expect(mocks.prisma.localAdmin.findUnique).not.toHaveBeenCalled();
   });
 
-  it("uses the non-sensitive missing-username bucket and skips database lookup", async () => {
+  it("uses a shared bounded unknown-client bucket and skips lookup for a missing username", async () => {
     const response = await POST(loginRequest({ username: "  ", password: "secret" }));
 
     expect(response.status).toBe(401);
-    expect(mocks.hashLocalRateLimitKey).toHaveBeenCalledWith("missing");
     expect(mocks.consumeLocalRateLimit).toHaveBeenCalledWith(
-      "auth-login-username",
-      "hash:missing",
+      "auth-login-unknown",
+      "all",
       { limit: 8, windowMs: 15 * 60 * 1000 },
     );
     expect(mocks.prisma.localAdmin.findUnique).not.toHaveBeenCalled();

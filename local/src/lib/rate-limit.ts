@@ -11,30 +11,23 @@ export type LocalRateLimitResult = {
   retryAfterSeconds: number;
 };
 
-const buckets = new Map<string, RateLimitBucket>();
-const MAX_BUCKETS = 10_000;
-let nextCleanupAt = 0;
+const scopes = new Map<string, Map<string, RateLimitBucket>>();
+const CLEANUP_BATCH = 8;
 
-function cleanupExpiredBuckets(now: number, force = false): void {
-  if (!force && (buckets.size < 1024 || now < nextCleanupAt)) return;
-  for (const [key, bucket] of buckets) {
-    if (bucket.resetAt <= now) buckets.delete(key);
-  }
-  nextCleanupAt = now + 60_000;
+function scopeCapacity(scope: string): number {
+  if (scope === "auth-login-client") return 2_048;
+  if (scope === "auth-login-client-username") return 4_096;
+  if (scope === "auth-login-unknown" || scope === "auth-login-unknown-recovery") return 1;
+  if (scope.startsWith("subscription-yaml-")) return 10_000;
+  return 2_048;
 }
 
-function makeRoomForBucket(): void {
-  while (buckets.size >= MAX_BUCKETS) {
-    let earliestKey: string | null = null;
-    let earliestResetAt = Number.POSITIVE_INFINITY;
-    for (const [key, bucket] of buckets) {
-      if (bucket.resetAt < earliestResetAt) {
-        earliestKey = key;
-        earliestResetAt = bucket.resetAt;
-      }
-    }
-    if (!earliestKey) return;
-    buckets.delete(earliestKey);
+function cleanupExpiredBuckets(buckets: Map<string, RateLimitBucket>, now: number): void {
+  const count = Math.min(CLEANUP_BATCH, buckets.size);
+  for (let index = 0; index < count; index += 1) {
+    const [key, bucket] = buckets.entries().next().value!;
+    buckets.delete(key);
+    if (bucket.resetAt > now) buckets.set(key, bucket);
   }
 }
 
@@ -47,19 +40,17 @@ export function consumeLocalRateLimit(
   key: string,
   options: { limit: number; windowMs: number; now?: number }
 ): LocalRateLimitResult {
-  const now = options.now ?? Date.now();
-  const limit = Math.max(1, Math.floor(options.limit));
-  const windowMs = Math.max(1000, Math.floor(options.windowMs));
-  cleanupExpiredBuckets(now);
-
-  const bucketKey = `${scope}:${key}`;
-  const current = buckets.get(bucketKey);
+  const now = Number.isFinite(options.now) ? options.now! : Date.now();
+  const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 1;
+  const windowMs = Number.isFinite(options.windowMs) ? Math.max(1000, Math.floor(options.windowMs)) : 1000;
+  let buckets = scopes.get(scope);
+  if (!buckets) { buckets = new Map(); scopes.set(scope, buckets); }
+  cleanupExpiredBuckets(buckets, now);
+  const current = buckets.get(key);
   if (!current || current.resetAt <= now) {
-    if (!current && buckets.size >= MAX_BUCKETS) {
-      cleanupExpiredBuckets(now, true);
-      makeRoomForBucket();
-    }
-    buckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
+    // Fail closed on saturation; active entries are never evicted by new identities.
+    if (!current && buckets.size >= scopeCapacity(scope)) return { allowed: false, retryAfterSeconds: 1 };
+    buckets.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true, retryAfterSeconds: 0 };
   }
 
@@ -87,7 +78,7 @@ export function getTrustedClientRateLimitKey(request: Request): string | null {
 }
 
 export function resetLocalRateLimit(scope: string, key: string): void {
-  buckets.delete(`${scope}:${key}`);
+  scopes.get(scope)?.delete(key);
 }
 
 export function localRateLimitResponse(message: string, retryAfterSeconds: number): Response {
@@ -98,7 +89,6 @@ export function localRateLimitResponse(message: string, retryAfterSeconds: numbe
 
 export function clearLocalRateLimitsForTests(): void {
   if (process.env.NODE_ENV === "test") {
-    buckets.clear();
-    nextCleanupAt = 0;
+    scopes.clear();
   }
 }
