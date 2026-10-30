@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const publicRoot = path.resolve(__dirname, "../..");
 
+function shellTimeout(defaultMs: number): number {
+  return process.platform === "win32" ? 120_000 : defaultMs;
+}
+
 function runRollbackScenario(restoreFails: boolean) {
   const script = `
     set -Eeuo pipefail
@@ -75,7 +79,7 @@ ENV
     cwd: publicRoot,
     encoding: "utf8",
     input: script,
-    timeout: 30_000,
+    timeout: shellTimeout(30_000),
     env: { ...process.env, LC_ALL: "C.UTF-8" },
   });
 }
@@ -83,22 +87,22 @@ ENV
 describe("self-host update rollback lifecycle", () => {
   it("restores the verified dump and old image after candidate health failure", () => {
     const result = runRollbackScenario(false);
-    expect(result.status).toBe(0);
+    expect(result.status, result.error?.message ?? result.stderr).toBe(0);
     expect(result.stdout).toContain("Candidate update failed: candidate health check failed");
     expect(result.stdout).toContain("pg_restore --clean --if-exists --exit-on-error");
     expect(result.stdout).toContain("tag subboost-rollback:update-");
     expect(result.stdout).toContain("old-image");
     expect(result.stdout).toContain("Previous version restored successfully.");
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it("keeps writers stopped and preserves the dump when database restore fails", () => {
     const result = runRollbackScenario(true);
-    expect(result.status).toBe(0);
+    expect(result.status, result.error?.message ?? result.stderr).toBe(0);
     expect(result.stdout).toContain("Automatic rollback stopped: database restore failed");
     expect(result.stdout).toContain("Keep app and cron stopped");
     expect(result.stdout).toMatch(/old-compose\.yml.* stop cron app/);
     expect(result.stdout).not.toMatch(/old-compose\.yml.* up -d app/);
-  }, 20_000);
+  }, shellTimeout(20_000));
 
   it("never deletes a volume that existed before a failed installation", () => {
     const result = spawnSync("bash", ["-lc", "exec \"$BASH\" -s"], {
@@ -123,7 +127,7 @@ describe("self-host update rollback lifecycle", () => {
         cleanup_failed_install "$home/volumes.before"
         cat "$home/removed"
       `,
-      timeout: 30_000,
+      timeout: shellTimeout(30_000),
       env: { ...process.env, LC_ALL: "C.UTF-8" },
     });
     expect(result.status).toBe(0);
