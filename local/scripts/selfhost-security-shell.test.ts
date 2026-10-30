@@ -564,31 +564,39 @@ ENV
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   }, 20_000);
 
-  it.each(["install.sh", "subboost.sh"])("cleans %s candidate files after interruption signals", (script) => {
+  it("cleans the staged environment when the actual manager entry is interrupted", () => {
     const result = runBash(`
       set -Eeuo pipefail
       base="$(mktemp -d)"
       trap 'rm -rf "$base"' EXIT
-      mkdir -p "$base/tmp"
-      export TMPDIR="$base/tmp" SUBBOOST_SCRIPT_SOURCE_ONLY=1
+      mkdir -p "$base/tmp" "$base/bin" "$base/home"
+      export REAL_CP="$(command -v cp)" PROBE_READY="$base/ready"
+      cat > "$base/bin/cp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  */candidate.env) [ -f "$1" ] || exit 17; : > "$PROBE_READY"; kill -s "$PROBE_SIGNAL" "$PPID"; exit 1 ;;
+esac
+exec "$REAL_CP" "$@"
+SH
+      cat > "$base/bin/sudo" <<'SH'
+#!/usr/bin/env bash
+exec "$@"
+SH
+      chmod +x "$base/bin/cp" "$base/bin/sudo"
+      export PATH="$base/bin:$PATH" TMPDIR="$base/tmp" SUBBOOST_HOME="$base/home" SUBBOOST_BIN="$base/manager"
+      unset SUBBOOST_SCRIPT_SOURCE_ONLY SUBBOOST_REQUIRE_MANAGER_UPDATE
+      printf 'SUBBOOST_IMAGE=fixture\\nSUBBOOST_RELEASE_URL=\\n' > "$base/home/.env"
+      : > "$base/home/docker-compose.yml"
       for pair in HUP:129 INT:130 TERM:143; do
-        signal="\${pair%:*}" expected="\${pair#*:}"
-        if SIGNAL="$signal" bash -c '
-          source local/scripts/${script}
-          trap "exit 129" HUP; trap "exit 130" INT; trap "exit 143" TERM
-          SUBBOOST_SCRIPT_SOURCE_ONLY=0
-          prepare_temp_directory
-          : > "$TMP_DIR/candidate.env"
-          [ -f "$TMP_DIR/candidate.env" ]
-          kill -s "$SIGNAL" "$$"
-          exit 0
-        '; then status=0; else status=$?; fi
-        [ "$status" = "$expected" ] || { printf '%s returned %s\\n' "$signal" "$status"; exit 1; }
+        export PROBE_SIGNAL="\${pair%:*}"; expected="\${pair#*:}"
+        rm -f "$PROBE_READY"
+        if bash local/scripts/subboost.sh update; then status=0; else status=$?; fi
+        [ "$status" = "$expected" ] && [ -f "$PROBE_READY" ]
         [ -z "$(find "$TMPDIR" -mindepth 1 -print -quit)" ]
       done
     `);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-  }, 60_000);
+  }, 30_000);
 
   it("updates an existing installation by running the downloaded manager first", () => {
     const result = firstUpdateScenario("matching");
