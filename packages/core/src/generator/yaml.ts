@@ -170,12 +170,13 @@ function getOrderedMappingKeys(record: Record<string, unknown>, preferredKeys: r
  * 防止 YAML 注入和配置破坏
  */
 function escapeYamlDoubleQuotedString(value: string): string {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\r/g, "\\r")
-    .replace(/\n/g, "\\n")
-    .replace(/\t/g, "\\t");
+  return JSON.stringify(value).slice(1, -1).replace(/[\u007f-\u009f\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
+
+function toYamlKey(key: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) && !/^(?:null|true|false|yes|no|on|off)$/i.test(key)) return key;
+  return `"${escapeYamlDoubleQuotedString(key)}"`;
 }
 
 /**
@@ -190,7 +191,7 @@ function toInlineYaml(value: unknown): string {
       if (s === "") return true;
       // 需要引号的情况：包含特殊字符或空格
       // 注意：在 flow style（{...} / [...]）里，`?` 等字符会触发更严格的 YAML 解析器报错（例如 PyYAML / 部分 Clash 客户端）。
-      if (/[+":,\[\]{}#&*!|>'%@`?\n]/.test(s) || s.includes(" ")) return true;
+      if (/[+":,\[\]{}#&*!|>'%@`?\s\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(s)) return true;
 
       // YAML 的“易被误判为标量类型”的字符串（布尔/空值/数字）
       // 例如：short-id: 7250（若不加引号，Clash 侧 YAML 解析可能会当成数字）
@@ -230,9 +231,9 @@ function toInlineYaml(value: unknown): string {
       .map(([k, v]) => {
         // 统一为 name 字段加双引号：避免不同节点名的输出格式不一致（也降低下游 YAML 解析器差异风险）
         if (k === "name" && typeof v === "string") {
-          return `${k}: "${escapeYamlDoubleQuotedString(v)}"`;
+          return `${toYamlKey(k)}: "${escapeYamlDoubleQuotedString(v)}"`;
         }
-        return `${k}: ${toInlineYaml(v)}`;
+        return `${toYamlKey(k)}: ${toInlineYaml(v)}`;
       });
     return `{${pairs.join(", ")}}`;
   }
@@ -244,7 +245,7 @@ function toBlockSequenceScalar(value: string): string {
   const ambiguous =
     !value ||
     trimmed !== value ||
-    /[\r\n#]/.test(value) ||
+    /[\u0000-\u001f\u007f-\u009f\u2028\u2029#]/.test(value) ||
     /:\s/.test(value) ||
     /^[\-?:,\[\]{}&*!|>'"%@`]/.test(value) ||
     /^(?:null|~|true|false|yes|no|on|off)$/i.test(value) ||
@@ -292,17 +293,17 @@ function appendYamlField(lines: string[], key: string, value: unknown, indent = 
   if (value === undefined) return;
 
   if (!isPlainObject(value)) {
-    lines.push(`${indent}${toInlineYaml(key)}: ${toInlineYaml(value)}`);
+    lines.push(`${indent}${toYamlKey(key)}: ${toInlineYaml(value)}`);
     return;
   }
 
   const entries = Object.entries(value).filter(([, v]) => v !== undefined);
   if (entries.length === 0) {
-    lines.push(`${indent}${toInlineYaml(key)}: {}`);
+    lines.push(`${indent}${toYamlKey(key)}: {}`);
     return;
   }
 
-  lines.push(`${indent}${toInlineYaml(key)}:`);
+  lines.push(`${indent}${toYamlKey(key)}:`);
   for (const [childKey, childValue] of entries) {
     appendYamlField(lines, childKey, childValue, `${indent}  `);
   }
@@ -368,7 +369,7 @@ export function configToYaml(config: ClashConfig): string {
       if (keys.length === 0) continue;
       keys.forEach((key, index) => {
         const prefix = index === 0 ? "  - " : "    ";
-        lines.push(`${prefix}${toInlineYaml(key)}: ${toInlineYaml(record[key])}`);
+        lines.push(`${prefix}${toYamlKey(key)}: ${toInlineYaml(record[key])}`);
       });
     }
   }
@@ -378,7 +379,7 @@ export function configToYaml(config: ClashConfig): string {
   lines.push("rule-providers:");
   if (config["rule-providers"]) {
     for (const [name, provider] of Object.entries(config["rule-providers"])) {
-      lines.push(`  ${name}: ${toInlineYaml(provider)}`);
+      lines.push(`  ${toYamlKey(name)}: ${toInlineYaml(provider)}`);
     }
   }
   lines.push("");

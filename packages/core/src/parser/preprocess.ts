@@ -2,6 +2,7 @@ import { decodeBase64, encodeBase64 } from "./base64";
 import { tryParseJson } from "../json";
 import { looksLikePlatformConfigContent } from "./platform/parse-platform-config";
 import { isClashYamlContent } from "./content-parsers";
+import { checkSubscriptionInput, checkSubscriptionItems, MAX_SUBSCRIPTION_OUTPUT_LENGTH, SubscriptionParseLimitError } from "./limits";
 
 export interface PreprocessSubscriptionContentResult {
   content: string;
@@ -55,6 +56,36 @@ function tryDecodeBase64Text(content: string): string | null {
   }
 }
 
+function utf8Length(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value.charCodeAt(index);
+    if (char < 0x80) bytes += 1;
+    else if (char < 0x800) bytes += 2;
+    else if (char >= 0xd800 && char <= 0xdbff && value.charCodeAt(index + 1) >= 0xdc00 && value.charCodeAt(index + 1) <= 0xdfff) {
+      bytes += 4;
+      index += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+function checkOutputLength(used: number, next: number): void {
+  if (used + next > MAX_SUBSCRIPTION_OUTPUT_LENGTH) {
+    throw new SubscriptionParseLimitError("预处理展开后的内容超过大小上限");
+  }
+}
+
+function* serverEntries(value: unknown): Generator<[number, unknown]> {
+  if (!value || typeof value !== "object") return;
+  let index = 0;
+  for (const key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    checkSubscriptionItems(index + 1);
+    yield [index++, (value as Record<string, unknown>)[key]];
+  }
+}
+
 function convertSsdSubscriptionToLinks(content: string): { content?: string; error?: string } {
   const raw = content.trim();
   if (!/^ssd:\/\//i.test(raw)) {
@@ -77,44 +108,42 @@ function convertSsdSubscriptionToLinks(content: string): { content?: string; err
     const defaultMethod = typeof parsed.encryption === "string" ? parsed.encryption.trim() : "";
     const defaultPassword = typeof parsed.password === "string" ? parsed.password : "";
 
-    const serverList = Array.isArray(parsed.servers)
-      ? parsed.servers
-      : parsed.servers && typeof parsed.servers === "object"
-        ? Object.values(parsed.servers as Record<string, unknown>)
-        : [];
+    const links: string[] = [];
+    let outputLength = 0;
+    for (const [index, entry] of serverEntries(parsed.servers)) {
+      if (!entry || typeof entry !== "object") continue;
+      const server = entry as Record<string, unknown>;
+      const host = typeof server.server === "string" ? server.server.trim() : "";
+      const port = Number(server.port ?? defaultPort);
+      const method = typeof server.encryption === "string" ? server.encryption.trim() : defaultMethod;
+      const password = typeof server.password === "string" ? server.password : defaultPassword;
+      if (!host || !Number.isFinite(port) || port < 1 || port > 65535 || !method || !password) continue;
 
-    const links = serverList
-      .map((entry, index) => {
-        if (!entry || typeof entry !== "object") return null;
-        const server = entry as Record<string, unknown>;
-        const host = typeof server.server === "string" ? server.server.trim() : "";
-        const port = Number(server.port ?? defaultPort);
-        const method = typeof server.encryption === "string" ? server.encryption.trim() : defaultMethod;
-        const password = typeof server.password === "string" ? server.password : defaultPassword;
-        if (!host || !Number.isFinite(port) || port < 1 || port > 65535 || !method || !password) {
-          return null;
-        }
+      const tagRaw =
+        typeof server.remarks === "string" && server.remarks.trim()
+          ? server.remarks.trim()
+          : typeof parsed.airport === "string" && parsed.airport.trim()
+            ? `${parsed.airport.trim()}-${index + 1}`
+            : `SSD-${index + 1}`;
+      const tag = safeDecodeURIComponentValue(tagRaw);
+      const pluginName = typeof server.plugin === "string" ? server.plugin.trim() : "";
+      const pluginOpts = typeof server.plugin_options === "string" ? server.plugin_options.trim() : "";
+      const authBytes = utf8Length(method) + 1 + utf8Length(password);
+      const estimate = 16 + Math.ceil(authBytes / 3) * 4 + host.length + String(port).length +
+        3 * (utf8Length(pluginName) + utf8Length(pluginOpts) + utf8Length(tag) + 1);
+      checkOutputLength(outputLength, estimate);
+      const userInfo = encodeBase64(`${method}:${password}`);
+      const plugin =
+        pluginName && pluginOpts
+          ? `/?plugin=${encodeURIComponent(`${pluginName};${pluginOpts}`)}`
+          : pluginName
+            ? `/?plugin=${encodeURIComponent(pluginName)}`
+            : "";
 
-        const tagRaw =
-          typeof server.remarks === "string" && server.remarks.trim()
-            ? server.remarks.trim()
-            : typeof parsed.airport === "string" && parsed.airport.trim()
-              ? `${parsed.airport.trim()}-${index + 1}`
-              : `SSD-${index + 1}`;
-        const tag = safeDecodeURIComponentValue(tagRaw);
-        const userInfo = encodeBase64(`${method}:${password}`);
-        const pluginName = typeof server.plugin === "string" ? server.plugin.trim() : "";
-        const pluginOpts = typeof server.plugin_options === "string" ? server.plugin_options.trim() : "";
-        const plugin =
-          pluginName && pluginOpts
-            ? `/?plugin=${encodeURIComponent(`${pluginName};${pluginOpts}`)}`
-            : pluginName
-              ? `/?plugin=${encodeURIComponent(pluginName)}`
-              : "";
-
-        return `ss://${userInfo}@${host}:${port}${plugin}#${encodeURIComponent(tag)}`;
-      })
-      .filter((item): item is string => Boolean(item));
+      const link = `ss://${userInfo}@${host}:${port}${plugin}#${encodeURIComponent(tag)}`;
+      outputLength += link.length + 1;
+      links.push(link);
+    }
 
     if (links.length === 0) {
       return { error: "SSD 订阅中未找到可转换的服务器条目" };
@@ -122,6 +151,7 @@ function convertSsdSubscriptionToLinks(content: string): { content?: string; err
 
     return { content: links.join("\n") };
   } catch (error) {
+    if (error instanceof SubscriptionParseLimitError) throw error;
     return { error: error instanceof Error ? error.message : "SSD 订阅解析失败" };
   }
 }
@@ -150,22 +180,26 @@ function convertNetchConfigToLinks(content: string): { content?: string; error?:
       return { error: "Netch 配置缺少 Server 列表" };
     }
 
-    const links = servers
-      .map((entry) => {
-        if (!entry) return null;
-        const obj =
-          typeof entry === "string"
-            ? (() => {
-                const decoded = tryParseJson<unknown>(entry);
-                return decoded.ok && decoded.value && typeof decoded.value === "object" ? decoded.value : null;
-              })()
-            : typeof entry === "object"
-              ? entry
-              : null;
-        if (!obj) return null;
-        return `netch://${encodeBase64(JSON.stringify(obj))}`;
-      })
-      .filter((item): item is string => Boolean(item));
+    const links: string[] = [];
+    let outputLength = 0;
+    for (const [, entry] of serverEntries(servers)) {
+      if (!entry) continue;
+      const obj =
+        typeof entry === "string"
+          ? (() => {
+              const decoded = tryParseJson<unknown>(entry);
+              return decoded.ok && decoded.value && typeof decoded.value === "object" ? decoded.value : null;
+            })()
+          : typeof entry === "object"
+            ? entry
+            : null;
+      if (!obj) continue;
+      const json = JSON.stringify(obj);
+      checkOutputLength(outputLength, 9 + Math.ceil(utf8Length(json) / 3) * 4);
+      const link = `netch://${encodeBase64(json)}`;
+      outputLength += link.length + 1;
+      links.push(link);
+    }
 
     if (links.length === 0) {
       return { error: "Netch 配置中未找到可转换的服务器条目" };
@@ -173,6 +207,7 @@ function convertNetchConfigToLinks(content: string): { content?: string; error?:
 
     return { content: links.join("\n") };
   } catch (error) {
+    if (error instanceof SubscriptionParseLimitError) throw error;
     return { error: error instanceof Error ? error.message : "Netch 配置解析失败" };
   }
 }
@@ -248,7 +283,8 @@ const SUBSCRIPTION_PREPROCESSORS: SubscriptionPreprocessor[] = [
   },
 ];
 
-export function preprocessSubscriptionContent(content: string): PreprocessSubscriptionContentResult {
+function preprocess(content: string): PreprocessSubscriptionContentResult {
+  checkSubscriptionInput(content);
   let current = content.trim();
   const errors: string[] = [];
   const applied: string[] = [];
@@ -272,6 +308,7 @@ export function preprocessSubscriptionContent(content: string): PreprocessSubscr
     }
 
     const normalizedNext = next.content.trim();
+    checkOutputLength(0, normalizedNext.length);
     if (!normalizedNext || normalizedNext === current) {
       break;
     }
@@ -287,5 +324,14 @@ export function preprocessSubscriptionContent(content: string): PreprocessSubscr
     errors: mergeUniqueErrors(errors),
     applied,
   };
+}
+
+export function preprocessSubscriptionContent(content: string): PreprocessSubscriptionContentResult {
+  try {
+    return preprocess(content);
+  } catch (error) {
+    if (error instanceof SubscriptionParseLimitError) return { content: "", errors: [error.message], applied: [] };
+    throw error;
+  }
 }
 

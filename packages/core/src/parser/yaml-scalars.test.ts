@@ -26,11 +26,11 @@ describe("subscription YAML scalar semantics", () => {
       .toEqual({ password: "000123", port: 443, "123": "numeric-key" });
   });
 
-  it("preserves aliases, cycles, timestamps and binary scalars", () => {
-    const value = loadSubscriptionYaml("first: &shared {password: 000123}\nsecond: *shared\ncycle: &cycle {self: *cycle}\nstamp: 2026-01-01\nbinary: !!binary QQ==") as Record<string, unknown>;
+  it("preserves ordinary aliases, timestamps and binary scalars and rejects cycles", () => {
+    const value = loadSubscriptionYaml("first: &shared {password: 000123}\nsecond: *shared\nstamp: 2026-01-01\nbinary: !!binary QQ==") as Record<string, unknown>;
     expect(value.first).toEqual({ password: "000123" });
     expect(value.second).toBe(value.first);
-    expect((value.cycle as Record<string, unknown>).self).toBe(value.cycle);
+    expect(() => loadSubscriptionYaml("cycle: &cycle {self: *cycle}")).toThrow("循环别名");
     expect(value.stamp).toEqual(new Date("2026-01-01T00:00:00.000Z"));
     expect(value.binary).toEqual(new Uint8Array([65]));
   });

@@ -10,6 +10,7 @@ import { normalizeParseResult } from "./normalize";
 import { preprocessSubscriptionContent } from "./preprocess";
 import { parseNodeLink } from "./parse-node-link";
 import type { ParseResult } from "@subboost/core/types/node";
+import { SubscriptionParseLimitError } from "./limits";
 
 function finalizeParseResult(result: ParseResult, priorErrors: string[] = []): ParseResult {
   return normalizeParseResult(result, priorErrors);
@@ -21,6 +22,17 @@ function finalizeParseResult(result: ParseResult, priorErrors: string[] = []): P
  * @returns 解析结果
  */
 export function parseSubscription(content: string): ParseResult {
+  try {
+    return parseSubscriptionInternal(content);
+  } catch (error) {
+    if (error instanceof SubscriptionParseLimitError) {
+      return { nodes: [], errors: [error.message], totalParsed: 0, totalFailed: 1 };
+    }
+    throw error;
+  }
+}
+
+function parseSubscriptionInternal(content: string): ParseResult {
   const preprocessed = preprocessSubscriptionContent(content);
   const trimmedContent = preprocessed.content.trim();
   const errors: string[] = [...preprocessed.errors];

@@ -76,7 +76,11 @@ function validateMappingKeys(content: string, events: Event[]): void {
   }
 }
 
-export function loadMihomoYaml(content: string, schema: Schema = MIHOMO_YAML_SCHEMA): unknown {
+export function loadMihomoYaml(
+  content: string,
+  schema: Schema = MIHOMO_YAML_SCHEMA,
+  beforeConstruct?: (source: string, events: Event[]) => void,
+): unknown {
   let events: Event[];
   try {
     events = parseEvents(content, {});
@@ -87,6 +91,7 @@ export function loadMihomoYaml(content: string, schema: Schema = MIHOMO_YAML_SCH
     content = normalized;
     events = parseEvents(content, {});
   }
+  beforeConstruct?.(content, events);
   validateMappingKeys(content, events);
   const documents = constructFromEvents(events, { source: content, schema });
   if (documents.length > 1) throw new YAMLException("expected a single document in the stream, but found more");

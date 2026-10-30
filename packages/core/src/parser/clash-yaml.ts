@@ -11,6 +11,7 @@ import { normalizeSsPlugin } from "./protocols/ss";
 import { splitWsPathEarlyData } from "./ws-early-data";
 import { getNodeEndpointError } from "../node-endpoint";
 import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "../mihomo/string-scalar";
+import { addSubscriptionError, checkSubscriptionInput, checkSubscriptionItems, MAX_SUBSCRIPTION_OUTPUT_LENGTH, SubscriptionParseLimitError } from "./limits";
 
 interface ClashConfig {
   proxies?: Record<string, unknown>[];
@@ -41,8 +42,8 @@ function applyWsEarlyDataInPlace(node: Record<string, unknown>) {
 
 function normalizeClashYamlScalarText(content: string): string {
   return content.replace(
-    /^(\s*short-id\s*:\s*)([0-9]+)(\s*(?:#.*)?)$/gm,
-    (_match, prefix: string, value: string, suffix: string) => `${prefix}"${value}"${suffix || ""}`
+    /^([ \t]*short-id[ \t]*:[ \t]*)([0-9]+)([ \t]*(?:#[^\r\n]*)?)(\r?)$/gm,
+    (_match, prefix: string, value: string, suffix: string, ending: string) => `${prefix}"${value}"${suffix}${ending}`
   );
 }
 
@@ -102,6 +103,13 @@ function repairRootFlowProxyListIndent(input: string): string {
   const canonicalIndent = countLeadingSpaces(lines[itemIndexes[0]]);
   if (itemIndexes.every((index) => countLeadingSpaces(lines[index]) === canonicalIndent)) return input;
 
+  let outputLength = input.length;
+  for (const index of itemIndexes) {
+    outputLength += canonicalIndent - countLeadingSpaces(lines[index]);
+    if (outputLength > MAX_SUBSCRIPTION_OUTPUT_LENGTH) {
+      throw new SubscriptionParseLimitError("YAML 缩进修复后的内容超过大小上限");
+    }
+  }
   for (const index of itemIndexes) {
     lines[index] = `${" ".repeat(canonicalIndent)}${lines[index].trimStart()}`;
   }
@@ -113,12 +121,20 @@ function repairInlineListIndent(input: string): string {
   // 逐个列表项消费其后续块，确保每一行最多检查一次，避免大型订阅退化为 O(n²)。
   const lines = input.split(/\r?\n/);
   const out: string[] = [];
+  let outputLength = 0;
+  const append = (line: string) => {
+    outputLength += line.length + 1;
+    if (outputLength > MAX_SUBSCRIPTION_OUTPUT_LENGTH) {
+      throw new SubscriptionParseLimitError("YAML 缩进修复后的内容超过大小上限");
+    }
+    out.push(line);
+  };
 
   for (let index = 0; index < lines.length; ) {
     const line = lines[index];
     const match = line.match(/^(\s*)-\s*(name\s*:\s*.+)$/);
     if (!match) {
-      out.push(line);
+      append(line);
       index += 1;
       continue;
     }
@@ -143,12 +159,15 @@ function repairInlineListIndent(input: string): string {
     }
 
     if (minIndent !== Number.POSITIVE_INFINITY && minIndent > keyIndent) {
-      out.push(`${" ".repeat(dashIndent)}-`);
-      out.push(`${" ".repeat(minIndent)}${match[2]}`);
+      if (outputLength + dashIndent + minIndent + match[2].length + 3 > MAX_SUBSCRIPTION_OUTPUT_LENGTH) {
+        throw new SubscriptionParseLimitError("YAML 缩进修复后的内容超过大小上限");
+      }
+      append(`${" ".repeat(dashIndent)}-`);
+      append(`${" ".repeat(minIndent)}${match[2]}`);
     } else {
-      out.push(line);
+      append(line);
     }
-    out.push(...lines.slice(index + 1, blockEnd));
+    for (let next = index + 1; next < blockEnd; next += 1) append(lines[next]);
     index = blockEnd;
   }
 
@@ -163,15 +182,26 @@ export function parseClashYaml(content: string): ParseResult {
   const errors: string[] = [];
 
   try {
-    const normalizeTabs = (s: string) => s.replace(/\t/g, "  ");
+    checkSubscriptionInput(content);
+    const normalizeTabs = (s: string) => {
+      let length = s.length;
+      for (const char of s) if (char === "\t" && ++length > MAX_SUBSCRIPTION_OUTPUT_LENGTH) {
+        throw new SubscriptionParseLimitError("YAML 制表符展开后的内容超过大小上限");
+      }
+      return s.replace(/\t/g, "  ");
+    };
 
     const tryLoad = loadSubscriptionYaml;
     const normalizedContent = normalizeClashYamlScalarText(normalizeTabs(content));
+    if (normalizedContent.length > MAX_SUBSCRIPTION_OUTPUT_LENGTH) {
+      throw new SubscriptionParseLimitError("YAML 标量规范化后的内容超过大小上限");
+    }
 
     let parsed: unknown;
     try {
       parsed = tryLoad(normalizedContent);
     } catch (e) {
+      if (e instanceof SubscriptionParseLimitError) throw e;
       // 尝试修复缩进后再解析一次
       const repaired = repairRootFlowProxyListIndent(repairInlineListIndent(normalizedContent));
       parsed = tryLoad(repaired);
@@ -191,13 +221,16 @@ export function parseClashYaml(content: string): ParseResult {
       const config = parsed as ClashConfig;
 
       if (config.proxies && Array.isArray(config.proxies)) {
+        checkSubscriptionItems(config.proxies.length);
         for (const proxy of config.proxies) {
           try {
             const node = normalizeNode(proxy);
             if (node) nodes.push(canonicalizeParsedNode(node));
           } catch (e) {
-            errors.push(
-              `节点 "${(proxy as any)?.name || "未知"}" 解析失败: ${e instanceof Error ? e.message : "未知错误"}`
+            if (e instanceof SubscriptionParseLimitError) throw e;
+            const name = typeof proxy?.name === "string" ? proxy.name.slice(0, 100) : "未知";
+            addSubscriptionError(errors,
+              `节点 "${name}" 解析失败: ${e instanceof Error ? e.message.slice(0, 500) : "未知错误"}`
             );
           }
         }
@@ -207,7 +240,8 @@ export function parseClashYaml(content: string): ParseResult {
           const node = normalizeNode(config as unknown as Record<string, unknown>);
           if (node) nodes.push(canonicalizeParsedNode(node));
         } catch (e) {
-          errors.push(`节点解析失败: ${e instanceof Error ? e.message : "未知错误"}`);
+          if (e instanceof SubscriptionParseLimitError) throw e;
+          addSubscriptionError(errors, `节点解析失败: ${e instanceof Error ? e.message.slice(0, 500) : "未知错误"}`);
         }
       }
 
@@ -220,11 +254,12 @@ export function parseClashYaml(content: string): ParseResult {
 
       // 注意：proxy-providers 需要在服务器端拉取，浏览器端无法直接获取
       if (hasProxyProviders) {
-        errors.push(
+        addSubscriptionError(errors,
           "检测到 proxy-providers 配置，由于浏览器限制无法自动拉取，请直接粘贴节点内容"
         );
       }
     } else if (Array.isArray(parsed)) {
+      checkSubscriptionItems(parsed.length);
       // 3) 仅粘贴了 proxies 列表（YAML 顶层为数组）
       for (const proxy of parsed) {
         if (!proxy || typeof proxy !== "object") continue;
@@ -232,13 +267,14 @@ export function parseClashYaml(content: string): ParseResult {
           const node = normalizeNode(proxy as Record<string, unknown>);
           if (node) nodes.push(canonicalizeParsedNode(node));
         } catch (e) {
-          const name = (proxy as any)?.name || "未知";
-          errors.push(`节点 "${name}" 解析失败: ${e instanceof Error ? e.message : "未知错误"}`);
+          if (e instanceof SubscriptionParseLimitError) throw e;
+          const name = typeof proxy.name === "string" ? proxy.name.slice(0, 100) : "未知";
+          addSubscriptionError(errors, `节点 "${name}" 解析失败: ${e instanceof Error ? e.message.slice(0, 500) : "未知错误"}`);
         }
       }
     } else {
       // 其他：无法识别为 Clash YAML
-      errors.push("无法识别为 Clash YAML（缺少 proxies 或节点字段）");
+      addSubscriptionError(errors, "无法识别为 Clash YAML（缺少 proxies 或节点字段）");
     }
 
     return {
@@ -248,6 +284,9 @@ export function parseClashYaml(content: string): ParseResult {
       totalFailed: errors.length,
     };
   } catch (e) {
+    if (e instanceof SubscriptionParseLimitError) {
+      return { nodes: [], errors: [e.message], totalParsed: 0, totalFailed: 1 };
+    }
     return {
       nodes: [],
       errors: [`YAML 解析错误: ${e instanceof Error ? e.message : "未知错误"}`],
