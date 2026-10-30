@@ -2,7 +2,8 @@ import * as yaml from "js-yaml";
 import { loadMihomoYaml, MIHOMO_YAML_INTEGER_TAG, MIHOMO_YAML_SCHEMA } from "../config/yaml-schema";
 import { MIHOMO_STRING_SCALAR_FIELDS } from "../mihomo/string-scalar";
 import { checkSubscriptionInput, SubscriptionParseLimitError } from "./limits";
-import { checkYamlExpansionBudget, checkYamlSyntaxBudget } from "./yaml-budget";
+import { checkYamlExpansionBudget } from "./yaml-budget";
+import { checkYamlSyntaxBudget } from "./yaml-syntax-budget";
 
 class YamlInteger extends Number {
   // Number's native tag keeps js-yaml's mapping-key semantics unchanged.
@@ -30,10 +31,9 @@ function integerText(text: string): string {
 
 export function loadSubscriptionYaml(content: string): unknown {
   checkSubscriptionInput(content);
-  checkYamlSyntaxBudget(content);
   let parsed: unknown;
   try {
-    parsed = loadMihomoYaml(content, scalarSchema, checkYamlExpansionBudget);
+    parsed = loadMihomoYaml(content, scalarSchema, checkYamlExpansionBudget, checkYamlSyntaxBudget);
   } catch (error) {
     if (error instanceof yaml.YAMLException && /(?:maxDepth|maxTotalMergeKeys|maxAliases)/.test(error.reason)) {
       throw new SubscriptionParseLimitError(`YAML 超过解析预算: ${error.reason}`);

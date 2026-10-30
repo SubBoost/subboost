@@ -5,16 +5,6 @@ import {
 
 interface Cost { nodes: number; text: number; depth: number; open: boolean }
 
-// parseEvents builds an array eagerly. Bound its potential size before invoking it.
-export function checkYamlSyntaxBudget(source: string): void {
-  let indicators = 0;
-  for (let index = 0; index < source.length; index += 1) {
-    if ("\n\r,:[]{}*&".includes(source[index]) && ++indicators > MAX_YAML_EXPANDED_NODES) {
-      throw new SubscriptionParseLimitError("YAML 结构数量超过上限");
-    }
-  }
-}
-
 // Account for each alias as its fully expanded value, before object construction.
 export function checkYamlExpansionBudget(source: string, events: Event[]): void {
   const anchors = new Map<string, Cost>();

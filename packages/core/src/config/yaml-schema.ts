@@ -80,15 +80,18 @@ export function loadMihomoYaml(
   content: string,
   schema: Schema = MIHOMO_YAML_SCHEMA,
   beforeConstruct?: (source: string, events: Event[]) => void,
+  beforeParse?: (source: string) => void,
 ): unknown {
   let events: Event[];
   try {
+    beforeParse?.(content);
     events = parseEvents(content, {});
   } catch (error) {
     if (!(error instanceof YAMLException) || error.reason !== "deficient indentation") throw error;
     const normalized = normalizeLegacyFlowIndent(content);
     if (normalized === content) throw error;
     content = normalized;
+    beforeParse?.(content);
     events = parseEvents(content, {});
   }
   beforeConstruct?.(content, events);
