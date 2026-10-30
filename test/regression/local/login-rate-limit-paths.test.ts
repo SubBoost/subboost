@@ -90,15 +90,11 @@ describe("local login layered rate limits", () => {
     expect(mocks.prisma.localAdmin.findUnique).not.toHaveBeenCalled();
   });
 
-  it("uses a shared bounded unknown-client bucket and skips lookup for a missing username", async () => {
+  it("skips lookup and rate-limit state for a missing username", async () => {
     const response = await POST(loginRequest({ username: "  ", password: "secret" }));
 
     expect(response.status).toBe(401);
-    expect(mocks.consumeLocalRateLimit).toHaveBeenCalledWith(
-      "auth-login-unknown",
-      "all",
-      { limit: 8, windowMs: 15 * 60 * 1000 },
-    );
+    expect(mocks.consumeLocalRateLimit).not.toHaveBeenCalled();
     expect(mocks.prisma.localAdmin.findUnique).not.toHaveBeenCalled();
     expect(mocks.bcryptCompare).not.toHaveBeenCalled();
   });

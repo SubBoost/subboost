@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { apiError } from "./http";
+import { clearUnknownLoginQueueForTests } from "./login-queue";
 
 type RateLimitBucket = {
   count: number;
@@ -17,7 +18,6 @@ const CLEANUP_BATCH = 8;
 function scopeCapacity(scope: string): number {
   if (scope === "auth-login-client") return 2_048;
   if (scope === "auth-login-client-username") return 4_096;
-  if (scope === "auth-login-unknown" || scope === "auth-login-unknown-recovery") return 1;
   if (scope.startsWith("subscription-yaml-")) return 10_000;
   return 2_048;
 }
@@ -90,5 +90,6 @@ export function localRateLimitResponse(message: string, retryAfterSeconds: numbe
 export function clearLocalRateLimitsForTests(): void {
   if (process.env.NODE_ENV === "test") {
     scopes.clear();
+    clearUnknownLoginQueueForTests();
   }
 }
