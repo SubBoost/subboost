@@ -108,6 +108,27 @@ describe("local login protection", () => {
     expect(mocks.compare).toHaveBeenCalledTimes(1);
   });
 
+  it("limits slow bodies before password work and recovers after their deadline", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    const slow = () => new Request("http://local.subboost.test/api/auth/login", {
+      method: "POST",
+      body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array(60_000)); }, cancel }),
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+    const pending = Array.from({ length: 8 }, () => POST(slow()));
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await POST(login("correct"))).status).toBe(429);
+    expect(mocks.compare).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(10_000);
+    const responses = await Promise.all(pending);
+    expect(responses.map((response) => response.status)).toEqual(Array(8).fill(408));
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(8));
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await POST(login("correct"))).status).toBe(200);
+    expect(mocks.compare).toHaveBeenCalledTimes(1);
+  });
+
   it("continues serving queued requests when a password check throws", async () => {
     vi.useFakeTimers();
     mocks.compare.mockRejectedValueOnce(new Error("verification failed"));

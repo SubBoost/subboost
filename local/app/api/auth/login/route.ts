@@ -1,9 +1,10 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { apiError, getStringField, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
+import { apiError, getStringField, jsonBodyError } from "@local/lib/http";
 import { prisma } from "@local/lib/prisma";
 import { sessionCookieOptions, signSession, SESSION_COOKIE } from "@local/lib/session";
 import { enterUnknownLoginQueue } from "@local/lib/login-queue";
+import { readLoginBody } from "@local/lib/login-body";
 import {
   consumeLocalRateLimit,
   getTrustedClientRateLimitKey,
@@ -26,7 +27,11 @@ export async function POST(request: Request) {
     }
   }
 
-  const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.small);
+  const read = await readLoginBody(request);
+  if (read.kind === "limited") return localRateLimitResponse("Too many login attempts. Try again later.", 1);
+  if (read.kind === "timeout") return apiError("Request body timed out.", "BAD_REQUEST", 408);
+  if (read.kind === "aborted") return apiError("Request body was interrupted.", "BAD_REQUEST", 400);
+  const parsedBody = read.result;
   if (!parsedBody.ok) return jsonBodyError(parsedBody);
   const body = parsedBody.value;
 

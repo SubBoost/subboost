@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { apiError } from "./http";
 import { clearUnknownLoginQueueForTests } from "./login-queue";
+import { clearLoginBodyLimitForTests } from "./login-body";
 
 type RateLimitBucket = {
   count: number;
@@ -91,5 +92,6 @@ export function clearLocalRateLimitsForTests(): void {
   if (process.env.NODE_ENV === "test") {
     scopes.clear();
     clearUnknownLoginQueueForTests();
+    clearLoginBodyLimitForTests();
   }
 }
