@@ -201,9 +201,7 @@ random_hex() {
 
 port_number() {
   local value="$1"
-  case "$value" in
-    *:*) value="${value##*:}" ;;
-  esac
+  case "$value" in *:*) value="${value##*:}" ;; esac
   value="${value#[}"
   value="${value%]}"
   case "$value" in ''|*[!0-9]*) ;; *) value="${value#"${value%%[!0]*}"}"; [ -n "$value" ] || value=0 ;; esac
@@ -212,12 +210,9 @@ port_number() {
 
 port_is_number() {
   local port; port="$(port_number "$1")"
-  case "$port" in
-    ''|*[!0-9]*) return 1 ;;
-  esac
+  case "$port" in ''|*[!0-9]*) return 1 ;; esac
   [ "$port" -ge 1 ] && [ "$port" -le 65535 ]
 }
-
 port_is_free() {
   local port
   port="$(port_number "$1")"
@@ -313,18 +308,11 @@ write_env_value() {
   install_secret_file "$tmp" "$ENV_FILE"
 }
 ensure_env_value() {
-  local key="$1"
-  local value="$2"
-  local current
-  current="$(env_value "$key" || true)"
-  if [ -z "$current" ]; then
-    write_env_value "$key" "$value"
-  fi
+  local key="$1" value="$2" current; current="$(env_value "$key" || true)"
+  if [ -z "$current" ]; then write_env_value "$key" "$value"; fi
 }
 
-set_env_value() {
-  write_env_value "$1" "$2"
-}
+set_env_value() { write_env_value "$1" "$2"; }
 
 ensure_scheme() {
   local url="$1"
@@ -336,8 +324,19 @@ ensure_scheme() {
 
 url_has_port() { printf '%s' "$1" | grep -Eq '^https?://\[[^]]+\]:[0-9]+($|/)|^https?://[^/]+:[0-9]+($|/)'; }
 
+valid_web_url() {
+  local LC_ALL=C pattern; pattern="^$2"$'://([a-zA-Z0-9.\200-\377-]+|\\[[0-9A-Fa-f:.]+\\])(:[0-9]{1,5})?$'
+  [[ "$1" =~ $pattern && "$1" != *$'\302'[$'\200'-$'\237']* ]]
+}
 valid_ipv6_literal() {
   local address="$1" part count=0 compressed=0; local -a parts
+  if [[ "$address" == *.* ]]; then
+    local suffix="${address##*:}" prefix="${address%:*}" byte; local -a octets
+    [[ "$prefix" =~ (^|:)[fF]{4}$ && "${prefix%:*}" != *[!0:]* && "$suffix" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+    IFS=. read -r -a octets <<< "$suffix"
+    for byte in "${octets[@]}"; do [[ "$byte" =~ ^(0|[1-9][0-9]{0,2})$ ]] && (( byte <= 255 )) || return 1; done
+    printf -v address '%s:%x:%x' "$prefix" "$(( octets[0] * 256 + octets[1] ))" "$(( octets[2] * 256 + octets[3] ))"
+  fi
   [[ ${#address} -le 39 && "$address" =~ ^[0-9A-Fa-f:]+$ && "$address" != *:::* ]] || return 1
   [[ "$address" != :* || "$address" == ::* ]] && [[ "$address" != *: || "$address" == *:: ]] || return 1
   if [[ "$address" == *::* ]]; then compressed=1; [[ "${address#*::}" != *::* ]] || return 1; fi
@@ -629,20 +628,20 @@ main() {
     https)
       final_url="${current_url:-$(prompt '输入已配置 HTTPS 的反向代理地址（例如 https://local.subboost.test）: ' '')}"
       final_url="${final_url%/}"
-      [[ "$final_url" =~ ^https://([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?$ ]] || die "请输入有效的 HTTPS 地址，不能包含路径。"
+      valid_web_url "$final_url" https || die "请输入有效的 HTTPS 地址，不能包含路径。"
       warn "请自行配置 HTTPS 证书和反向代理，将请求转发到 http://127.0.0.1:$selected_port；安装器不会配置 TLS。"
       ;;
     public-http)
       final_url="${current_url:-$(prompt '输入服务器地址（HTTP）: ' "http://$(detect_public_host)")}"
       final_url="$(ensure_scheme "${final_url%/}")"
-      [[ "$final_url" =~ ^http://([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(:[0-9]{1,5})?$ ]] || die "请输入有效的 HTTP 地址，不能包含路径。"
+      valid_web_url "$final_url" http || die "请输入有效的 HTTP 地址，不能包含路径。"
       if ! url_has_port "$final_url"; then final_url="$final_url:$selected_port"; fi
       binding=""
       warn "HTTP 未加密，设置令牌、密码和会话可能被网络上的其他人读取；只在可信网络使用。"
       ;;
     *) die "访问方式须为 ssh、https 或 public-http。" ;;
   esac
-  if [[ "$final_url" =~ ^https?://\[([0-9A-Fa-f:]+)\] ]] && ! valid_ipv6_literal "${BASH_REMATCH[1]}"; then die "访问地址的 IPv6 格式无效。"; fi
+  if [[ "$final_url" =~ ^https?://\[([0-9A-Fa-f:.]+)\] ]] && ! valid_ipv6_literal "${BASH_REMATCH[1]}"; then die "访问地址的 IPv6 格式无效。"; fi
   if url_has_port "$final_url" && ! port_is_number "$final_url"; then die "访问地址的端口须为 1-65535。"; fi
   if [ "$access_mode" != "public-http" ]; then
     local docker_version docker_major

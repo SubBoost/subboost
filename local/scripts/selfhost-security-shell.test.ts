@@ -221,6 +221,42 @@ describe("self-host access and temporary workspace", () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
+  it("accepts Unicode domains and IPv4-mapped IPv6 URLs", () => {
+    const unicodeHost = "\u4f8b\u5b50.local.subboost.test";
+    const cases = [
+      [`https://${unicodeHost}`, "https", "xn--fsqu00a.local.subboost.test"],
+      ["https://[::ffff:203.0.113.1]:8443", "https", "[::ffff:cb00:7101]"],
+      ["http://[0:0:0:0:0:ffff:203.0.113.1]:8443", "public-http", "[::ffff:cb00:7101]"],
+    ] as const;
+    for (const [url, mode, expectedHost] of cases) {
+      expect(new URL(url).hostname).toBe(expectedHost);
+      const result = installScenario(`export LC_ALL=C SUBBOOST_ACCESS_MODE=${mode} APP_URL='${url}'`);
+      expect(result.status, `${url}: ${result.stderr}`).toBe(0);
+      expect(result.stdout).toContain(`APP_URL=${url}\n`);
+    }
+  }, 60_000);
+
+  it("rejects invalid mapped IPv6, userinfo and controls in access URLs", () => {
+    const malformed = [
+      "https://[::ffff:203.0.113.256]",
+      "https://[::ffff:203.00.113.1]",
+      "https://[:::]",
+    ];
+    for (const url of malformed) expect(() => new URL(url)).toThrow();
+    expect(new URL("https://user@local.subboost.test").username).toBe("user");
+    expect(new URL("https://local\n.subboost.test").hostname).toBe("local.subboost.test");
+    for (const url of [
+      ...malformed,
+      "https://user@local.subboost.test",
+      "https://local\n.subboost.test",
+      "https://local\u0080.subboost.test",
+    ]) {
+      const result = installScenario(`export SUBBOOST_ACCESS_MODE=https APP_URL='${url}'`);
+      expect(result.status, url).not.toBe(0);
+      expect(result.stdout).not.toContain("unexpected-start=");
+    }
+  }, 60_000);
+
   it("accepts valid IPv6 URLs and rejects invalid IPv6 URLs before startup", () => {
     for (const url of ["https://[::1]:8443", "https://[2001:db8::1]"]) {
       const result = installScenario(`export SUBBOOST_ACCESS_MODE=https APP_URL='${url}'`);
