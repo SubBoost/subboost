@@ -26,6 +26,79 @@ describe("rule discovery resource limits", () => {
     expect(new Set(listUrls).size).toBe(3);
   });
 
+  it("expires a new combination when its oldest reused list expires", async () => {
+    let now = 0;
+    let googleEmpty = false;
+    const listFetches: Array<{ url: string; at: number }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/git/trees/meta")) return Response.json({ tree: [{ path: "geo", type: "tree", sha: "geo" }] });
+      if (url.includes("/git/trees/geo")) return tree(["geosite/google-cn.mrs", "geosite/youtube-cn.mrs"]);
+      listFetches.push({ url, at: now });
+      return new Response(url.endsWith("/google-cn.list") && googleEmpty ? "" : "+.example.test");
+    }) as typeof fetch;
+    const service = createRuleCatalogService({ fetchImpl, now: () => now, cacheTtlMs: 100 });
+    const first = await service.getCnRuleCandidateDiscovery({ moduleIds: ["google"] });
+    expect(first).toMatchObject({ fetchedAt: 0, expiresAt: 100, source: "remote" });
+    now = 80;
+    await service.refreshRuleIndex({ force: true });
+    now = 90;
+    googleEmpty = true;
+    const combined = await service.getCnRuleCandidateDiscovery({ moduleIds: ["google", "youtube"] });
+    expect(combined).toMatchObject({ fetchedAt: 0, expiresAt: 100, source: "remote" });
+    expect(combined.allItems.find((item) => item.id === "google-cn")?.empty).toBe(false);
+    now = 110;
+    const refreshed = await service.getCnRuleCandidateDiscovery({ moduleIds: ["google", "youtube"] });
+    expect(refreshed).toMatchObject({ fetchedAt: 80, expiresAt: 180, source: "remote" });
+    expect(refreshed.allItems.find((item) => item.id === "google-cn")?.empty).toBe(true);
+    expect(listFetches.filter(({ url }) => url.endsWith("/google-cn.list")).map(({ at }) => at)).toEqual([0, 110]);
+    expect(listFetches.filter(({ url }) => url.endsWith("/youtube-cn.list")).map(({ at }) => at)).toEqual([90]);
+  });
+
+  it("bounds the combination by the index expiry and marks an expired index stale", async () => {
+    let now = 0;
+    let failIndex = false;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/git/trees/")) {
+        if (failIndex) return new Response("", { status: 503 });
+        return url.includes("/git/trees/meta")
+          ? Response.json({ tree: [{ path: "geo", type: "tree", sha: "geo" }] })
+          : tree(["geosite/google-cn.mrs", "geosite/youtube-cn.mrs"]);
+      }
+      return new Response("+.example.test");
+    }) as typeof fetch;
+    const service = createRuleCatalogService({ fetchImpl, now: () => now, cacheTtlMs: 100 });
+    await service.getRemoteRuleIndex();
+    now = 90;
+    const combined = await service.getCnRuleCandidateDiscovery({ moduleIds: ["google", "youtube"] });
+    expect(combined).toMatchObject({ fetchedAt: 0, expiresAt: 100, source: "remote" });
+    now = 110;
+    failIndex = true;
+    const stale = await service.getCnRuleCandidateDiscovery({ moduleIds: ["google", "youtube"] });
+    expect(stale).toMatchObject({ fetchedAt: 0, expiresAt: 100, source: "stale", allItems: combined.allItems });
+  });
+
+  it("marks a discovery stale if its inputs expire while another list is loading", async () => {
+    let now = 0;
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/git/trees/meta")) return Response.json({ tree: [{ path: "geo", type: "tree", sha: "geo" }] });
+      if (url.includes("/git/trees/geo")) return tree(["geosite/google-cn.mrs", "geosite/youtube-cn.mrs"]);
+      if (url.endsWith("/youtube-cn.list")) await pending;
+      return new Response("+.example.test");
+    }) as typeof fetch;
+    const service = createRuleCatalogService({ fetchImpl, now: () => now, cacheTtlMs: 100 });
+    const combined = service.getCnRuleCandidateDiscovery({ moduleIds: ["google", "youtube"] });
+    await vi.waitFor(() => expect(vi.mocked(fetchImpl).mock.calls.some(([input]) => String(input).endsWith("/youtube-cn.list"))).toBe(true));
+    await service.getCnRuleCandidateDiscovery({ moduleIds: ["google"] });
+    now = 110;
+    release();
+    expect(await combined).toMatchObject({ fetchedAt: 0, expiresAt: 100, source: "stale" });
+  });
+
   it("rejects excess distinct discoveries while sharing in-flight list work", async () => {
     const parents = collectCnCandidateParents([], { defaultToAll: true }).slice(0, 5);
     expect(parents).toHaveLength(5);

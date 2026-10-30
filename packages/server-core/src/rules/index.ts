@@ -33,6 +33,7 @@ import {
   type VerifiedRuleSetInfo,
 } from "./types";
 import { checkRuleListLineCount, fetchRuleText, LIST_BYTES, TREE_BYTES } from "./transport";
+import { discoveryFreshness, type RuleListData } from "./freshness";
 
 export * from "./types";
 
@@ -342,8 +343,8 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
   let indexInflight: Promise<RemoteRuleIndex> | null = null;
   const discoveryCache = new Map<string, CnRuleCandidateDiscovery>();
   const discoveryInflight = new Map<string, Promise<CnRuleCandidateDiscovery>>();
-  const listCache = new Map<string, { lines: string[]; bytes: number; expiresAt: number }>();
-  const listInflight = new Map<string, Promise<{ lines: string[]; bytes: number }>>();
+  const listCache = new Map<string, RuleListData>();
+  const listInflight = new Map<string, Promise<RuleListData>>();
   let listCacheBytes = 0;
 
   async function fetchRemoteRuleIndex(): Promise<RemoteRuleIndex> {
@@ -465,7 +466,7 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
     };
   }
 
-  function fetchRuleList(ruleId: string, force: boolean): Promise<{ lines: string[]; bytes: number }> {
+  function fetchRuleList(ruleId: string, force: boolean): Promise<RuleListData> {
     const cached = listCache.get(ruleId);
     if (!force && cached && getNow(options) < cached.expiresAt) {
       listCache.delete(ruleId);
@@ -488,6 +489,8 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
       checkRuleListLineCount(body);
       const lines = normalizeRuleListLines(body.split(/\r?\n/));
       const bytes = body.length * 2 + lines.length * 64;
+      const fetchedAt = getNow(options);
+      const list = { lines, bytes, fetchedAt, expiresAt: toExpiresAt(fetchedAt, options) };
       const previous = listCache.get(ruleId);
       if (previous) { listCacheBytes -= previous.bytes; listCache.delete(ruleId); }
       if (bytes <= MAX_LIST_CACHE_BYTES) {
@@ -496,10 +499,10 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
           listCacheBytes -= listCache.get(oldest)!.bytes;
           listCache.delete(oldest);
         }
-        listCache.set(ruleId, { lines, bytes, expiresAt: toExpiresAt(getNow(options), options) });
+        listCache.set(ruleId, list);
         listCacheBytes += bytes;
       }
-      return { lines, bytes };
+      return list;
     }).finally(() => { listInflight.delete(ruleId); });
     listInflight.set(ruleId, next);
     return next;
@@ -540,7 +543,7 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
     const ids = ["geolocation-cn", ...sourcesToFetch.map((source) => source.id)];
     if (!geositeNames.has("geolocation-cn")) ids[0] = "";
     const uniqueIds = [...new Set(ids.filter(Boolean))];
-    const lists = new Map<string, { lines: string[]; bytes: number }>();
+    const lists = new Map<string, RuleListData>();
     let cursor = 0;
     let uniqueBytes = 0;
     let failed = false;
@@ -566,14 +569,11 @@ export function createRuleCatalogService(options: RuleCatalogServiceOptions = {}
     const geolocationCnLines = lists.get(ids[0])?.lines ?? [];
     const fetchedSources = sourcesToFetch.map((source) => ({ ...source, lines: lists.get(source.id)!.lines }));
     const allItems = buildCnRuleCandidatesFromSources(fetchedSources, geolocationCnLines);
-    const fetchedAt = getNow(options);
     return {
       items: allItems.filter((item) => item.actionable),
       allItems,
       parents,
-      fetchedAt,
-      expiresAt: toExpiresAt(fetchedAt, options),
-      source: index.source,
+      ...discoveryFreshness(index, lists.values(), getNow(options)),
     };
   }
 
