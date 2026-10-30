@@ -11,18 +11,9 @@ COMPOSE_FILE="$SUBBOOST_HOME/docker-compose.yml"
 BACKUP_DIR="$SUBBOOST_HOME/backups"
 TMP_DIR=""
 
-say() {
-  printf '%s\n' "$*"
-}
-
-die() {
-  printf 'ERROR: %s\n' "$*" >&2
-  exit 1
-}
-
-is_root() {
-  [ "$(id -u)" = "0" ]
-}
+say() { printf '%s\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+is_root() { [ "$(id -u)" = "0" ]; }
 
 sudo_do() {
   if is_root; then "$@"; else sudo "$@"; fi
@@ -67,9 +58,7 @@ docker_cmd() {
   if [ "$DOCKER_RUNNER" = "sudo docker" ]; then sudo docker "$@"; else docker "$@"; fi
 }
 
-compose() {
-  compose_files "$ENV_FILE" "$COMPOSE_FILE" "$@"
-}
+compose() { compose_files "$ENV_FILE" "$COMPOSE_FILE" "$@"; }
 
 compose_files() {
   local env_file="$1"
@@ -87,6 +76,7 @@ compose_files_with_image() {
 }
 
 load_env() {
+  local TMP_DIR="$TMP_DIR" SUBBOOST_SCRIPT_SOURCE_ONLY="${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}"
   [ -f "$ENV_FILE" ] || die "Missing $ENV_FILE"
   set -a
   # shellcheck disable=SC1090
@@ -94,10 +84,40 @@ load_env() {
   set +a
 }
 
+temp_directory_identity() { stat -c '%d:%i' -- "$1" 2>/dev/null || stat -f '%d:%i' "$1" 2>/dev/null; }
 prepare_temp_directory() {
   if [ -z "$TMP_DIR" ]; then
     TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/subboost-manager.XXXXXXXXXX")" || die "Cannot create private temporary directory."
+    # Freeze the path and identity used by cleanup, even if variables change later.
+    local identity quoted_dir quoted_identity; identity="$(temp_directory_identity "$TMP_DIR")" || die "Cannot identify temporary directory: $TMP_DIR"
+    if [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ]; then printf -v quoted_dir '%q' "$TMP_DIR"; printf -v quoted_identity '%q' "$identity"; trap "[ -d $quoted_dir ] && [ ! -L $quoted_dir ] && [ \"\$(temp_directory_identity $quoted_dir)\" = $quoted_identity ] && rm -rf -- $quoted_dir" EXIT; fi
   fi
+}
+validate_compose_binding() {
+  # The app's published ports must all use the requested host and include the selected port.
+  local bind="${1#[}" port="$2"; bind="${bind%]}"
+  if command -v python3 >/dev/null 2>&1; then python3 -c 'import json,sys; a=json.load(sys.stdin)["services"]["app"]; p=a.get("ports",[]); sys.exit(not (a.get("network_mode")!="host" and isinstance(p,list) and all(isinstance(x,dict) and x.get("host_ip","")==sys.argv[1] for x in p) and any(str(x.get("target"))=="3000" and str(x.get("published"))==sys.argv[2] and x.get("protocol","tcp")=="tcp" for x in p)))' "$bind" "$port" 2>/dev/null
+  elif command -v node >/dev/null 2>&1; then node -e 'const a=JSON.parse(require("fs").readFileSync(0,"utf8")).services.app,p=a.ports; process.exit(Array.isArray(p)&&a.network_mode!=="host"&&p.every(x=>x&&(x.host_ip===undefined?"":x.host_ip)===process.argv[1])&&p.some(x=>String(x.target)==="3000"&&String(x.published)===process.argv[2]&&(x.protocol===undefined?"tcp":x.protocol)==="tcp")?0:1)' "$bind" "$port" 2>/dev/null
+  elif command -v jq >/dev/null 2>&1; then jq -e --arg bind "$bind" --arg port "$port" '(.services.app // {}) as $a | ($a.ports | type=="array") and ($a.network_mode != "host") and all($a.ports[]; (if has("host_ip") then .host_ip else "" end)==$bind) and any($a.ports[]; (.target|tostring)=="3000" and (.published|tostring)==$port and (if has("protocol") then .protocol else "tcp" end)=="tcp")' >/dev/null 2>&1
+  elif [ -z "$bind" ]; then scan_unbound_compose "$port" || { printf '%s\n' 'Install Python 3, Node.js, or jq to inspect this Compose configuration.' >&2; return 1; }
+  else printf '%s\n' 'Install Python 3, Node.js, or jq to verify the Compose binding.' >&2; return 1; fi
+}
+scan_unbound_compose() {
+  # Parser-free compatibility is limited to a canonical, single-port, unbound app.
+  awk -v port="$1" '
+    NR==1 && $0!="{" {bad=1} {last=$0} /"host_ip"[[:space:]]*:/ {bad=1}
+    /^  "services": \{$/ {s=1;next} s && /^  \},?$/ {s=0} s && /^    "app": \{$/ {a=1;apps++;next} a && /^    \},?$/ {a=0}
+    a && /^      "network_mode":/ {bad=1} a && /^      "ports": \[$/ {p=1;lists++;next} p && /^      \],?$/ {p=0} p && /^        \{$/ {items++}
+    p && /^          "(target|published|protocol)":/ {v=$0; sub(/^.*:[[:space:]]*"?/,"",v); sub(/"?,?[[:space:]]*$/,"",v); if ($0 ~ /"target":/) {targets++;if(v!="3000")bad=1} else if ($0 ~ /"published":/) {published++;if(v!=port)bad=1} else if(v!="tcp")bad=1}
+    END {if(last!="}" || apps!=1 || lists!=1 || items!=1 || targets!=1 || published!=1 || bad)exit 1}'
+}
+inspect_compose_binding() {
+  # Refuse complex old mappings rather than discarding a previous address or port.
+  local port="$1"
+  if command -v python3 >/dev/null 2>&1; then python3 -c 'import json,sys; a=json.load(sys.stdin)["services"]["app"]; p=a.get("ports",[]); h={x.get("host_ip","") for x in p}; q=[x for x in p if str(x.get("target"))=="3000" and x.get("protocol","tcp")=="tcp"]; ok=a.get("network_mode")!="host" and len(p)==1 and len(h)==1 and len(q)==1 and str(q[0].get("published","")).isdigit(); sys.exit(1) if not ok else print(str(next(iter(h)))+"|"+str(q[0]["published"]))' 2>/dev/null
+  elif command -v node >/dev/null 2>&1; then node -e 'const a=JSON.parse(require("fs").readFileSync(0,"utf8")).services.app,p=a.ports,h=[...new Set(p.map(x=>x.host_ip===undefined?"":x.host_ip))],q=p.filter(x=>String(x.target)==="3000"&&(x.protocol===undefined?"tcp":x.protocol)==="tcp"); if(a.network_mode==="host"||p.length!==1||h.length!==1||q.length!==1||!/^\d+$/.test(String(q[0].published)))process.exit(1); process.stdout.write(h[0]+"|"+q[0].published)' 2>/dev/null
+  elif command -v jq >/dev/null 2>&1; then jq -er '(.services.app // {}) as $a | [$a.ports[] | if has("host_ip") then .host_ip else "" end] | unique as $h | [$a.ports[] | select((.target|tostring)=="3000" and (if has("protocol") then .protocol else "tcp" end)=="tcp")] as $q | if $a.network_mode!="host" and ($a.ports|length)==1 and ($h|length)==1 and ($q|length)==1 and ($q[0].published|tostring|test("^[0-9]+$")) then ($h[0]+"|"+($q[0].published|tostring)) else error("unsupported binding") end' 2>/dev/null
+  else scan_unbound_compose "$port" && printf '|%s' "$port" || { printf '%s\n' 'Install Python 3, Node.js, or jq to inspect the existing Compose binding, including bindings on other services.' >&2; return 1; }; fi
 }
 download_to_temp() {
   local url="$1"
@@ -145,9 +165,7 @@ resolve_url() {
   esac
 }
 
-read_env_file() {
-  sudo_do cat "$ENV_FILE"
-}
+read_env_file() { sudo_do cat "$ENV_FILE"; }
 
 write_env_value() {
   prepare_temp_directory
@@ -266,6 +284,7 @@ port_number() {
   esac
   value="${value#[}"
   value="${value%]}"
+  case "$value" in ''|*[!0-9]*) ;; *) value="${value#"${value%%[!0]*}"}"; [ -n "$value" ] || value=0 ;; esac
   printf '%s\n' "$value"
 }
 
@@ -407,7 +426,7 @@ update_cmd() {
   local old_compose="$TMP_DIR/old-compose.yml"
   local old_manager="$TMP_DIR/old-manager"
   local rollback_dump="$BACKUP_DIR/update-rollback-$(date -u +%Y%m%dT%H%M%SZ).dump"
-  local image="${SUBBOOST_IMAGE:-}" compose_url="" manager_url="" services=""
+  local image="${SUBBOOST_IMAGE:-}" compose_url="" manager_url="" services="" old_binding old_host old_port requested_port requested_host
   local app_id old_image_id rollback_tag old_image_ref update_error restore_error db_ready
   local manager_present=0 old_manager_present=0
   local -a restore_status
@@ -453,6 +472,13 @@ update_cmd() {
     set_file_env_value "$candidate_env" LOCAL_SETUP_TOKEN "$(random_hex 32)"
   fi
   compose_files_with_image "$image" "$candidate_env" "$candidate_compose" config >/dev/null
+  requested_port="$(port_number "${SUBBOOST_PORT:-3000}")"
+  old_binding="$(compose_files "$old_env" "$old_compose" config --format json | inspect_compose_binding "$requested_port")" || die "Cannot safely inspect the existing Compose binding; check the app's published ports."
+  IFS='|' read -r old_host old_port <<< "$old_binding"
+  [ "$old_port" -eq "$requested_port" ] 2>/dev/null || die "Existing Compose publishes a different application port; reconcile it before updating."
+  requested_host="${SUBBOOST_BIND_ADDRESS:-$old_host}"; requested_host="${requested_host#[}"; requested_host="${requested_host%]}"
+  if [ -n "${SUBBOOST_BIND_ADDRESS:-}" ] && [ -n "$old_host" ] && [ "$old_host" != "$requested_host" ]; then die "Existing Compose uses a different bind address; reconcile it before updating."; fi
+  compose_files_with_image "$image" "$candidate_env" "$candidate_compose" config --format json | validate_compose_binding "$requested_host" "$old_port" || die "Candidate Compose does not preserve the existing application binding; use a compatible Compose file."
   services="$(compose_files_with_image "$image" "$candidate_env" "$candidate_compose" config --services)"
   for service in app db cron; do
     printf '%s\n' "$services" | grep -Fxq "$service" || die "Candidate Compose is missing service: $service"
@@ -665,7 +691,6 @@ main() {
 }
 
 if [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ]; then
-  trap '[ -z "$TMP_DIR" ] || rm -rf -- "$TMP_DIR"' EXIT
   trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
   DOCKER_RUNNER=""
   main "$@"

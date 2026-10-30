@@ -48,6 +48,7 @@ ENV
       if [ "$1" = "compose" ]; then
         case "$*" in
           *" config --services") printf 'app\ndb\ncron\n'; return 0 ;;
+          *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\n'; return 0 ;;
           *" config") return 0 ;;
           *" ps -q app") printf 'app-id\n'; return 0 ;;
           *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;

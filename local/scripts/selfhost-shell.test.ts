@@ -270,6 +270,7 @@ ENV
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull") return 0 ;;
             *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
@@ -363,6 +364,7 @@ ENV
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config" | *" pull" | *" stop cron app") return 0 ;;
             *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
             *"pg_restore --list"* | *"pg_restore --clean"*) cat >/dev/null; return 0 ;;
@@ -455,6 +457,7 @@ ENV
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull")
               printf 'pull_image=%s\\n' "\${SUBBOOST_IMAGE:-}" >> "$docker_log"
@@ -563,6 +566,7 @@ JSON
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull")
               printf 'pull_image=%s\\n' "\${SUBBOOST_IMAGE:-}" >> "$docker_log"
