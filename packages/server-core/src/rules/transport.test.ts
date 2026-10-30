@@ -25,6 +25,74 @@ describe("rule transport limits", () => {
     expect(streamCancel).toHaveBeenCalledOnce();
   });
 
+  it("handles an empty response and cancels error responses", async () => {
+    await expect(getText(vi.fn(async () => new Response(null, { status: 204 })) as typeof fetch)).resolves.toBe("");
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ cancel }), { status: 503 });
+    await expect(getText(vi.fn(async () => response) as typeof fetch)).rejects.toThrow("HTTP 503");
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("preserves size and status errors when cancelling a response rejects", async () => {
+    const body = () => new ReadableStream({ cancel() { throw new Error("cancel rejected"); } });
+    const oversized = new Response(body(), { headers: { "content-length": "17" } });
+    await expect(getText(vi.fn(async () => oversized) as typeof fetch)).rejects.toThrow("too large");
+    const unavailable = new Response(body(), { status: 503 });
+    await expect(getText(vi.fn(async () => unavailable) as typeof fetch)).rejects.toThrow("HTTP 503");
+    await expect(getText(vi.fn(async () => new Response("ok")) as typeof fetch)).resolves.toBe("ok");
+  });
+
+  it("keeps a timeout result if cancelling a late response rejects", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn(async () => new Response(new ReadableStream({
+      cancel() { throw new Error("cancel rejected"); },
+    }))) as typeof fetch;
+    const result = fetchRuleText(fetchImpl, url, {}, 16, String, 0);
+    vi.advanceTimersByTime(0);
+    await expect(result).rejects.toThrow("timed out");
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(getText(vi.fn(async () => new Response("ok")) as typeof fetch)).resolves.toBe("ok");
+  });
+
+  it("releases failed fetches so queued work can continue", async () => {
+    const pending: Array<{ resolve: (response: Response) => void; reject: (error: Error) => void }> = [];
+    const fetchImpl = vi.fn(() => {
+      if (pending.length === 8) return Promise.resolve(new Response("next"));
+      return new Promise<Response>((resolve, reject) => pending.push({ resolve, reject }));
+    }) as typeof fetch;
+    const requests = Array.from({ length: 8 }, () => getText(fetchImpl).then(
+      (value) => value,
+      (error: Error) => error.message,
+    ));
+    const queued = getText(fetchImpl);
+    await vi.waitFor(() => expect(pending).toHaveLength(8));
+    expect(fetchImpl).toHaveBeenCalledTimes(8);
+    pending[0].reject(new Error("network failed"));
+    await expect(queued).resolves.toBe("next");
+    pending.slice(1).forEach(({ resolve }) => resolve(new Response("ok")));
+    expect(await Promise.all(requests)).toEqual(["network failed", "ok", "ok", "ok", "ok", "ok", "ok", "ok"]);
+  });
+
+  it("releases capacity after a response stream fails", async () => {
+    const stream = new ReadableStream<Uint8Array>({ pull(controller) { controller.error(new Error("stream failed")); } });
+    await expect(getText(vi.fn(async () => new Response(stream)) as typeof fetch)).rejects.toThrow("stream failed");
+    await expect(getText(vi.fn(async () => new Response("ok")) as typeof fetch)).resolves.toBe("ok");
+  });
+
+  it("cancels a response when the deadline expires before fetch starts", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.signal?.aborted).toBe(true);
+      return new Response(new ReadableStream({ cancel }));
+    }) as typeof fetch;
+    const result = fetchRuleText(fetchImpl, url, {}, 16, String, 0);
+    vi.advanceTimersByTime(0);
+    await expect(result).rejects.toThrow("timed out");
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+
   it("bounds active and queued work and cancels stalled streams on deadline", async () => {
     vi.useFakeTimers();
     let active = 0;

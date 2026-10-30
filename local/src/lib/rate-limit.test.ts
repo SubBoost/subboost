@@ -21,6 +21,12 @@ describe("local rate limits", () => {
     expect(consumeLocalRateLimit("login", "all", { limit: 2, windowMs: 10_000, now: 11_000 }).allowed).toBe(true);
   });
 
+  it("fails closed when the configured limit is not a finite number", () => {
+    const options = { limit: Number.NaN, windowMs: 10_000, now: 1_000 };
+    expect(consumeLocalRateLimit("login", "client", options).allowed).toBe(true);
+    expect(consumeLocalRateLimit("login", "client", options).allowed).toBe(false);
+  });
+
   it("hashes sensitive keys and supports clearing successful identity buckets", () => {
     const key = hashLocalRateLimitKey("secret-token");
     expect(key).toMatch(/^[a-f0-9]{64}$/);

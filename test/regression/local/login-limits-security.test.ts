@@ -108,6 +108,16 @@ describe("local login protection", () => {
     expect(mocks.compare).toHaveBeenCalledTimes(1);
   });
 
+  it("handles a disconnected request before body admission without using a password check", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const response = await POST(login("correct", undefined, undefined, controller.signal));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Request body was interrupted.", code: "BAD_REQUEST" });
+    expect(mocks.compare).not.toHaveBeenCalled();
+    expect((await POST(login("correct"))).status).toBe(200);
+  });
+
   it("limits slow bodies before password work and recovers after their deadline", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn();

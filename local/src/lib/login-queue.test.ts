@@ -64,4 +64,49 @@ describe("unknown-client login queue", () => {
     release!();
     expect(await enterUnknownLoginQueue(disconnected.signal)).toBeNull();
   });
+
+  it("does not free additional capacity when a completed check is released twice", async () => {
+    const initial = await enterUnknownLoginQueue(new AbortController().signal);
+    initial!();
+    initial!();
+    const first = enterUnknownLoginQueue(new AbortController().signal);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const firstRelease = await first;
+    const second = enterUnknownLoginQueue(new AbortController().signal);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const secondRelease = await second;
+    let thirdStarted = false;
+    const third = enterUnknownLoginQueue(new AbortController().signal).then((release) => { thirdStarted = true; return release; });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(thirdStarted).toBe(false);
+    firstRelease!();
+    (await third)!();
+    secondRelease!();
+  });
+
+  it("does not clear pending checks outside the test runtime", async () => {
+    const first = await enterUnknownLoginQueue(new AbortController().signal);
+    first!();
+    let started = false;
+    const pending = enterUnknownLoginQueue(new AbortController().signal).then((release) => { started = true; return release; });
+    vi.stubEnv("NODE_ENV", "production");
+    clearUnknownLoginQueueForTests();
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(started).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    (await pending)!();
+    vi.stubEnv("NODE_ENV", "test");
+  });
+
+  it("clears pending checks and permits a new one in the test runtime", async () => {
+    const first = await enterUnknownLoginQueue(new AbortController().signal);
+    first!();
+    const pending = enterUnknownLoginQueue(new AbortController().signal);
+    clearUnknownLoginQueueForTests();
+    expect(await pending).toBeNull();
+    const next = await enterUnknownLoginQueue(new AbortController().signal);
+    expect(next).toBeTypeOf("function");
+    next!();
+  });
+
 });

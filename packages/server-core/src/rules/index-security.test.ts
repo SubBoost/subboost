@@ -124,6 +124,51 @@ describe("rule discovery resource limits", () => {
     expect(await Promise.all(discoveries)).toHaveLength(16);
   });
 
+  it("returns an existing stale result when distinct discovery capacity is full", async () => {
+    const parents = collectCnCandidateParents([], { defaultToAll: true }).slice(0, 4);
+    const keys = parents.map((parent) => `${parent.parentModuleId}:${parent.parentRuleId}`);
+    let stall = false;
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/git/trees/meta")) return Response.json({ tree: [{ path: "geo", type: "tree", sha: "geo" }] });
+      if (url.includes("/git/trees/geo")) return tree(["geosite/geolocation-cn.mrs"]);
+      if (stall) await pending;
+      return new Response("+.covered.test");
+    }) as typeof fetch;
+    const service = createRuleCatalogService({ fetchImpl });
+    const cached = await service.getCnRuleCandidateDiscovery({ moduleIds: ["google"] });
+    stall = true;
+    const discoveries = Array.from({ length: 16 }, (_, mask) => service.getCnRuleCandidateDiscovery({
+      moduleIds: [], excludedRuleKeys: keys.filter((_, index) => (mask & (1 << index)) !== 0), force: true,
+    }));
+    await vi.waitFor(() => expect(vi.mocked(fetchImpl).mock.calls.filter(([input]) => String(input).endsWith(".list"))).toHaveLength(2));
+    expect(await service.getCnRuleCandidateDiscovery({ moduleIds: ["google"], force: true }))
+      .toEqual({ ...cached, source: "stale" });
+    release();
+    expect(await Promise.all(discoveries)).toHaveLength(16);
+  });
+
+  it("evicts older lists when their combined cache size reaches its budget", async () => {
+    const body = Array.from({ length: 55_000 }, (_, index) => `+.entry${index}.test`).join("\n");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/git/trees/meta")) return Response.json({ tree: [{ path: "geo", type: "tree", sha: "geo" }] });
+      if (url.includes("/git/trees/geo")) {
+        return tree(["geosite/google-cn.mrs", "geosite/youtube-cn.mrs", "geosite/netflix-cn.mrs", "geosite/disney-cn.mrs"]);
+      }
+      return new Response(body);
+    }) as typeof fetch;
+    const service = createRuleCatalogService({ fetchImpl });
+    for (const moduleId of ["google", "youtube", "netflix", "disney"]) {
+      expect((await service.getCnRuleCandidateDiscovery({ moduleIds: [moduleId] })).source).toBe("remote");
+    }
+    expect((await service.getCnRuleCandidateDiscovery({ moduleIds: ["google", "steam"] })).source).toBe("remote");
+    const googleFetches = vi.mocked(fetchImpl).mock.calls.filter(([input]) => String(input).endsWith("/google-cn.list"));
+    expect(googleFetches).toHaveLength(2);
+  });
+
   it("preserves stale and unavailable behavior when streamed lists exceed their limit", async () => {
     let oversized = false;
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {

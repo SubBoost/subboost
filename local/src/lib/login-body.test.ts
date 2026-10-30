@@ -127,4 +127,51 @@ describe("login request body admission", () => {
     });
     expect(await readLoginBody(declared)).toEqual({ kind: "parsed", result: { ok: false, reason: "too_large" } });
   });
+
+  it("handles absent bodies, including a declared oversized body", async () => {
+    const url = "http://local.subboost.test/api/auth/login";
+    expect(await readLoginBody(new Request(url, { method: "POST" }))).toEqual({ kind: "parsed", result: { ok: true, value: {} } });
+    expect(await readLoginBody(new Request(url, { method: "POST", headers: { "content-length": "65537" } })))
+      .toEqual({ kind: "parsed", result: { ok: false, reason: "too_large" } });
+    expect(await readLoginBody(ordinary())).toEqual({ kind: "parsed", result: { ok: true, value: {} } });
+  });
+
+  it("releases both discard and read capacity when cancellation rejects", async () => {
+    const aborted = new AbortController();
+    aborted.abort();
+    for (let i = 0; i < 8; i += 1) {
+      expect(await readLoginBody(streamed(async () => { throw new Error("cancel rejected"); }, aborted.signal))).toEqual({ kind: "aborted" });
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    const cancelled = vi.fn();
+    expect(await readLoginBody(streamed(cancelled, aborted.signal))).toEqual({ kind: "aborted" });
+    expect(cancelled).toHaveBeenCalledOnce();
+
+    for (let i = 0; i < 8; i += 1) {
+      const oversized = streamed(async () => { throw new Error("cancel rejected"); });
+      oversized.headers.set("content-length", "65537");
+      expect(await readLoginBody(oversized)).toEqual({ kind: "parsed", result: { ok: false, reason: "too_large" } });
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await readLoginBody(ordinary())).toEqual({ kind: "parsed", result: { ok: true, value: {} } });
+  });
+
+  it("returns a body error and frees admission when the source stream fails", async () => {
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error("source failed")); } });
+    const request = new Request("http://local.subboost.test/api/auth/login", {
+      method: "POST", body, duplex: "half",
+    } as RequestInit & { duplex: "half" });
+    expect(await readLoginBody(request)).toEqual({ kind: "parsed", result: { ok: false, reason: "invalid_json" } });
+    expect(await readLoginBody(ordinary())).toEqual({ kind: "parsed", result: { ok: true, value: {} } });
+  });
+
+  it("does not reset the admission budget outside the test runtime", async () => {
+    for (let i = 0; i < 64; i += 1) await readLoginBody(ordinary("{"));
+    vi.stubEnv("NODE_ENV", "production");
+    clearLoginBodyLimitForTests();
+    expect(await readLoginBody(ordinary())).toEqual({ kind: "limited" });
+    vi.stubEnv("NODE_ENV", "test");
+    await vi.advanceTimersByTimeAsync(16);
+    expect(await readLoginBody(ordinary())).toEqual({ kind: "parsed", result: { ok: true, value: {} } });
+  });
 });
