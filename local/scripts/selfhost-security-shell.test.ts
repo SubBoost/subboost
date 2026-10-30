@@ -564,6 +564,32 @@ ENV
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   }, 20_000);
 
+  it.each(["install.sh", "subboost.sh"])("cleans %s candidate files after interruption signals", (script) => {
+    const result = runBash(`
+      set -Eeuo pipefail
+      base="$(mktemp -d)"
+      trap 'rm -rf "$base"' EXIT
+      mkdir -p "$base/tmp"
+      export TMPDIR="$base/tmp" SUBBOOST_SCRIPT_SOURCE_ONLY=1
+      for pair in HUP:129 INT:130 TERM:143; do
+        signal="\${pair%:*}" expected="\${pair#*:}"
+        if SIGNAL="$signal" bash -c '
+          source local/scripts/${script}
+          trap "exit 129" HUP; trap "exit 130" INT; trap "exit 143" TERM
+          SUBBOOST_SCRIPT_SOURCE_ONLY=0
+          prepare_temp_directory
+          : > "$TMP_DIR/candidate.env"
+          [ -f "$TMP_DIR/candidate.env" ]
+          kill -s "$SIGNAL" "$$"
+          exit 0
+        '; then status=0; else status=$?; fi
+        [ "$status" = "$expected" ] || { printf '%s returned %s\\n' "$signal" "$status"; exit 1; }
+        [ -z "$(find "$TMPDIR" -mindepth 1 -print -quit)" ]
+      done
+    `);
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  }, 60_000);
+
   it("updates an existing installation by running the downloaded manager first", () => {
     const result = firstUpdateScenario("matching");
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
