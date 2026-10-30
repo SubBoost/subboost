@@ -93,4 +93,27 @@ describe("rule transport limits", () => {
     await Promise.resolve();
     await expect(fetchRuleText(nextFetch, url, {}, 16, String, 100)).resolves.toBe("ok");
   });
+
+  it("keeps slots occupied until oversized stream cancellation completes", async () => {
+    vi.useFakeTimers();
+    const finishCancellation: Array<() => void> = [];
+    const fetchImpl = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(17)); },
+      cancel() { return new Promise<void>((resolve) => finishCancellation.push(resolve)); },
+    }))) as typeof fetch;
+    const requests = Array.from({ length: 8 }, () => fetchRuleText(fetchImpl, url, {}, 16, String, 100).catch((error: Error) => error.message));
+    await vi.waitFor(() => expect(finishCancellation).toHaveLength(8));
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await Promise.all(requests)).every((value) => value.includes("timed out"))).toBe(true);
+    const nextFetch = vi.fn(async () => new Response("ok")) as typeof fetch;
+    const queued = fetchRuleText(nextFetch, url, {}, 16, String, 100).catch((error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await queued).toContain("timed out");
+    expect(nextFetch).not.toHaveBeenCalled();
+    finishCancellation.forEach((finish) => finish());
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await expect(fetchRuleText(nextFetch, url, {}, 16, String, 100)).resolves.toBe("ok");
+  });
 });

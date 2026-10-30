@@ -57,13 +57,15 @@ function onAbort(signal: AbortSignal): Promise<never> {
 async function readBody(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
   const length = Number(response.headers.get("content-length"));
   if (Number.isFinite(length) && length > maxBytes) {
-    void response.body?.cancel().catch(() => {});
+    await response.body?.cancel().catch(() => {});
     throw new Error("Rule response is too large");
   }
   if (!response.body) return "";
   const reader = response.body.getReader();
-  const cancel = () => { void reader.cancel().catch(() => {}); };
-  signal.addEventListener("abort", cancel, { once: true });
+  let cancellation: Promise<void> | undefined;
+  const cancel = () => { cancellation ??= reader.cancel().catch(() => {}); return cancellation; };
+  const cancelOnAbort = () => { void cancel(); };
+  signal.addEventListener("abort", cancelOnAbort, { once: true });
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -75,10 +77,11 @@ async function readBody(response: Response, maxBytes: number, signal: AbortSigna
       chunks.push(part.value);
     }
   } catch (error) {
-    cancel();
+    await cancel();
     throw error;
   } finally {
-    signal.removeEventListener("abort", cancel);
+    signal.removeEventListener("abort", cancelOnAbort);
+    if (cancellation) await cancellation;
   }
   if (signal.aborted) throw new Error("Rule fetch timed out");
   const bytes = new Uint8Array(size);
@@ -108,11 +111,11 @@ export async function fetchRuleText(
       try {
         const response = await fetchImpl(url, { headers, signal: controller.signal });
         if (controller.signal.aborted) {
-          void response.body?.cancel().catch(() => {});
+          await response.body?.cancel().catch(() => {});
           throw new Error("Rule fetch timed out");
         }
         if (!response.ok) {
-          void response.body?.cancel().catch(() => {});
+          await response.body?.cancel().catch(() => {});
           throw new Error(describeError(response.status));
         }
         return await readBody(response, maxBytes, controller.signal);
