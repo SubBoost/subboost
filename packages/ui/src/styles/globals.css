@@ -258,7 +258,8 @@
   @container (max-width: 37rem) {
     .proxy-group-custom-rule-editor-trailing {
       flex: 1 1 20.5rem;
-      grid-template-columns: minmax(120px, 1fr) auto 92px;
+      grid-template-columns: minmax(120px, 10rem) auto 92px;
+      justify-content: space-between;
       width: 100%;
     }
 
@@ -274,23 +275,44 @@
     .proxy-group-rule-no-resolve-label {
       display: none;
     }
+
+    .proxy-group-custom-rule-editor-trailing {
+      grid-template-columns: minmax(96px, 8rem) auto 92px;
+    }
+
+    .proxy-group-custom-rule-editor-target {
+      min-width: 96px !important;
+      padding-inline: 0.25rem !important;
+    }
+
+    .proxy-group-custom-rule-editor-trailing > :nth-child(2) {
+      gap: 0.125rem !important;
+      padding-inline: 0.125rem !important;
+    }
   }
 
-  @container (max-width: 18rem) {
+  .proxy-group-custom-rule-editor-trailing .proxy-group-rule-no-resolve-label {
+    display: inline;
+    white-space: nowrap;
+  }
+
+  @container (width < 18rem) {
     .proxy-group-custom-rule-editor-trailing {
       grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .proxy-group-custom-rule-editor-target {
       grid-column: 1 / -1;
+      justify-self: start;
+      max-width: 8rem !important;
+    }
+
+    .proxy-group-custom-rule-editor-trailing > :nth-child(2) {
+      justify-self: start;
     }
 
     .proxy-group-custom-rule-editor-trailing > :last-child {
       justify-self: end;
-    }
-
-    .proxy-group-custom-rule-editor-trailing .proxy-group-rule-no-resolve-label {
-      display: inline;
     }
   }
 
