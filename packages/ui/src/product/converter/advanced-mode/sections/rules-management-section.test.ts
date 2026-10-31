@@ -378,7 +378,7 @@ describe("RulesManagementSection", () => {
       (element) => Boolean((element.props as any).onCheckedChange)
     )[0];
     await enabledSwitch.props.onCheckedChange(false);
-    expect(mocks.store.setRuleOrder).toHaveBeenCalledWith(["custom:one"]);
+    expect(mocks.store.setRuleOrder).toHaveBeenCalledWith(["custom:one"], false);
   });
 
   it("moves editable rules by buttons, absolute order input, blur, and escape cleanup", () => {

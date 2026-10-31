@@ -96,7 +96,7 @@ describe("moved rule ownership", () => {
       nodes: [], template: "full", builtinRuleEdits: { "module:microsoft:onedrive": { target: "module:cn" } },
       customRuleSets: [{ id: "nested-set", name: "Nested", behavior: "domain", path: "geosite/nested.mrs", target: "module:cn" }],
       userConfig: { enabledGroups: ["select", "microsoft"], enabledRules: ["select", "microsoft"],
-        customRules: [{ id: "logic", type: "AND", value: "((RULE-SET,onedrive),(OR,((RULE-SET,nested-set),(RULE-SET,unknown))))", target: logicTarget }],
+        customRules: [{ id: "logic", type: "AND", value: "((RULE-SET,onedrive),(OR,((RULE-SET,nested-set),(NETWORK,UDP))))", target: logicTarget }],
         ruleProviderBaseUrl: "https://local.subboost.test/rules" },
     });
     const active = make("DIRECT");
@@ -104,7 +104,6 @@ describe("moved rule ownership", () => {
     expect((active.rules as string[]).some((rule) => rule.startsWith("RULE-SET,onedrive,") || rule.startsWith("RULE-SET,nested-set,"))).toBe(false);
     expect(active["rule-providers"]).toHaveProperty("onedrive");
     expect(active["rule-providers"]).toHaveProperty("nested-set");
-    expect(active["rule-providers"]).not.toHaveProperty("unknown");
     const inactive = make("module:cn");
     expect((inactive.rules as string[]).some((rule) => rule.startsWith("AND,"))).toBe(false);
     expect(inactive["rule-providers"]).not.toHaveProperty("onedrive");

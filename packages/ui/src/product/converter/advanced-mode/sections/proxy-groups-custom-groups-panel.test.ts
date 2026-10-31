@@ -207,6 +207,15 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     };
   });
 
+  it("does not list a structured module target in a same-name custom group", () => {
+    mocks.store.customProxyGroups = [{ id: "same", name: "CN", emoji: "", groupType: "select" }];
+    mocks.store.customRules = [];
+    mocks.store.customRuleSets = [];
+    mocks.store.builtinRuleEdits = { "module:auto:builtin-a": { target: { kind: "module", id: "cn" } } };
+    renderPanel({ 0: new Set(["same"]) });
+    expect(mocks.captures.ruleRows.some((row: any) => row.name === "Builtin A")).toBe(false);
+  });
+
   it("adds manual groups with a random reset emoji and rejects duplicates", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const { setters } = renderPanel({ 1: { emoji: "🧩", name: "New" }, 2: "Useful group" });

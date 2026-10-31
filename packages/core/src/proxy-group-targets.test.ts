@@ -8,10 +8,24 @@ import {
   parseProxyGroupTargetValue,
   isDisabledCustomProxyGroupTarget,
   resolveProxyGroupTargetName,
+  resolveProxyGroupTargetContainer,
   ruleTargetMatchesName,
 } from "./proxy-group-targets";
 
 describe("proxy group target helpers", () => {
+  it("keeps structured group identity and distinguishes active literal policies", () => {
+    const options = { moduleNames: { cn: "Shared" }, enabledModules: [], availablePolicyTargets: ["Shared", "module:cn"],
+      literalTargetNames: ["module:cn"], customProxyGroups: [{ id: "custom", name: "Shared", emoji: "", groupType: "select" as const }] };
+    expect(resolveProxyGroupTargetContainer({ kind: "module", id: "cn" }, options)).toEqual({ kind: "module", id: "cn" });
+    expect(resolveProxyGroupTargetContainer({ kind: "custom", id: "custom" }, options)).toEqual({ kind: "custom", id: "custom" });
+    expect(resolveProxyGroupTargetContainer({ kind: "custom", id: "missing" }, options)).toBeNull();
+    expect(resolveProxyGroupTargetContainer("Shared", options)).toEqual({ kind: "custom", id: "custom" });
+    expect(resolveProxyGroupTargetContainer("module:cn", options)).toBeNull();
+    expect(resolveProxyGroupTargetContainer("Shared", { ...options, customProxyGroups: [] })).toBeNull();
+    expect(resolveProxyGroupTargetContainer("Shared", { ...options, customProxyGroups: [], enabledModules: ["cn"] })).toEqual({ kind: "module", id: "cn" });
+    expect(resolveProxyGroupTargetContainer("Shared", { ...options, customProxyGroups: [], availablePolicyTargets: [] })).toEqual({ kind: "module", id: "cn" });
+    expect(resolveProxyGroupTargetContainer("Missing", options)).toBeNull();
+  });
   it("parses shorthand references without changing literal names", () => {
     const options = { moduleNames: { auto: "Auto" }, customProxyGroups: [
       { id: "media", name: "Media", emoji: "", groupType: "select" as const },

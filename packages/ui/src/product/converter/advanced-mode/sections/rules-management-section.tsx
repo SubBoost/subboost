@@ -97,8 +97,9 @@ export function RulesManagementSection({
   const movableKeys = allRulesMode ? preMatchKeys : editableKeys;
 
   const applyRuleOrder = React.useCallback(
-    (nextRuleOrder: string[]) => {
-      setRuleOrder(nextRuleOrder);
+    (nextRuleOrder: string[], allRulesMode?: boolean) => {
+      if (allRulesMode === false) setRuleOrder(nextRuleOrder, false);
+      else setRuleOrder(nextRuleOrder);
       setOrderDrafts((prev) => {
         const next = { ...prev };
         for (const key of Object.keys(next)) {
@@ -141,7 +142,7 @@ export function RulesManagementSection({
   const handleToggleAllRulesMode = React.useCallback(
     async (checked: boolean) => {
       if (!checked) {
-        applyRuleOrder(editableKeys);
+        applyRuleOrder(editableKeys, false);
         return;
       }
 

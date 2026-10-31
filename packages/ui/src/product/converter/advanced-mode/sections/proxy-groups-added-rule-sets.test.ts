@@ -128,7 +128,8 @@ vi.mock("@subboost/core/proxy-group-name", () => ({
   resolveProxyGroupModuleName: (module: { name: string }, override?: string) =>
     override || module.name,
 }));
-vi.mock("@subboost/core/proxy-group-targets", () => ({
+vi.mock("@subboost/core/proxy-group-targets", async (original) => ({
+  ...await original<typeof import("@subboost/core/proxy-group-targets")>(),
   resolveProxyGroupTargetName: (
     target: unknown,
     options: {
@@ -435,13 +436,13 @@ describe("ProxyGroupsAddedRuleSets", () => {
       id: "fallback",
     });
     expect(mocks.store.updateModuleRule).toHaveBeenCalledWith(
-      "fallback",
+      "auto",
       "rule-a",
       {
         id: "rule-a",
         name: "Rule A",
         behavior: "domain",
-        path: "geosite/rule-a.mrs",
+        path: "geosite/rule-a.mrs", noResolve: false,
       },
     );
 
@@ -460,11 +461,11 @@ describe("ProxyGroupsAddedRuleSets", () => {
       kind: "custom",
       id: "custom-2",
     });
-    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("custom-2", "rule-a", {
+    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("auto", "rule-a", {
       id: "rule-a",
       name: "Rule A",
       behavior: "domain",
-      path: "geosite/rule-a.mrs",
+      path: "geosite/rule-a.mrs", noResolve: false,
     });
   });
 
@@ -484,11 +485,11 @@ describe("ProxyGroupsAddedRuleSets", () => {
       kind: "custom",
       id: "custom-2",
     });
-    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("custom-2", "rule-b", {
+    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("custom-1", "rule-b", {
       id: "rule-b",
       name: "Rule B",
       behavior: "ipcidr",
-      path: "geoip/rule-b.mrs",
+      path: "geoip/rule-b.mrs", noResolve: false,
     });
 
     mocks.store.enabledProxyGroups = [];
@@ -508,11 +509,11 @@ describe("ProxyGroupsAddedRuleSets", () => {
       kind: "module",
       id: "fallback",
     });
-    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("fallback", "rule-b", {
+    expect(mocks.store.updateModuleRule).toHaveBeenCalledWith("custom-1", "rule-b", {
       id: "rule-b",
       name: "Rule B",
       behavior: "ipcidr",
-      path: "geoip/rule-b.mrs",
+      path: "geoip/rule-b.mrs", noResolve: false,
     });
 
     renderAdded({

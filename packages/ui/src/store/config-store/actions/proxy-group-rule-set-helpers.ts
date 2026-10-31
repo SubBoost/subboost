@@ -186,3 +186,12 @@ export function ruleTargetMatchesContainer(
   if (typeof normalized === "string") return normalized === legacyTargetName.trim();
   return normalized?.kind === container.kind && normalized.id === container.id;
 }
+
+export function ruleTargetsEqual(left: ProxyGroupRuleTarget, right: ProxyGroupRuleTarget): boolean {
+  if (typeof left === "string" || typeof right === "string") {
+    return typeof left === "string" && typeof right === "string" && left.trim() === right.trim();
+  }
+  const leftRef = normalizeProxyGroupTargetRef(left);
+  const rightRef = normalizeProxyGroupTargetRef(right);
+  return Boolean(leftRef && rightRef && leftRef.kind === rightRef.kind && leftRef.id === rightRef.id);
+}

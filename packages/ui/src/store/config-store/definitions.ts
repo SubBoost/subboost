@@ -7,6 +7,7 @@ import type {
   GroupListenerBinding,
   GroupListenerTarget,
   ProxyGroupAdvancedConfig,
+  ProxyGroupRuleTarget,
   TemplateType,
 } from "@subboost/core/types/config";
 import { DEFAULT_BASE_CONFIG_YAML, DEFAULT_SUBBOOST_CONFIG } from "@subboost/core/config/defaults";
@@ -270,7 +271,7 @@ export interface ConfigActions {
   addCustomRules: (rules: CustomRule[]) => void;
   updateCustomRule: (id: string, rule: Partial<Omit<CustomRule, "id">>) => void;
   removeCustomRule: (index: number) => void;
-  setRuleOrder: (order: string[]) => void;
+  setRuleOrder: (order: string[], allRulesMode?: boolean) => void;
 
   // 自定义分流组
   addCustomProxyGroup: (group: Omit<CustomProxyGroup, "id">) => void;
@@ -288,13 +289,15 @@ export interface ConfigActions {
   updateModuleRule: (
     moduleId: string,
     ruleId: string,
-    rule: Partial<Omit<RuleSetDraft, "id">>
+    rule: Partial<Omit<RuleSetDraft, "id">>,
+    sourceTarget?: ProxyGroupRuleTarget
   ) => void;
-  removeModuleRule: (moduleId: string, ruleId: string) => void;
+  removeModuleRule: (moduleId: string, ruleId: string, sourceTarget?: ProxyGroupRuleTarget) => void;
   moveModuleRule: (
     moduleId: string,
     ruleId: string,
-    target: { kind: "module" | "custom"; id: string }
+    target: { kind: "module" | "custom"; id: string },
+    sourceTarget?: ProxyGroupRuleTarget
   ) => void;
   restoreModuleRule: (moduleId: string, ruleId: string) => void;
   resetModuleRuleTarget: (moduleId: string, ruleId: string) => void;

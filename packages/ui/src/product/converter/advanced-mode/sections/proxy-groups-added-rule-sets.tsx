@@ -16,7 +16,7 @@ import { toast } from "@subboost/ui/components/ui/toaster";
 import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 import { getModuleRuleOrderKey } from "@subboost/core/generator/module-rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
-import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
+import { resolveProxyGroupTargetContainer } from "@subboost/core/proxy-group-targets";
 import {
   collectCustomRoutingRuleSets,
   getRuleSetTargetValue,
@@ -27,7 +27,7 @@ import {
 import { DEFAULT_RULE_PROVIDER_BASE_URL } from "@subboost/core/rules/metadata";
 import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
 import { resolveRuleSetUrl, useRuleSetOperation } from "./use-rule-set-resolution";
-import type { RuleSetMetadata } from "@subboost/core/types/config";
+import type { CustomRuleSet, RuleSetMetadata } from "@subboost/core/types/config";
 import {
   useConfigStore,
   type RuleSetDraft as StoreRuleSetDraft,
@@ -93,9 +93,10 @@ export function ProxyGroupsAddedRuleSets({
   const [draft, setDraft] = React.useState<RuleSetDraft | null>(null);
   const api = useProductApiAdapter();
   const operation = useRuleSetOperation(JSON.stringify([editingKey, draft, customRuleSets]));
+  const policyContext = React.useMemo(() => getGeneratedPolicyTargetContext(generatedYaml), [generatedYaml]);
   const literalTargetNames = React.useMemo(() => [
-    ...customProxyGroups.map((group) => group.name), ...(getGeneratedPolicyTargetContext(generatedYaml)?.availablePolicyTargets || []),
-  ], [customProxyGroups, generatedYaml]);
+    ...customProxyGroups.map((group) => group.name), ...(policyContext?.availablePolicyTargets || []),
+  ], [customProxyGroups, policyContext]);
 
   const addedRuleSets = React.useMemo(
     () =>
@@ -104,8 +105,10 @@ export function ProxyGroupsAddedRuleSets({
         customProxyGroups,
         proxyGroupNameOverrides,
         literalTargetNames,
+        enabledModules: enabledProxyGroups,
+        ...policyContext,
       }),
-    [customProxyGroups, customRuleSets, proxyGroupNameOverrides, literalTargetNames],
+    [customProxyGroups, customRuleSets, enabledProxyGroups, proxyGroupNameOverrides, literalTargetNames, policyContext],
   );
   const visibleProxyGroupModules = React.useMemo(() => {
     const hidden = new Set(hiddenProxyGroups);
@@ -158,63 +161,39 @@ export function ProxyGroupsAddedRuleSets({
       item: CustomRoutingRuleSetItem,
       target: { kind: "module" | "custom"; id: string },
     ) => {
+      const matchesTarget = (value: CustomRuleSet["target"]) => {
+        const container = resolveProxyGroupTargetContainer(value, { moduleNames, customProxyGroups, literalTargetNames,
+          enabledModules: enabledProxyGroups, availablePolicyTargets: policyContext?.availablePolicyTargets });
+        return container?.kind === target.kind && container.id === target.id;
+      };
+      const customConflict = customRuleSets.some((ruleSet) => ruleSet.id === item.id &&
+        (item.rawTarget === undefined ? item.target.value !== getRuleSetTargetValue(target) : ruleSet.target !== item.rawTarget) &&
+        matchesTarget(ruleSet.target));
       if (target.kind === "module") {
         const proxyModule = visibleProxyGroupModules.find(
           (entry) => entry.id === target.id,
         );
         if (!proxyModule) return true;
-        const moduleName = resolveProxyGroupModuleName(
-          proxyModule,
-          proxyGroupNameOverrides?.[proxyModule.id],
-        );
         const builtinConflict = (proxyModule.rules ?? []).some((rule) => {
           if (rule.id !== item.id) return false;
           const edit = builtinRuleEdits?.[getModuleRuleOrderKey(proxyModule.id, rule.id)];
-          const editTarget = edit?.target
-            ? resolveProxyGroupTargetName(edit.target, {
-                moduleNames,
-                customProxyGroups,
-                literalTargetNames,
-                fallbackTarget: moduleName,
-              })
-            : moduleName;
-          return edit?.enabled !== false && editTarget === moduleName;
+          return edit?.enabled !== false && (!edit?.target || matchesTarget(edit.target));
         });
-        const customConflict = customRuleSets.some(
-          (ruleSet) =>
-            ruleSet.id === item.id &&
-            resolveProxyGroupTargetName(ruleSet.target, {
-              moduleNames,
-              customProxyGroups,
-              literalTargetNames,
-            }) === moduleName &&
-            item.target.value !== getRuleSetTargetValue(target),
-        );
         return builtinConflict || customConflict;
       }
 
       const group = customProxyGroups.find((entry) => entry.id === target.id);
       if (!group) return true;
-      const targetName = group.name.trim();
-      if (!targetName) return true;
-      return customRuleSets.some(
-        (ruleSet) =>
-          ruleSet.id === item.id &&
-          resolveProxyGroupTargetName(ruleSet.target, {
-            moduleNames,
-            customProxyGroups,
-            literalTargetNames,
-          }) === targetName &&
-          item.target.value !== getRuleSetTargetValue(target),
-      );
+      return !group.name.trim() || customConflict;
     },
     [
       builtinRuleEdits,
       customProxyGroups,
       customRuleSets,
+      enabledProxyGroups,
       literalTargetNames,
       moduleNames,
-      proxyGroupNameOverrides,
+      policyContext,
       visibleProxyGroupModules,
     ],
   );
@@ -230,18 +209,19 @@ export function ProxyGroupsAddedRuleSets({
   };
 
   const removeRuleSet = (item: CustomRoutingRuleSetItem) => {
-    removeModuleRule(item.target.id, item.id);
+    if (item.rawTarget === undefined) removeModuleRule(item.target.id, item.id);
+    else removeModuleRule(item.target.id, item.id, item.rawTarget);
     if (editingKey === item.key) cancelEditing();
   };
 
   const saveEditing = (item: CustomRoutingRuleSetItem) => {
     if (!draft) return;
 
-    const target = parseRuleSetTargetValue(draft.targetValue);
+    const target = draft.targetValue === item.target.value ? item.target : parseRuleSetTargetValue(draft.targetValue);
     const path = normalizeRuleSetPathInput(draft.path);
     if (!target || !path) return;
 
-    if (hasConflict(item, target)) {
+    if (target.kind !== "literal" && hasConflict(item, target)) {
       toast({
         title: "规则集已存在",
         description: "目标分流组里已经有同名规则集，请先移除重复项。",
@@ -256,15 +236,15 @@ export function ProxyGroupsAddedRuleSets({
       name: item.name,
       ...metadata,
       path,
-      ...(draft.noResolve ? { noResolve: true } : {}),
+      noResolve: draft.noResolve,
     };
 
-    if (item.target.id === target.id && item.target.kind === target.kind) {
-      updateModuleRule(item.target.id, item.id, nextModuleRule);
-    } else {
+    if (item.rawTarget === undefined) updateModuleRule(item.target.id, item.id, nextModuleRule);
+    else updateModuleRule(item.target.id, item.id, nextModuleRule, item.rawTarget);
+    if ((item.target.id !== target.id || item.target.kind !== target.kind) && target.kind !== "literal") {
       if (target.kind === "module" && !enabledProxyGroups.includes(target.id)) toggleProxyGroup(target.id);
-      moveModuleRule(item.target.id, item.id, target);
-      updateModuleRule(target.id, item.id, nextModuleRule);
+      if (item.rawTarget === undefined) moveModuleRule(item.target.id, item.id, target);
+      else moveModuleRule(item.target.id, item.id, target, item.rawTarget);
     }
 
     cancelEditing();
@@ -349,6 +329,7 @@ export function ProxyGroupsAddedRuleSets({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {item.target.kind === "literal" && <SelectItem value={item.target.value} className="text-xs">{item.target.name}</SelectItem>}
                         {targetOptions.map((target) => (
                           <SelectItem
                             key={target.value}

@@ -19,7 +19,7 @@ import { getModuleRuleOrderKey } from "@subboost/core/generator/module-rules";
 import { createRuleTargetActivation } from "@subboost/core/generator/rule-target-activation";
 import { createPolicyTargetResolver } from "@subboost/core/generator/policy-targets";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
-import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
+import { resolveProxyGroupTargetContainer, resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { normalizeRuleSetPathInput } from "@subboost/core/rules/rule-model";
 import { RULE_CATEGORIES, type RuleSetInfo } from "@subboost/core/rules/metadata";
 import { useConfigStore } from "@subboost/ui/store/config-store";
@@ -168,13 +168,18 @@ export function ProxyGroupsRulesLibrary() {
               const customTargetName = customRuleSet
                 ? resolveRuleSetTarget(customRuleSet.target)
                 : resolvedBuiltinTargetName;
-              const customGroup = activeCustomProxyGroups.find((g) => g.name === customTargetName);
-              const belongsToModule = customTargetName && !customGroup
-                ? visibleProxyGroupModules.find((m) => resolveModuleFullName(m) === customTargetName)
-                : null;
               const isActive = customRuleSet ? activation.customTargetActive(customRuleSet.target)
                 : Boolean(builtinSourceModule && activation.builtinRuleActive(builtinSourceModule.id, rule.id));
-              const belongsToCustom = customGroup || (!belongsToModule && isActive && policyContext?.availablePolicyTargets.includes(customTargetName)
+              const configuredTarget = customRuleSet?.target || (builtinSourceModule &&
+                (builtinRuleEdits?.[getModuleRuleOrderKey(builtinSourceModule.id, rule.id)]?.target || { kind: "module" as const, id: builtinSourceModule.id }));
+              const container = configuredTarget ? resolveProxyGroupTargetContainer(configuredTarget, {
+                moduleNames, customProxyGroups, literalTargetNames, enabledModules: enabledProxyGroups,
+                availablePolicyTargets: policyContext?.availablePolicyTargets,
+              }) : null;
+              const customGroup = activeCustomProxyGroups.find((g) => container?.kind === "custom" && container.id === g.id);
+              const belongsToModule = visibleProxyGroupModules.find((m) => container?.kind === "module" && container.id === m.id) ||
+                (!container && isActive ? visibleProxyGroupModules.find((m) => resolveModuleFullName(m) === customTargetName) : null);
+              const belongsToCustom = customGroup || (!container && !belongsToModule && isActive && policyContext?.availablePolicyTargets.includes(customTargetName)
                 ? { name: customTargetName } : null);
               const isModuleEnabled = belongsToModule
                 ? enabledProxyGroups.includes(belongsToModule.id)

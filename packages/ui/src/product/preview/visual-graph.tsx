@@ -40,6 +40,7 @@ export function VisualGraph() {
     customRuleSets,
     proxyGroupAdvanced,
     builtinRuleEdits,
+    cnIpNoResolve,
     proxyGroupNameOverrides,
     proxyGroupOrder,
     testUrl,
@@ -58,6 +59,7 @@ export function VisualGraph() {
       customRuleSets: state.customRuleSets ?? [],
       proxyGroupAdvanced: state.proxyGroupAdvanced ?? {},
       builtinRuleEdits: state.builtinRuleEdits ?? {},
+      cnIpNoResolve: state.cnIpNoResolve,
       proxyGroupNameOverrides: state.proxyGroupNameOverrides ?? {},
       proxyGroupOrder: state.proxyGroupOrder ?? [],
       testUrl: state.testUrl,
@@ -397,6 +399,29 @@ export function VisualGraph() {
     () => customRules.filter((rule) => activation.customTargetActive(rule.target)),
     [activation, customRules],
   );
+  const ungroupedBuiltinRuleSets = React.useMemo(() => {
+    const groupNames = new Set(displayGroups.map((group) => group.name));
+    return Object.entries(builtinRuleEdits).flatMap(([key, edit]) => {
+      const match = key.match(/^module:([^:]+):(.+)$/);
+      if (!match || !edit?.target || !activation.builtinRuleActive(match[1], match[2])) return [];
+      const source = PROXY_GROUP_MODULES.find((module) => module.id === match[1]);
+      const rule = source?.rules?.find((item) => item.id === match[2]);
+      if (!source || !rule) return [];
+      const target = resolvePolicyTarget(resolveProxyGroupTargetName(edit.target, {
+        moduleNames, customProxyGroups: activeCustomProxyGroups, literalTargetNames, fallbackTarget: resolveModuleName(source),
+      }));
+      if (groupNames.has(target)) return [];
+      return [{ ...rule, key, target, noResolve: source.id === "cn" && rule.id === "cn-ip" ? cnIpNoResolve : rule.noResolve }];
+    });
+  }, [activation, activeCustomProxyGroups, builtinRuleEdits, cnIpNoResolve, displayGroups, literalTargetNames,
+    moduleNames, resolveModuleName, resolvePolicyTarget]);
+  const ungroupedCustomRuleSetCount = React.useMemo(() => {
+    const groupNames = new Set(displayGroups.map((group) => group.name));
+    return customRuleSets.filter((ruleSet) => activation.customTargetActive(ruleSet.target) &&
+      !groupNames.has(resolvePolicyTarget(resolveProxyGroupTargetName(ruleSet.target, {
+        moduleNames, customProxyGroups: activeCustomProxyGroups, literalTargetNames,
+      })))).length;
+  }, [activation, activeCustomProxyGroups, customRuleSets, displayGroups, literalTargetNames, moduleNames, resolvePolicyTarget]);
   const customRoutingRuleSets = React.useMemo(
     () => {
       const active = customRuleSets.filter((ruleSet) => activation.customTargetActive(ruleSet.target));
@@ -405,12 +430,14 @@ export function VisualGraph() {
         customProxyGroups: activeCustomProxyGroups,
         proxyGroupNameOverrides,
         literalTargetNames,
+        enabledModules: enabledProxyGroups,
+        ...policyContext,
       });
       const projectedIds = new Set(projected.map((ruleSet) => ruleSet.id));
       return [...projected, ...active.filter((ruleSet) => !projectedIds.has(ruleSet.id))
         .map((ruleSet) => ({ ...ruleSet, key: `custom-rule-set:${ruleSet.id}` }))];
     },
-    [activation, activeCustomProxyGroups, customRuleSets, proxyGroupNameOverrides, literalTargetNames],
+    [activation, activeCustomProxyGroups, customRuleSets, enabledProxyGroups, proxyGroupNameOverrides, literalTargetNames, policyContext],
   );
 
   // 注意：`containerRef` 有 `p-4`，Safari 上用 `clientWidth` 会把 padding 算进去，导致阈值判断偏大；
@@ -493,7 +520,7 @@ export function VisualGraph() {
         </div>
         <div className="rounded-lg bg-ink/5 p-2">
           <div className="text-lg font-bold text-purple-500">
-            {displayGroups.reduce((acc, g) => acc + g.rules.length, 0)}
+            {displayGroups.reduce((acc, g) => acc + g.rules.length, 0) + ungroupedBuiltinRuleSets.length + ungroupedCustomRuleSetCount}
           </div>
           <div className="text-[10px] text-fg-50">规则集</div>
         </div>
@@ -573,6 +600,15 @@ export function VisualGraph() {
         literalTargetNames={literalTargetNames}
         policyContext={policyContext}
       />
+      {ungroupedBuiltinRuleSets.length > 0 && <CustomRulesPreview
+        heading="其他规则集"
+        customRules={[]}
+        ruleSets={ungroupedBuiltinRuleSets}
+        moduleNames={moduleNames}
+        customProxyGroups={activeCustomProxyGroups}
+        literalTargetNames={literalTargetNames}
+        policyContext={policyContext}
+      />}
     </div>
   );
 }

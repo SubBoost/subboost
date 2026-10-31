@@ -132,7 +132,7 @@ export function createCustomActions(
       });
     },
 
-    setRuleOrder: (order: string[]) => {
+    setRuleOrder: (order: string[], allRulesMode?: boolean) => {
       setAndGenerateConfig((state) => {
         if (!order.length) return { ruleOrder: [] };
         const active = new Set(buildGeneratedRuleEntries({
@@ -143,7 +143,7 @@ export function createCustomActions(
           ...getGeneratedPolicyTargetContext(state.generatedYaml),
         }).map((entry) => entry.key));
         const wanted = new Set(order);
-        const fullOrder = hasFullRuleOrderKeys(order);
+        const fullOrder = allRulesMode ?? (hasFullRuleOrderKeys(order) || hasFullRuleOrderKeys(state.ruleOrder));
         const preserved = new Set(state.ruleOrder.filter((key) => !active.has(key) && !wanted.has(key) &&
           (fullOrder || (!key.startsWith("module:") && !key.startsWith("special:")))));
         let index = 0;

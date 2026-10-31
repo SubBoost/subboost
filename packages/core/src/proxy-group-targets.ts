@@ -53,6 +53,31 @@ export function normalizeProxyGroupRuleTarget(
   return ref;
 }
 
+/** Resolve the owning group without conflating structured references that share a name. */
+export function resolveProxyGroupTargetContainer(
+  target: ProxyGroupRuleTarget,
+  options: ProxyGroupTargetOptions & { enabledModules?: readonly string[]; availablePolicyTargets?: readonly string[] }
+): ProxyGroupTargetRef | null {
+  const normalized = normalizeProxyGroupRuleTarget(target, options);
+  const groups = options.customProxyGroups || [];
+  if (!normalized) return null;
+  if (typeof normalized !== "string") {
+    const exists = normalized.kind === "module"
+      ? Object.prototype.hasOwnProperty.call(options.moduleNames, normalized.id)
+      : groups.some((group) => group.id === normalized.id);
+    return exists ? normalized : null;
+  }
+  const custom = groups.filter((group) => group.name.trim() === normalized);
+  const modules = Object.entries(options.moduleNames).filter(([, name]) => name.trim() === normalized);
+  const activeCustom = custom.find((group) => group.enabled !== false);
+  if (activeCustom) return { kind: "custom", id: activeCustom.id };
+  const activeModule = modules.find(([id]) => !options.enabledModules || options.enabledModules.includes(id));
+  if (activeModule) return { kind: "module", id: activeModule[0] };
+  if (options.availablePolicyTargets?.includes(normalized)) return null;
+  if (custom[0]) return { kind: "custom", id: custom[0].id };
+  return modules[0] ? { kind: "module", id: modules[0][0] } : null;
+}
+
 export function isDisabledCustomProxyGroupTarget(
   target: ProxyGroupRuleTarget,
   options: ProxyGroupTargetOptions
