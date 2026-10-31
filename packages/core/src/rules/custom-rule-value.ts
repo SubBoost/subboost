@@ -89,6 +89,29 @@ export function normalizeLogicRulePayload(type: LogicRuleType, payload: string):
   return { ok: true, value: `(${subRules.join(",")})` };
 }
 
+/** Collect rule-set dependencies from validated nested logic conditions. */
+export function collectLogicRuleSetIds(type: string, payload: string): string[] {
+  if (!isLogicRuleType(type)) return [];
+  const normalized = normalizeLogicRulePayload(type, payload);
+  if (!normalized.ok) return [];
+  const ids = new Set<string>();
+  const visit = (value: string) => {
+    const inner = unwrapParens(value);
+    if (inner === null) return;
+    for (const raw of splitTopLevel(inner) || []) {
+      const condition = unwrapParens(raw);
+      if (condition === null) continue;
+      const comma = condition.indexOf(",");
+      const childType = condition.slice(0, comma);
+      const childValue = condition.slice(comma + 1);
+      if (childType === "RULE-SET") ids.add(childValue.split(",")[0]);
+      else if (isLogicRuleType(childType)) visit(childValue);
+    }
+  };
+  visit(normalized.value);
+  return [...ids];
+}
+
 /** Single validation entry for a custom rule value, shared by UI input, batch import and persisted configs. */
 export function normalizeCustomRuleValue(type: string, value: string): LogicRulePayloadResult {
   const trimmed = value.trim();

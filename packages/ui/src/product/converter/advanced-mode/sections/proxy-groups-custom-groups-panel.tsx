@@ -11,6 +11,7 @@ import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { DEFAULT_LOAD_BALANCE_STRATEGY, type LoadBalanceStrategy, type ProxyGroupGroupType } from "@subboost/core/types/config";
 import { useConfigStore } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
 import {
   buildManualRuleTargets,
@@ -67,6 +68,7 @@ export function ProxyGroupsCustomGroupsPanel({
     dnsYaml,
     mixedPort,
     listenerPorts = {},
+    generatedYaml,
   } = useConfigStore();
 
   const [expandedCustomGroups, setExpandedCustomGroups] = React.useState<Set<string>>(new Set());
@@ -81,6 +83,9 @@ export function ProxyGroupsCustomGroupsPanel({
   // 注意：新增 useState 追加在末尾，保持既有测试的 setter 索引稳定
   const [settingsGroupId, setSettingsGroupId] = React.useState<string | null>(null);
   const interactions = useProductInteractionAdapter();
+  const literalTargetNames = React.useMemo(() => [
+    ...customProxyGroups.map((group) => group.name), ...(getGeneratedPolicyTargetContext(generatedYaml)?.availablePolicyTargets || []),
+  ], [customProxyGroups, generatedYaml]);
   const listenerConflictState = React.useMemo(
     () => ({ dnsYaml, mixedPort, listenerPorts, groupListeners }),
     [dnsYaml, mixedPort, listenerPorts, groupListeners]
@@ -159,6 +164,7 @@ export function ProxyGroupsCustomGroupsPanel({
               resolveProxyGroupTargetName(rule.target, {
                 moduleNames,
                 customProxyGroups: state.customProxyGroups,
+                literalTargetNames,
               }) === sourceGroup.name,
           )
         : null;
@@ -176,6 +182,7 @@ export function ProxyGroupsCustomGroupsPanel({
               resolveProxyGroupTargetName(rule.target, {
                 moduleNames,
                 customProxyGroups: state.customProxyGroups,
+                literalTargetNames,
               }) === targetName,
           )
         ) {
@@ -190,7 +197,7 @@ export function ProxyGroupsCustomGroupsPanel({
 
       moveModuleRule(sourceGroup.id, ruleId, target);
     },
-    [moduleNames, moveModuleRule],
+    [literalTargetNames, moduleNames, moveModuleRule],
   );
 
   return (
@@ -256,12 +263,14 @@ export function ProxyGroupsCustomGroupsPanel({
             const manualRules = listCustomRulesForTarget(customRules, group.name, {
               moduleNames,
               customProxyGroups,
+              literalTargetNames,
             });
             const groupRuleSets = customRuleSets.filter(
               (ruleSet) =>
                 resolveProxyGroupTargetName(ruleSet.target, {
                   moduleNames,
                   customProxyGroups,
+                  literalTargetNames,
                 }) === group.name,
             );
             const movedBuiltinRules = Object.entries(builtinRuleEdits).flatMap(([key, edit]) => {
@@ -274,6 +283,7 @@ export function ProxyGroupsCustomGroupsPanel({
               const targetName = resolveProxyGroupTargetName(edit.target, {
                 moduleNames,
                 customProxyGroups,
+                literalTargetNames,
               });
               return targetName === group.name ? [{ sourceModule, rule }] : [];
             });

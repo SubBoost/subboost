@@ -22,6 +22,7 @@ export function listCustomRulesForTarget(
   options?: {
     moduleNames?: Record<string, string>;
     customProxyGroups?: CustomProxyGroup[];
+    literalTargetNames?: readonly string[];
   },
 ): CustomRuleListItem[] {
   const normalizedTarget = targetName.trim();
@@ -33,6 +34,7 @@ export function listCustomRulesForTarget(
       const target = resolveProxyGroupTargetName(rule.target, {
         moduleNames: options?.moduleNames || {},
         customProxyGroups: options?.customProxyGroups || [],
+        literalTargetNames: options?.literalTargetNames,
       });
       return target === normalizedTarget;
     });

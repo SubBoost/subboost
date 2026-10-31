@@ -50,3 +50,11 @@ export function chooseFallbackPolicyTarget(candidates: unknown[], availablePolic
 export function withBuiltinPolicyTargets(targets: unknown[]): string[] {
   return uniquePolicyTargets([...targets, ...BUILTIN_POLICY_TARGETS]);
 }
+
+export function buildPolicyTargetContext(groupNames: unknown[], nodeNames: unknown[]) {
+  const availablePolicyTargets = withBuiltinPolicyTargets([...groupNames, ...nodeNames]);
+  return {
+    availablePolicyTargets,
+    fallbackPolicyTarget: chooseFallbackPolicyTarget([groupNames[0], nodeNames[0], "DIRECT"], availablePolicyTargets),
+  };
+}

@@ -191,12 +191,25 @@ export function createProxyGroupActions(
         for (const draft of rules) {
           const normalized = normalizeRuleSetDraft(draft);
           if (!normalized) continue;
+          const alreadyAssigned = PROXY_GROUP_MODULES.some((source) => {
+            if (!isPresetModuleRule(source, normalized.id)) return false;
+            const edit = nextBuiltinRuleEdits?.[getModuleRuleOrderKey(source.id, normalized.id)];
+            return edit?.enabled !== false && (Boolean(edit?.target) || state.enabledProxyGroups.includes(source.id));
+          });
+          if (alreadyAssigned) continue;
           if (proxyModule && isPresetModuleRule(proxyModule, normalized.id)) {
             const key = getModuleRuleOrderKey(proxyModule.id, normalized.id);
             nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, {
               enabled: true,
               target: null,
             });
+            continue;
+          }
+          const hiddenSource = PROXY_GROUP_MODULES.find((source) =>
+            state.hiddenProxyGroups.includes(source.id) && isPresetModuleRule(source, normalized.id));
+          if (hiddenSource && !state.customRuleSets.some((rule) => rule.id === normalized.id)) {
+            nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits,
+              getModuleRuleOrderKey(hiddenSource.id, normalized.id), { enabled: true, target: targetRef });
             continue;
           }
           customDrafts.push(normalized);

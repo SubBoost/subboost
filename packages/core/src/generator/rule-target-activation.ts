@@ -27,9 +27,9 @@ export function createRuleTargetActivation(options: ActivationOptions) {
     if (typeof normalized === "string") {
       const matchingModules = PROXY_GROUP_MODULES.filter((item) => moduleNames[item.id] === normalized);
       const matchingGroups = customGroups.filter((item) => item.name.trim() === normalized);
-      if (matchingModules.some((item) => enabled.has(item.id)) || matchingGroups.some((item) => item.enabled !== false)) return "active";
+      if (policyTargets.has(normalized) || matchingModules.some((item) => enabled.has(item.id)) || matchingGroups.some((item) => item.enabled !== false)) return "active";
       if (matchingModules.length || matchingGroups.length) return "inactive";
-      return policyTargets.has(normalized) ? "active" : "unknown";
+      return "unknown";
     }
     if (normalized.kind === "module") {
       if (!Object.prototype.hasOwnProperty.call(moduleNames, normalized.id)) return "unknown";

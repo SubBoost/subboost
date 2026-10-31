@@ -13,6 +13,7 @@ import {
   type GeneratedRuleEntry,
 } from "@subboost/core/generator/rules";
 import { useConfigStore } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import { SectionHeader } from "../section-header";
 
 function clamp(value: number, min: number, max: number): number {
@@ -51,11 +52,13 @@ export function RulesManagementSection({
     cnIpNoResolve,
     experimentalCnUseCnRuleSet,
     ruleOrder,
+    generatedYaml,
     setRuleOrder,
   } = useConfigStore();
   const [orderDrafts, setOrderDrafts] = React.useState<Record<string, string>>({});
   const allRulesMode = ruleOrder.length === 0 || hasFullRuleOrderKeys(ruleOrder);
 
+  const policyContext = React.useMemo(() => getGeneratedPolicyTargetContext(generatedYaml), [generatedYaml]);
   const entries = React.useMemo(
     () =>
       buildGeneratedRuleEntries({
@@ -68,6 +71,7 @@ export function RulesManagementSection({
         cnIpNoResolve,
         experimentalCnUseCnRuleSet,
         ruleOrder,
+        ...policyContext,
       }),
     [
       cnIpNoResolve,
@@ -79,6 +83,7 @@ export function RulesManagementSection({
       builtinRuleEdits,
       proxyGroupNameOverrides,
       ruleOrder,
+      policyContext,
     ]
   );
 

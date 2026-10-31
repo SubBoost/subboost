@@ -28,6 +28,7 @@ import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
 import { useConfigStore, type RuleSetDraft } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import {
   buildManualRuleTargets,
   listCustomRulesForTarget,
@@ -85,8 +86,8 @@ export function ProxyGroupsCategories() {
     dnsYaml,
     mixedPort,
     listenerPorts = {},
+    generatedYaml,
   } = useConfigStore();
-
   const [expandedCategories, setExpandedCategories] = React.useState<
     Set<string>
   >(new Set(customProxyGroups.length > 0 ? [CUSTOM_CATEGORY_ID] : []));
@@ -95,6 +96,7 @@ export function ProxyGroupsCategories() {
     () => resolveNodeNameFilter(nodes, nodeNameFilter).effectiveNodes,
     [nodeNameFilter, nodes],
   );
+  const literalTargetNames = React.useMemo(() => [...customProxyGroups.map((group) => group.name), ...(getGeneratedPolicyTargetContext(generatedYaml)?.availablePolicyTargets || [])], [customProxyGroups, generatedYaml]);
   const [editingModuleId, setEditingModuleId] = React.useState<string | null>(
     null,
   );
@@ -226,7 +228,6 @@ export function ProxyGroupsCategories() {
       moduleNameToId.set(name, proxyModule.id);
       moduleNames[proxyModule.id] = name;
     }
-
     const pushRuleSetForTarget = (moduleId: string, rule: RuleSetDraft & { source?: EffectiveModuleRuleSource }) => {
       ruleSetsByTarget[moduleId] = [...(ruleSetsByTarget[moduleId] || []), rule];
     };
@@ -239,6 +240,7 @@ export function ProxyGroupsCategories() {
       const targetName = resolveProxyGroupTargetName(ruleSet.target, {
         moduleNames,
         customProxyGroups,
+        literalTargetNames,
       });
       const moduleId = moduleNameToId.get(targetName);
       if (!moduleId) continue;
@@ -258,6 +260,7 @@ export function ProxyGroupsCategories() {
         ? resolveProxyGroupTargetName(edit.target, {
             moduleNames,
             customProxyGroups,
+            literalTargetNames,
             fallbackTarget: defaultTarget,
           })
         : "";
@@ -280,13 +283,13 @@ export function ProxyGroupsCategories() {
         }
       }
     }
-
     return { ruleSetsByTarget, hiddenPresetRuleIds };
   }, [
     builtinRuleEdits,
     cnIpNoResolve,
     customRuleSets,
     customProxyGroups,
+    literalTargetNames,
     resolveModuleDisplayName,
   ]);
 
@@ -429,6 +432,7 @@ export function ProxyGroupsCategories() {
                             customRules,
                             display.full,
                             {
+                              literalTargetNames,
                               moduleNames: Object.fromEntries(
                                 PROXY_GROUP_MODULES.map((item) => [
                                   item.id,
@@ -443,7 +447,6 @@ export function ProxyGroupsCategories() {
                           );
                           const advancedConfig = proxyGroupAdvanced[module.id] || {};
                           const effectiveGroupType = advancedConfig.groupType ?? module.groupType;
-
                           const handleHideModule = async () => {
                             const ok = await confirmDialog(
                               isCore

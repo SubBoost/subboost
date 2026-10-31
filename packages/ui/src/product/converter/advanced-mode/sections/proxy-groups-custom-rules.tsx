@@ -24,6 +24,7 @@ import {
 import { normalizeCustomRuleValue } from "@subboost/core/rules/custom-rule-value";
 import { getCustomRuleDefinition, supportsNoResolve } from "@subboost/core/rules/custom-rule-types";
 import { useConfigStore } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import { allocateRuleSetId } from "@subboost/core/rules/rule-model";
 import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
 import { resolveRuleSetUrl, useRuleSetOperation } from "./use-rule-set-resolution";
@@ -123,6 +124,7 @@ export function ProxyGroupsCustomRules() {
     enabledProxyGroups,
     customProxyGroups,
     proxyGroupNameOverrides,
+    generatedYaml,
   } = useConfigStore();
 
   const [newRuleType, setNewRuleType] =
@@ -166,14 +168,18 @@ export function ProxyGroupsCustomRules() {
       ),
     [proxyGroupNameOverrides],
   );
+  const literalTargetNames = React.useMemo(() => [
+    ...customProxyGroups.map((group) => group.name), ...(getGeneratedPolicyTargetContext(generatedYaml)?.availablePolicyTargets || []),
+  ], [customProxyGroups, generatedYaml]);
 
   const resolveTargetName = React.useCallback(
     (target: CustomRule["target"]) =>
       resolveProxyGroupTargetName(target, {
         moduleNames,
         customProxyGroups,
+        literalTargetNames,
       }),
-    [customProxyGroups, moduleNames],
+    [customProxyGroups, literalTargetNames, moduleNames],
   );
 
   const targetOptions = React.useMemo(

@@ -224,7 +224,8 @@ describe("VisualGraph", () => {
       customProxyGroups: [
         expect.objectContaining({ id: "custom-1", name: "🧩 Custom" }),
       ],
-      literalTargetNames: ["🧩 Custom"],
+      literalTargetNames: ["🧩 Custom", "🇭🇰 Alpha", "Beta", "Gamma", "Relay"],
+      policyContext: undefined,
     });
 
     const preview = mocks.captures.proxyGroupsPreview;
@@ -281,7 +282,8 @@ describe("VisualGraph", () => {
         ad: "🛑 广告拦截",
       },
       customProxyGroups: [],
-      literalTargetNames: [],
+      literalTargetNames: ["Only"],
+      policyContext: undefined,
     });
   });
 

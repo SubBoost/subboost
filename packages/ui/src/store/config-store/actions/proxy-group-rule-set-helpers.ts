@@ -12,8 +12,9 @@ import type {
   RuleSetBehavior,
 } from "@subboost/core/types/config";
 import type { ConfigState, RuleSetDraft } from "../definitions";
+import { getGeneratedPolicyTargetContext } from "../generated-policy-targets";
 
-type RuleTargetState = Pick<ConfigState, "customProxyGroups" | "proxyGroupNameOverrides">;
+type RuleTargetState = Pick<ConfigState, "customProxyGroups" | "proxyGroupNameOverrides"> & Partial<Pick<ConfigState, "generatedYaml">>;
 
 export function normalizeRuleSetDraft(rule: RuleSetDraft): RuleSetDraft | null {
   if (!rule || typeof rule.id !== "string" || typeof rule.path !== "string") return null;
@@ -44,6 +45,7 @@ export function normalizeRuleOrderForState(state: {
   experimentalCnUseCnRuleSet: boolean;
   cnIpNoResolve: boolean;
   ruleOrder: string[];
+  generatedYaml?: string;
 }): string[] {
   return normalizePersistedRuleOrder({
     enabledModules: state.enabledProxyGroups,
@@ -55,6 +57,7 @@ export function normalizeRuleOrderForState(state: {
     experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet,
     cnIpNoResolve: state.cnIpNoResolve,
     ruleOrder: state.ruleOrder,
+    ...getGeneratedPolicyTargetContext(state.generatedYaml),
   });
 }
 
@@ -178,7 +181,7 @@ export function ruleTargetMatchesContainer(
   const normalized = normalizeProxyGroupRuleTarget(target, {
     moduleNames: buildModuleNameMap(state.proxyGroupNameOverrides),
     customProxyGroups: state.customProxyGroups,
-    literalTargetNames: [legacyTargetName],
+    literalTargetNames: [legacyTargetName, ...(getGeneratedPolicyTargetContext(state.generatedYaml)?.availablePolicyTargets || [])],
   });
   if (typeof normalized === "string") return normalized === legacyTargetName.trim();
   return normalized?.kind === container.kind && normalized.id === container.id;

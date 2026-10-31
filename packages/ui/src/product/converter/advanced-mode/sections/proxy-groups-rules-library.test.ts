@@ -546,6 +546,33 @@ describe("ProxyGroupsRulesLibrary", () => {
     ]);
   });
 
+  it("recognizes a moved builtin after its source is hidden and prevents duplicate additions", () => {
+    mocks.store.enabledProxyGroups = [];
+    mocks.store.hiddenProxyGroups = ["auto"];
+    mocks.store.builtinRuleEdits = { "module:auto:netflix": { target: { kind: "custom", id: "custom-1" } } };
+    mocks.search.searchResults = [netflixRule];
+    const { html } = renderLibrary({ 0: [netflixRule], 1: "custom:custom-1" });
+    expect(html).toContain("Custom");
+    expect(html).toContain("已添加");
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+
+    renderLibrary({ 0: [netflixRule], 1: "custom:custom-2" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "规则集已在其他分流组中" }));
+  });
+
+  it("allows a hidden, unmoved preset to be added as a custom rule set", () => {
+    mocks.store.hiddenProxyGroups = ["auto"];
+    mocks.store.enabledProxyGroups = [];
+    renderLibrary({ 0: [netflixRule], 1: "custom:custom-1" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", expect.arrayContaining([
+      expect.objectContaining({ id: "netflix" }),
+    ]));
+  });
+
   it("covers empty hints, loading-more state, disabled builtin edits, and optional interactions", () => {
     mocks.search.ruleSearchKeyword = "";
     mocks.search.searchResults = [];

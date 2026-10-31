@@ -66,6 +66,62 @@ describe("moved rule ownership", () => {
     expectRule(output(["select", "cn"], explicitCustom, [{ ...sameName, enabled: false }]), "onedrive", null);
   });
 
+  it.each(["module", "custom"] as const)("accepts a real node with a disabled %s group's literal name", (kind) => {
+    const name = kind === "module" ? resolveModuleName("cn") : "Regional";
+    const target = kind === "module" ? { kind: "module" as const, id: "cn" } : { kind: "custom" as const, id: "regional" };
+    const make = (ruleTarget: ProxyGroupRuleTarget) => generateClashConfig({
+      nodes: [{ name, type: "ss", server: "203.0.113.1", port: 8388, cipher: "aes-128-gcm", password: "fixture" }],
+      template: "full", customProxyGroups: [{ ...customGroup, enabled: false }],
+      builtinRuleEdits: { "module:microsoft:onedrive": { target: ruleTarget } },
+      customRuleSets: [{ id: "named-set", name: "Named", behavior: "domain", path: "geosite/named.mrs", target: ruleTarget }],
+      userConfig: { enabledGroups: ["select", "microsoft"], enabledRules: ["select", "microsoft"],
+        customRules: [{ id: "named-rule", type: "DOMAIN", value: "local.subboost.test", target: ruleTarget }],
+        ruleProviderBaseUrl: "https://local.subboost.test/rules" },
+    });
+    const literal = make(name);
+    const literalRules = literal.rules as string[];
+    expect(literalRules).toContain(`RULE-SET,onedrive,${name}`);
+    expect(literalRules).toContain(`RULE-SET,named-set,${name}`);
+    expect(literalRules).toContain(`DOMAIN,local.subboost.test,${name}`);
+    expect(literal["rule-providers"]).toHaveProperty("onedrive");
+    expect(literal["rule-providers"]).toHaveProperty("named-set");
+    const structured = make(target);
+    expect((structured.rules as string[]).some((rule) => rule.includes("onedrive") || rule.includes("named-set") || rule.includes("local.subboost.test"))).toBe(false);
+    expect(structured["rule-providers"]).not.toHaveProperty("onedrive");
+    expect(structured["rule-providers"]).not.toHaveProperty("named-set");
+  });
+
+  it("keeps known providers referenced by active nested logic rules without emitting their direct rules", () => {
+    const make = (logicTarget: ProxyGroupRuleTarget) => generateClashConfig({
+      nodes: [], template: "full", builtinRuleEdits: { "module:microsoft:onedrive": { target: "module:cn" } },
+      customRuleSets: [{ id: "nested-set", name: "Nested", behavior: "domain", path: "geosite/nested.mrs", target: "module:cn" }],
+      userConfig: { enabledGroups: ["select", "microsoft"], enabledRules: ["select", "microsoft"],
+        customRules: [{ id: "logic", type: "AND", value: "((RULE-SET,onedrive),(OR,((RULE-SET,nested-set),(RULE-SET,unknown))))", target: logicTarget }],
+        ruleProviderBaseUrl: "https://local.subboost.test/rules" },
+    });
+    const active = make("DIRECT");
+    expect((active.rules as string[]).some((rule) => rule.startsWith("AND,"))).toBe(true);
+    expect((active.rules as string[]).some((rule) => rule.startsWith("RULE-SET,onedrive,") || rule.startsWith("RULE-SET,nested-set,"))).toBe(false);
+    expect(active["rule-providers"]).toHaveProperty("onedrive");
+    expect(active["rule-providers"]).toHaveProperty("nested-set");
+    expect(active["rule-providers"]).not.toHaveProperty("unknown");
+    const inactive = make("module:cn");
+    expect((inactive.rules as string[]).some((rule) => rule.startsWith("AND,"))).toBe(false);
+    expect(inactive["rule-providers"]).not.toHaveProperty("onedrive");
+    expect(inactive["rule-providers"]).not.toHaveProperty("nested-set");
+  });
+
+  it("keeps an active custom provider's metadata when an inactive preset shares its referenced ID", () => {
+    const config = generateClashConfig({
+      nodes: [], template: "full", builtinRuleEdits: { "module:microsoft:onedrive": { target: "module:cn" } },
+      customRuleSets: [{ id: "onedrive", name: "Own OneDrive", behavior: "domain", path: "geosite/own-onedrive.mrs", target: "DIRECT" }],
+      userConfig: { enabledGroups: ["select", "microsoft"], enabledRules: ["select", "microsoft"],
+        customRules: [{ id: "logic", type: "AND", value: "((RULE-SET,onedrive),(NETWORK,UDP))", target: "DIRECT" }],
+        ruleProviderBaseUrl: "https://local.subboost.test/rules" },
+    });
+    expect(config["rule-providers"].onedrive.url).toBe("https://local.subboost.test/rules/geosite/own-onedrive.mrs");
+  });
+
   it("keeps explicit available policy targets and suppresses missing targets", () => {
     const entries = buildGeneratedRuleEntries({
       enabledModules: [], customRules: [], availablePolicyTargets: ["Node A", "DIRECT"],

@@ -32,6 +32,7 @@ import {
   useConfigStore,
   type RuleSetDraft as StoreRuleSetDraft,
 } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import {
   RULE_EDIT_ACTIONS_CLASS,
   RULE_EDIT_PRIMARY_FIELD_CLASS,
@@ -85,12 +86,16 @@ export function ProxyGroupsAddedRuleSets({
     updateModuleRule,
     removeModuleRule,
     moveModuleRule,
+    generatedYaml,
   } = useConfigStore();
 
   const [editingKey, setEditingKey] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<RuleSetDraft | null>(null);
   const api = useProductApiAdapter();
   const operation = useRuleSetOperation(JSON.stringify([editingKey, draft, customRuleSets]));
+  const literalTargetNames = React.useMemo(() => [
+    ...customProxyGroups.map((group) => group.name), ...(getGeneratedPolicyTargetContext(generatedYaml)?.availablePolicyTargets || []),
+  ], [customProxyGroups, generatedYaml]);
 
   const addedRuleSets = React.useMemo(
     () =>
@@ -98,8 +103,9 @@ export function ProxyGroupsAddedRuleSets({
         customRuleSets,
         customProxyGroups,
         proxyGroupNameOverrides,
+        literalTargetNames,
       }),
-    [customProxyGroups, customRuleSets, proxyGroupNameOverrides],
+    [customProxyGroups, customRuleSets, proxyGroupNameOverrides, literalTargetNames],
   );
   const visibleProxyGroupModules = React.useMemo(() => {
     const hidden = new Set(hiddenProxyGroups);
@@ -168,6 +174,7 @@ export function ProxyGroupsAddedRuleSets({
             ? resolveProxyGroupTargetName(edit.target, {
                 moduleNames,
                 customProxyGroups,
+                literalTargetNames,
                 fallbackTarget: moduleName,
               })
             : moduleName;
@@ -179,6 +186,7 @@ export function ProxyGroupsAddedRuleSets({
             resolveProxyGroupTargetName(ruleSet.target, {
               moduleNames,
               customProxyGroups,
+              literalTargetNames,
             }) === moduleName &&
             item.target.value !== getRuleSetTargetValue(target),
         );
@@ -195,6 +203,7 @@ export function ProxyGroupsAddedRuleSets({
           resolveProxyGroupTargetName(ruleSet.target, {
             moduleNames,
             customProxyGroups,
+            literalTargetNames,
           }) === targetName &&
           item.target.value !== getRuleSetTargetValue(target),
       );
@@ -203,6 +212,7 @@ export function ProxyGroupsAddedRuleSets({
       builtinRuleEdits,
       customProxyGroups,
       customRuleSets,
+      literalTargetNames,
       moduleNames,
       proxyGroupNameOverrides,
       visibleProxyGroupModules,

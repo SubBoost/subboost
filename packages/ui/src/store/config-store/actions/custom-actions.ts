@@ -3,10 +3,11 @@ import {
   createCustomRuleId,
   ensureCustomRuleId,
 } from "@subboost/core/rules/custom-rule-utils";
-import { normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
+import { buildGeneratedRuleEntries, hasFullRuleOrderKeys, normalizePersistedRuleOrder } from "@subboost/core/generator/rules";
 import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
 import type { ConfigActions } from "../definitions";
 import type { GetState, SetAndGenerateConfig, SetState } from "../store-types";
+import { getGeneratedPolicyTargetContext } from "../generated-policy-targets";
 import {
   compactBuiltinRuleEdits,
   ruleTargetMatchesContainer,
@@ -34,6 +35,7 @@ type NormalizeRuleOrderState = {
   experimentalCnUseCnRuleSet: boolean;
   cnIpNoResolve: boolean;
   ruleOrder: string[];
+  generatedYaml?: string;
 };
 
 function normalizeRuleOrderForState(state: NormalizeRuleOrderState): string[] {
@@ -47,6 +49,7 @@ function normalizeRuleOrderForState(state: NormalizeRuleOrderState): string[] {
     experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet,
     cnIpNoResolve: state.cnIpNoResolve,
     ruleOrder: state.ruleOrder,
+    ...getGeneratedPolicyTargetContext(state.generatedYaml),
   });
 }
 
@@ -130,9 +133,27 @@ export function createCustomActions(
     },
 
     setRuleOrder: (order: string[]) => {
-      setAndGenerateConfig((state) => ({
-        ruleOrder: normalizeRuleOrderForState({ ...state, ruleOrder: order }),
-      }));
+      setAndGenerateConfig((state) => {
+        if (!order.length) return { ruleOrder: [] };
+        const active = new Set(buildGeneratedRuleEntries({
+          enabledModules: state.enabledProxyGroups, customProxyGroups: state.customProxyGroups,
+          customRules: state.customRules, customRuleSets: state.customRuleSets,
+          builtinRuleEdits: state.builtinRuleEdits, proxyGroupNameOverrides: state.proxyGroupNameOverrides,
+          experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet, cnIpNoResolve: state.cnIpNoResolve,
+          ...getGeneratedPolicyTargetContext(state.generatedYaml),
+        }).map((entry) => entry.key));
+        const wanted = new Set(order);
+        const fullOrder = hasFullRuleOrderKeys(order);
+        const preserved = new Set(state.ruleOrder.filter((key) => !active.has(key) && !wanted.has(key) &&
+          (fullOrder || (!key.startsWith("module:") && !key.startsWith("special:")))));
+        let index = 0;
+        const merged = state.ruleOrder.flatMap((key) => {
+          if (preserved.has(key)) return [key];
+          return wanted.has(key) ? [order[index++]] : [];
+        });
+        merged.push(...order.slice(index));
+        return { ruleOrder: normalizeRuleOrderForState({ ...state, ruleOrder: merged }) };
+      });
     },
 
     addCustomProxyGroup: (group: Omit<CustomProxyGroup, "id">) => {

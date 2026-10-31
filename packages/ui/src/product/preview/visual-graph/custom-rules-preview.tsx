@@ -3,8 +3,8 @@
 import * as React from "react";
 import { ArrowRight, Shield } from "lucide-react";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
-import type { CustomRoutingRuleSetItem } from "@subboost/core/rules/custom-routing-rule-sets";
-import type { CustomProxyGroup, CustomRule } from "@subboost/core/types/config";
+import { createPolicyTargetResolver } from "@subboost/core/generator/policy-targets";
+import type { CustomProxyGroup, CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 
 const UNAVAILABLE_TARGET_LABEL = "目标分流组不可用";
 
@@ -14,22 +14,24 @@ export function CustomRulesPreview({
   moduleNames,
   customProxyGroups,
   literalTargetNames,
+  policyContext,
 }: {
   customRules: CustomRule[];
-  ruleSets?: CustomRoutingRuleSetItem[];
+  ruleSets?: Array<Pick<CustomRuleSet, "id" | "name" | "path" | "target" | "noResolve"> & { key: string }>;
   moduleNames: Record<string, string>;
   customProxyGroups: CustomProxyGroup[];
   literalTargetNames?: readonly string[];
+  policyContext?: { availablePolicyTargets: string[]; fallbackPolicyTarget: string };
 }) {
   const resolveTargetName = React.useCallback(
     (target: CustomRule["target"]) =>
-      resolveProxyGroupTargetName(target, {
+      createPolicyTargetResolver(policyContext)(resolveProxyGroupTargetName(target, {
         moduleNames,
         customProxyGroups,
         literalTargetNames,
         fallbackTarget: UNAVAILABLE_TARGET_LABEL,
-      }),
-    [customProxyGroups, moduleNames, literalTargetNames],
+      })),
+    [customProxyGroups, moduleNames, literalTargetNames, policyContext],
   );
 
   const items = React.useMemo(

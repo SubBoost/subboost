@@ -37,7 +37,7 @@ import { collectDnsPolicyEntries, configToYaml } from "./yaml";
 import { shareHealthChecks } from "./shared-health-checks";
 import { isMihomoSupportedProxyNode, normalizeMihomoVlessForGeneration } from "../mihomo/proxy-sanitizer";
 import { getValidDialerRelayGroupNames } from "../subscription/dialer-relay-group-names";
-import { chooseFallbackPolicyTarget, withBuiltinPolicyTargets } from "./policy-targets";
+import { buildPolicyTargetContext } from "./policy-targets";
 import { resolveGroupListenerEntries, type GroupListenerTargetResolution } from "./group-listeners";
 
 export interface GenerateOptions {
@@ -466,17 +466,9 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     return nextKeys.map((key) => byKey.get(key)).filter(Boolean) as ProxyGroup[];
   })();
 
-  const availablePolicyTargets = withBuiltinPolicyTargets([
-    ...proxyGroups.map((group) => group.name),
-    ...outputNodes.filter((node) => !isSubscriptionInfoNodeName(node.name)).map((node) => node.name),
-  ]);
-  const fallbackPolicyTarget = chooseFallbackPolicyTarget(
-    [
-      proxyGroups[0]?.name,
-      outputNodes.find((node) => !isSubscriptionInfoNodeName(node.name))?.name,
-      "DIRECT",
-    ],
-    availablePolicyTargets
+  const { availablePolicyTargets, fallbackPolicyTarget } = buildPolicyTargetContext(
+    proxyGroups.map((group) => group.name),
+    outputNodes.filter((node) => !isSubscriptionInfoNodeName(node.name)).map((node) => node.name),
   );
   const resolvedListeners = (() => {
     const baseListeners = baseTopLevelPatch.listeners;
@@ -578,7 +570,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     
     // 规则提供者（包含自定义分流组的规则）
     "rule-providers": {
-      ...generateRuleProviders({ ...generateOpts, availablePolicyTargets }),
+      ...generateRuleProviders({ ...generateOpts, customRules: config.customRules, availablePolicyTargets }),
     },
     
     // 规则（包含自定义分流组的规则）

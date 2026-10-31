@@ -12,10 +12,12 @@ import {
 } from "@subboost/core/generator/proxy-groups";
 import { getModuleRuleOrderKey } from "@subboost/core/generator/module-rules";
 import { createRuleTargetActivation } from "@subboost/core/generator/rule-target-activation";
+import { createPolicyTargetResolver } from "@subboost/core/generator/policy-targets";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
 import { collectCustomRoutingRuleSets } from "@subboost/core/rules/custom-routing-rule-sets";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import { CustomRulesPreview } from "./visual-graph/custom-rules-preview";
 import { getDialerEmojiFromName } from "./visual-graph/emoji";
 import {
@@ -43,6 +45,7 @@ export function VisualGraph() {
     testUrl,
     testInterval,
     ruleProviderBaseUrl,
+    generatedYaml,
     setProxyGroupOrder,
   } = useConfigStore(
     useShallow((state) => ({
@@ -60,6 +63,7 @@ export function VisualGraph() {
       testUrl: state.testUrl,
       testInterval: state.testInterval,
       ruleProviderBaseUrl: state.ruleProviderBaseUrl,
+      generatedYaml: state.generatedYaml,
       setProxyGroupOrder: state.setProxyGroupOrder,
     })),
   );
@@ -96,10 +100,14 @@ export function VisualGraph() {
     () => customProxyGroups.filter((group) => group && group.enabled !== false),
     [customProxyGroups],
   );
-  const literalTargetNames = React.useMemo(
-    () => customProxyGroups.flatMap((group) => typeof group?.name === "string" ? [group.name] : []),
-    [customProxyGroups],
-  );
+  const policyContext = React.useMemo(() => getGeneratedPolicyTargetContext(generatedYaml), [generatedYaml]);
+  const resolvePolicyTarget = React.useMemo(() => createPolicyTargetResolver(policyContext), [policyContext]);
+  const literalTargetNames = React.useMemo(() => [
+    ...customProxyGroups.flatMap((group) => typeof group?.name === "string" ? [group.name] : []),
+    ...(policyContext?.availablePolicyTargets || [
+      ...effectiveNodes.map((node) => node.name), ...enabledDialerProxyGroups.map((group) => group.name),
+    ]),
+  ], [customProxyGroups, effectiveNodes, enabledDialerProxyGroups, policyContext]);
 
   React.useEffect(() => {
     const el = containerRef.current;
@@ -171,8 +179,8 @@ export function VisualGraph() {
     customProxyGroups,
     builtinRuleEdits,
     proxyGroupNameOverrides,
-    availablePolicyTargets: [...generatedProxyGroups.map((group) => group.name), ...effectiveNodes.map((node) => node.name)],
-  }), [enabledProxyGroups, customProxyGroups, builtinRuleEdits, proxyGroupNameOverrides, generatedProxyGroups, effectiveNodes]);
+    availablePolicyTargets: policyContext?.availablePolicyTargets ?? [...generatedProxyGroups.map((group) => group.name), ...effectiveNodes.map((node) => node.name)],
+  }), [enabledProxyGroups, customProxyGroups, builtinRuleEdits, proxyGroupNameOverrides, generatedProxyGroups, effectiveNodes, policyContext]);
 
   // 按生成后的 proxy-groups 顺序展示（更贴近 Clash 实际 UI）
   const displayGroups = React.useMemo((): VisualDisplayGroup[] => {
@@ -191,21 +199,19 @@ export function VisualGraph() {
     }
     const movedBuiltinRulesFor = (groupName: string, moduleId?: string) =>
       Object.entries(builtinRuleEdits || {}).flatMap(([key, edit]) => {
-        const target = edit?.target
-          ? resolveProxyGroupTargetName(edit.target, {
-              moduleNames,
-              customProxyGroups: activeCustomProxyGroups,
-              literalTargetNames,
-            })
-          : "";
-        if (edit?.enabled === false || target !== groupName) return [];
         const match = key.match(/^module:([^:]+):(.+)$/);
-        if (!match) return [];
+        if (!match || !edit?.target || edit.enabled === false) return [];
         const [, sourceModuleId, ruleId] = match;
         if (sourceModuleId === moduleId) return [];
         if (!activation.builtinRuleActive(sourceModuleId, ruleId)) return [];
         const sourceModule = PROXY_GROUP_MODULES.find((module) => module.id === sourceModuleId);
         const sourceRule = sourceModule?.rules?.find((rule) => rule.id === ruleId);
+        if (!sourceModule || !sourceRule) return [];
+        const target = resolvePolicyTarget(resolveProxyGroupTargetName(edit.target, {
+          moduleNames, customProxyGroups: activeCustomProxyGroups, literalTargetNames,
+          fallbackTarget: resolveModuleName(sourceModule),
+        }));
+        if (target !== groupName) return [];
         return sourceRule ? [{ id: sourceRule.id, name: sourceRule.name, behavior: sourceRule.behavior }] : [];
       });
     const base = generatedProxyGroups.map((g) => {
@@ -218,14 +224,14 @@ export function VisualGraph() {
             .filter((r) => {
               const edit = builtinRuleEdits?.[getModuleRuleOrderKey(mod.id, r.id)];
               if (!activation.builtinRuleActive(mod.id, r.id)) return false;
-              const target = edit?.target
+              const target = resolvePolicyTarget(edit?.target
                 ? resolveProxyGroupTargetName(edit.target, {
                     moduleNames,
                     customProxyGroups: activeCustomProxyGroups,
                     literalTargetNames,
                     fallbackTarget: moduleTarget,
                   })
-                : moduleTarget;
+                : moduleTarget);
               return edit?.enabled !== false && target === moduleTarget;
             })
             .map((r) => ({
@@ -236,11 +242,11 @@ export function VisualGraph() {
           ...customRuleSets
             .filter(
               (ruleSet) =>
-                resolveProxyGroupTargetName(ruleSet.target, {
+                activation.customTargetActive(ruleSet.target) && resolvePolicyTarget(resolveProxyGroupTargetName(ruleSet.target, {
                   moduleNames,
                   customProxyGroups: activeCustomProxyGroups,
                   literalTargetNames,
-                }) === moduleTarget,
+                })) === moduleTarget,
             )
             .map((ruleSet) => ({
               id: ruleSet.id,
@@ -272,11 +278,11 @@ export function VisualGraph() {
         rules: [...customRuleSets
           .filter(
             (ruleSet) =>
-              resolveProxyGroupTargetName(ruleSet.target, {
+              activation.customTargetActive(ruleSet.target) && resolvePolicyTarget(resolveProxyGroupTargetName(ruleSet.target, {
                 moduleNames,
                 customProxyGroups: activeCustomProxyGroups,
                 literalTargetNames,
-              }) === groupName,
+              })) === groupName,
           )
           .map((r) => ({
             id: r.id,
@@ -295,7 +301,10 @@ export function VisualGraph() {
             emoji: getDialerEmojiFromName(g.name),
             groupType: g.type,
             category: "dialer",
-            rules: [],
+            rules: [...movedBuiltinRulesFor(g.name), ...customRuleSets.filter((ruleSet) =>
+              activation.customTargetActive(ruleSet.target) && resolvePolicyTarget(resolveProxyGroupTargetName(ruleSet.target, {
+                moduleNames, customProxyGroups: activeCustomProxyGroups, literalTargetNames,
+              })) === g.name).map((ruleSet) => ({ id: ruleSet.id, name: ruleSet.name, behavior: ruleSet.behavior }))],
             dialer: {
               relayNodes: Array.isArray(g.relayNodes)
                 ? g.relayNodes.filter(
@@ -371,6 +380,7 @@ export function VisualGraph() {
     moduleNames,
     literalTargetNames,
     resolveModuleName,
+    resolvePolicyTarget,
   ]);
 
   const defaultProxyByGroupName = React.useMemo(() => {
@@ -388,13 +398,18 @@ export function VisualGraph() {
     [activation, customRules],
   );
   const customRoutingRuleSets = React.useMemo(
-    () =>
-      collectCustomRoutingRuleSets({
-        customRuleSets: customRuleSets.filter((ruleSet) => activation.customTargetActive(ruleSet.target)),
+    () => {
+      const active = customRuleSets.filter((ruleSet) => activation.customTargetActive(ruleSet.target));
+      const projected = collectCustomRoutingRuleSets({
+        customRuleSets: active,
         customProxyGroups: activeCustomProxyGroups,
         proxyGroupNameOverrides,
         literalTargetNames,
-      }),
+      });
+      const projectedIds = new Set(projected.map((ruleSet) => ruleSet.id));
+      return [...projected, ...active.filter((ruleSet) => !projectedIds.has(ruleSet.id))
+        .map((ruleSet) => ({ ...ruleSet, key: `custom-rule-set:${ruleSet.id}` }))];
+    },
     [activation, activeCustomProxyGroups, customRuleSets, proxyGroupNameOverrides, literalTargetNames],
   );
 
@@ -556,6 +571,7 @@ export function VisualGraph() {
         moduleNames={moduleNames}
         customProxyGroups={activeCustomProxyGroups}
         literalTargetNames={literalTargetNames}
+        policyContext={policyContext}
       />
     </div>
   );

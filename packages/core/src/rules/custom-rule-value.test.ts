@@ -5,11 +5,17 @@ import { configToYaml } from "@subboost/core/generator/yaml";
 import { buildGenerateOptionsFromConfig } from "@subboost/core/subscription/config-utils";
 import { validateSubBoostTemplateConfig } from "@subboost/core/templates/config-template";
 import { validConfig } from "@subboost/core/templates/config-template.test-helpers";
-import { normalizeCustomRuleValue, normalizeLogicRulePayload } from "./custom-rule-value";
+import { collectLogicRuleSetIds, normalizeCustomRuleValue, normalizeLogicRulePayload } from "./custom-rule-value";
 
 const TAILSCALE_PAYLOAD = "((PROCESS-NAME,tailscaled),(NETWORK,UDP),(SRC-PORT,41641))";
 
 describe("logic rule payload", () => {
+  it("collects only actual rule-set conditions from nested valid logic", () => {
+    expect(collectLogicRuleSetIds("AND", "((RULE-SET,onedrive,no-resolve),(OR,((RULE-SET,custom),(NOT,((RULE-SET,onedrive))))),(DOMAIN-REGEX,RULE-SET,fake))"))
+      .toEqual(["onedrive", "custom"]);
+    expect(collectLogicRuleSetIds("DOMAIN-REGEX", "(RULE-SET,fake)")).toEqual([]);
+    expect(collectLogicRuleSetIds("NOT", "((RULE-SET,broken),(NETWORK,UDP))")).toEqual([]);
+  });
   it("accepts the Clash Verge payload as-is and strips whitespace around tokens", () => {
     expect(normalizeLogicRulePayload("AND", TAILSCALE_PAYLOAD)).toEqual({ ok: true, value: TAILSCALE_PAYLOAD });
     expect(normalizeLogicRulePayload("AND", " ( (PROCESS-NAME, tailscaled) , (NETWORK,UDP),(SRC-PORT , 41641) ) "))
