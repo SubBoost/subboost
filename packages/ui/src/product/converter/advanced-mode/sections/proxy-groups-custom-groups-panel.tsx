@@ -193,7 +193,7 @@ export function ProxyGroupsCustomGroupsPanel({
         }
       }
 
-      moveModuleRule(sourceGroup.id, ruleId, target);
+      moveModuleRule({ kind: "custom", id: sourceGroup.id }, ruleId, target);
     },
     [belongsToGroup, moveModuleRule],
   );
@@ -346,7 +346,7 @@ export function ProxyGroupsCustomGroupsPanel({
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2 text-fg-35 hover:text-red-300"
-                            onClick={() => removeModuleRule(group.id, r.id)}
+                            onClick={() => removeModuleRule({ kind: "custom", id: group.id }, r.id)}
                             title="删除规则集"
                             aria-label={`删除 ${r.name} 规则集`}
                           >
@@ -375,7 +375,7 @@ export function ProxyGroupsCustomGroupsPanel({
                             currentTarget={{ kind: "custom", id: group.id, name: group.name }}
                             onMove={(target) => {
                               if (isRuleSetMoveTarget(target)) {
-                                moveModuleRule(group.id, rule.id, target);
+                                moveModuleRule({ kind: "custom", id: group.id }, rule.id, target);
                               }
                             }}
                           />
@@ -384,7 +384,7 @@ export function ProxyGroupsCustomGroupsPanel({
                             variant="ghost"
                             size="sm"
                             className="h-7 px-2 text-fg-35 hover:text-red-300"
-                            onClick={() => removeModuleRule(group.id, rule.id)}
+                            onClick={() => removeModuleRule({ kind: "custom", id: group.id }, rule.id)}
                             title="删除规则集"
                             aria-label={`删除 ${rule.name} 规则集`}
                           >
@@ -400,6 +400,7 @@ export function ProxyGroupsCustomGroupsPanel({
                       item={item}
                       targets={manualRuleTargets}
                       currentTargetName={group.name}
+                      currentTarget={{ kind: "custom", id: group.id, name: group.name }}
                       onMove={moveManualRule}
                       onRemove={({ index }) => removeCustomRule(index)}
                     />

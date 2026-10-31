@@ -220,7 +220,7 @@ describe("ProxyGroupsCustomRules", () => {
     expect(html).toContain("规则集 (RULE-SET)");
     expect(mocks.captures.inputs).toHaveLength(1);
     mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [expect.objectContaining({
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [expect.objectContaining({
       name: "udemy", path: url, behavior: "domain", id: "udemy",
     })]);
     expect(mocks.store.addCustomRule).not.toHaveBeenCalled();
@@ -239,7 +239,7 @@ describe("ProxyGroupsCustomRules", () => {
     expect(detectRuleSet).toHaveBeenCalledTimes(1);
     expect(setters[1]).not.toHaveBeenCalled();
     resolve({ name: "remote", path: url, format: "yaml", behavior: "classical" });
-    await vi.waitFor(() => expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [expect.objectContaining({ path: url, format: "yaml", behavior: "classical" })]));
+    await vi.waitFor(() => expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [expect.objectContaining({ path: url, format: "yaml", behavior: "classical" })]));
     expect(setters[1]).toHaveBeenCalledWith("");
   });
 
@@ -273,11 +273,11 @@ describe("ProxyGroupsCustomRules", () => {
     mocks.store.customRuleSets = [{ id: "udemy", path: "geosite/udemy.mrs", target: { kind: "custom", id: "custom-1" } }];
     renderRules({ 0: "RULE-SET", 1: "https://local.subboost.test/geosite/udemy.mrs", 2: "Custom Group" });
     mocks.captures.buttons.find((button) => button.children === "添加规则").onClick();
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [expect.objectContaining({ id: "udemy-2", name: "udemy-2" })]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [expect.objectContaining({ id: "udemy-2", name: "udemy-2" })]);
     const batch = mocks.captures.batchDialogs[0];
     expect(batch.existingRuleSets[0].target).toBe("Custom Group");
     batch.onImportRuleSets([{ id: "udemy-3", name: "udemy-3", path: "geosite/udemy.mrs", target: "Custom Group", behavior: "domain" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenLastCalledWith("custom-1", [expect.objectContaining({ id: "udemy-3" })]);
+    expect(mocks.store.addModuleRules).toHaveBeenLastCalledWith({ kind: "custom", id: "custom-1" }, [expect.objectContaining({ id: "udemy-3" })]);
   });
 
   it.each(["DIRECT", "REJECT"])("requires a proxy group for rule sets instead of %s", (target) => {

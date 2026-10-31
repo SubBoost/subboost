@@ -252,10 +252,10 @@ describe("public ProxyGroupsCategories branch coverage", () => {
     const rule = { id: "openai", name: "OpenAI", behavior: "domain", path: "geosite/openai.mrs" };
 
     card.onAddRules([rule]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("ad", [rule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "ad" }, [rule]);
 
     card.onAddRulesToModule("streaming-west", [rule]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("streaming-west", [rule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "streaming-west" }, [rule]);
     expect(mocks.store.toggleProxyGroup).not.toHaveBeenCalledWith("streaming-west");
 
     card.onAddRulesToModule("youtube", [rule]);
@@ -263,10 +263,10 @@ describe("public ProxyGroupsCategories branch coverage", () => {
 
     card.onAddRuleToCustomGroup("missing", rule);
     card.onAddRuleToCustomGroup("custom", rule);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom", [rule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom" }, [rule]);
 
     mocks.store.customRuleSets = [{ id: "openai", name: "OpenAI", behavior: "domain", path: "geosite/openai.mrs", target: "🛑 Custom Group" }];
     card.onAddRuleToCustomGroup("custom", rule);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom", [rule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom" }, [rule]);
   });
 });

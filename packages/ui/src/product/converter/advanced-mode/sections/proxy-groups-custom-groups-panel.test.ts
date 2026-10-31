@@ -319,7 +319,7 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     expect(mocks.captures.moveMenus[0].kinds).toEqual(["module", "custom"]);
 
     mocks.captures.moveMenus[0].onMove({ kind: "custom", id: "custom-2", name: "Target" });
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("custom-1", "rule-a", {
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, "rule-a", {
       kind: "custom",
       id: "custom-2",
       name: "Target",
@@ -337,7 +337,7 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     mocks.store.enabledProxyGroups = [];
     renderPanel({ 0: new Set(["custom-1"]) });
     mocks.captures.moveMenus[0].onMove({ kind: "module", id: "fallback", name: "Fallback" });
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("custom-1", "rule-a", {
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, "rule-a", {
       kind: "module",
       id: "fallback",
       name: "Fallback",
@@ -359,19 +359,19 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     );
     const builtinMove = mocks.captures.moveMenus.find((menu: any) => menu.ariaLabel === "移动 Builtin A 规则集");
     builtinMove.onMove({ kind: "module", id: "fallback", name: "Fallback" });
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("custom-1", "builtin-a", {
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, "builtin-a", {
       kind: "module",
       id: "fallback",
       name: "Fallback",
     });
 
     builtinMove.onMove({ kind: "module", id: "auto", name: "Auto" });
-    expect(mocks.store.moveModuleRule).toHaveBeenLastCalledWith("custom-1", "builtin-a", {
+    expect(mocks.store.moveModuleRule).toHaveBeenLastCalledWith({ kind: "custom", id: "custom-1" }, "builtin-a", {
       kind: "module", id: "auto", name: "Auto",
     });
 
     mocks.captures.buttons.find((button: any) => button["aria-label"] === "删除 Builtin A 规则集").onClick();
-    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith("custom-1", "builtin-a");
+    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, "builtin-a");
   });
 
   it("updates manual rules, deletes rule rows, and renders empty state", () => {
@@ -388,7 +388,7 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     expect(mocks.store.removeCustomRule).toHaveBeenCalledWith(0);
 
     mocks.captures.buttons.find((props: any) => props["aria-label"] === "删除 Rule A 规则集").onClick();
-    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith("custom-1", "rule-a");
+    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, "rule-a");
 
     mocks.store.customProxyGroups = [];
     renderPanel();
@@ -504,7 +504,7 @@ describe("ProxyGroupsCustomGroupsPanel", () => {
     renderPanel({ 0: new Set(["custom-1"]) });
     mocks.captures.moveMenus[0].onMove({ kind: "module", id: "fallback", name: "Fallback" });
     expect(mocks.store.toggleProxyGroup).not.toHaveBeenCalled();
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("custom-1", "rule-a", {
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, "rule-a", {
       kind: "module",
       id: "fallback",
       name: "Fallback",

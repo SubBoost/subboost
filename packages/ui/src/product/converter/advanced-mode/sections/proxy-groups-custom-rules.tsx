@@ -214,7 +214,7 @@ export function ProxyGroupsCustomRules() {
           ...PROXY_GROUP_MODULES.flatMap((module) => module.rules.map((rule) => rule.id)),
           ...customRuleSets.map((rule) => rule.id),
         ]);
-        addModuleRules(target.id, [{ ...ruleSet, id, name: id, noResolve: newRuleNoResolve }]);
+        addModuleRules(target, [{ ...ruleSet, id, name: id, noResolve: newRuleNoResolve }]);
         setNewRuleValue("");
       };
       runRuleSetOperation((signal) => {
@@ -322,7 +322,7 @@ export function ProxyGroupsCustomRules() {
         onImportRuleSets={(rules) => {
           for (const rule of rules) {
             const target = toStableRuleTarget(resolveTargetName(rule.target), moduleNames, customProxyGroups);
-            if (typeof target !== "string") addModuleRules(target.id, [rule]);
+            if (typeof target !== "string") addModuleRules(target, [rule]);
           }
         }}
         onImport={(rules) =>

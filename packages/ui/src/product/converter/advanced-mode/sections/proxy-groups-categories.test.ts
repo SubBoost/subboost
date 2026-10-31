@@ -322,20 +322,20 @@ describe("ProxyGroupsCategories", () => {
     card.onToggleRulesExpanded();
     expect(setters[3]).toHaveBeenCalledWith(expect.any(Function));
     card.onAddRules([{ id: "rule-a" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("auto", [{ id: "rule-a" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "auto" }, [{ id: "rule-a" }]);
     card.onAddRulesToModule("fallback", [{ id: "rule-b" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("fallback", [{ id: "rule-b" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "fallback" }, [{ id: "rule-b" }]);
     expect(mocks.store.toggleProxyGroup).toHaveBeenCalledWith("fallback");
 
     mocks.store.toggleProxyGroup.mockClear();
     card.onAddRulesToModule("auto", [{ id: "rule-c" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("auto", [{ id: "rule-c" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "auto" }, [{ id: "rule-c" }]);
     expect(mocks.store.toggleProxyGroup).not.toHaveBeenCalled();
 
     card.onRemoveExtraRule("rule-a");
-    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith("auto", "rule-a");
+    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith({ kind: "module", id: "auto" }, "rule-a");
     card.onMoveRule("rule-a", "top");
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("auto", "rule-a", "top");
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith({ kind: "module", id: "auto" }, "rule-a", "top");
     card.onMoveManualRule("manual-1", { kind: "module", id: "fallback", name: "Fallback" });
     expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", {
       target: { kind: "module", id: "fallback" },
@@ -379,13 +379,13 @@ describe("ProxyGroupsCategories", () => {
 
     const customRule = { id: "geo", name: "Geo", behavior: "domain", path: "geo.txt", noResolve: true };
     mocks.captures.moduleCards[0].onAddRuleToCustomGroup("custom-1", customRule);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [customRule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [customRule]);
 
     mocks.store.customRuleSets = [{ id: "geo", name: "Geo", behavior: "domain", path: "geo.txt", target: "Custom" }];
     mocks.store.addModuleRules.mockClear();
     renderCategories({ 0: new Set(["core"]) });
     mocks.captures.moduleCards[0].onAddRuleToCustomGroup("custom-1", customRule);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [customRule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [customRule]);
 
     mocks.store.customProxyGroups = [{ id: "custom-1", name: "Custom" }];
     renderCategories({ 0: new Set(["core"]) });
@@ -399,7 +399,7 @@ describe("ProxyGroupsCategories", () => {
       path: "/geo-off.txt",
       noResolve: false,
     });
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [
       {
         id: "geo-no-resolve-off",
         name: "Geo Off",

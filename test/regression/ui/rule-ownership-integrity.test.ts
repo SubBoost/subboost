@@ -172,4 +172,45 @@ describe("moved rule integrity", () => {
     expect(h.state().customRuleSets[0]).toEqual(expect.objectContaining({ target: name }));
     expect(h.state().customRuleSets[0].noResolve).toBeUndefined();
   });
+
+  it("keeps the custom group identity for add, edit, move and delete when ids collide", () => {
+    const custom = { kind: "custom" as const, id: "cn" };
+    const h = harness({ enabledProxyGroups: ["select"],
+      customProxyGroups: [{ id: "cn", name: "Regional", emoji: "", groupType: "select" }] });
+    h.groups.addModuleRules(custom, [{ id: "own-set", name: "Own Set", behavior: "domain", path: "geosite/own-set.mrs" }]);
+    expect(h.state().customRuleSets[0].target).toEqual(custom);
+    expect(buildGeneratedRuleEntries({ ...h.state(), enabledModules: h.state().enabledProxyGroups })
+      .find((entry) => entry.key === "custom-rule-set:own-set")?.target).toBe("Regional");
+    h.groups.updateModuleRule(custom, "own-set", { noResolve: true });
+    expect(h.state().customRuleSets[0].noResolve).toBe(true);
+    h.groups.moveModuleRule(custom, "own-set", { kind: "module", id: "ai" });
+    expect(h.state().customRuleSets[0].target).toEqual({ kind: "module", id: "ai" });
+    h.groups.moveModuleRule("ai", "own-set", custom);
+    expect(h.state().customRuleSets[0].target).toEqual(custom);
+    h.groups.removeModuleRule(custom, "own-set");
+    expect(h.state().customRuleSets).toEqual([]);
+  });
+
+  it("moves and deletes a preset from a custom group sharing a built-in id", () => {
+    const custom = { kind: "custom" as const, id: "cn" };
+    const h = harness({ enabledProxyGroups: ["select", "microsoft"],
+      customProxyGroups: [{ id: "cn", name: "Regional", emoji: "", groupType: "select" }] });
+    h.groups.moveModuleRule("microsoft", "onedrive", custom);
+    h.templates.toggleProxyGroup("microsoft");
+    h.groups.moveModuleRule(custom, "onedrive", { kind: "module", id: "ai" });
+    expect(h.state().builtinRuleEdits["module:microsoft:onedrive"].target).toEqual({ kind: "module", id: "ai" });
+    h.groups.moveModuleRule("ai", "onedrive", custom);
+    h.groups.removeModuleRule(custom, "onedrive");
+    expect(h.state().builtinRuleEdits["module:microsoft:onedrive"].enabled).toBe(false);
+  });
+
+  it("adds a preset to a custom group whose id matches its source module", () => {
+    const custom = { kind: "custom" as const, id: "microsoft" };
+    const h = harness({ enabledProxyGroups: ["select"],
+      customProxyGroups: [{ id: "microsoft", name: "Regional", emoji: "", groupType: "select" }] });
+    h.groups.addModuleRules(custom, [{ id: "onedrive", name: "OneDrive", behavior: "domain", path: "geosite/onedrive.mrs" }]);
+    expect(h.state().builtinRuleEdits["module:microsoft:onedrive"].target).toEqual(custom);
+    expect(buildGeneratedRuleEntries({ ...h.state(), enabledModules: h.state().enabledProxyGroups })
+      .find((entry) => entry.key === "module:microsoft:onedrive")?.target).toBe("Regional");
+  });
 });

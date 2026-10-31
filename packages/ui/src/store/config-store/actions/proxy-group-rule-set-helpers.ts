@@ -77,18 +77,6 @@ export function resolveMoveTargetName(
   return group?.name?.trim() || null;
 }
 
-export function resolveRuleSetContainerTargetName(
-  id: string,
-  customProxyGroups: CustomProxyGroup[],
-  proxyGroupNameOverrides?: Record<string, string>
-): string | null {
-  return (
-    resolveModuleTargetName(id, proxyGroupNameOverrides) ||
-    customProxyGroups.find((group) => group.id === id)?.name?.trim() ||
-    null
-  );
-}
-
 export function compactBuiltinRuleEdits(edits: BuiltinRuleEdits): BuiltinRuleEdits {
   const next: BuiltinRuleEdits = {};
   for (const [key, edit] of Object.entries(edits || {})) {

@@ -392,6 +392,7 @@ export function ProxyGroupsModuleRulesPanel({
               item={item}
               targets={manualRuleTargets}
               currentTargetName={moduleDisplayName}
+              currentTarget={{ kind: "module", id: module.id, name: moduleDisplayName }}
               onMove={(nextItem, target) => onMoveManualRule(nextItem.rule.id, target)}
               onRemove={({ index }) => onRemoveManualRule(index)}
             />

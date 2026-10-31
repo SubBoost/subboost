@@ -563,7 +563,7 @@ export function ProxyGroupsRulesLibrary() {
                     skippedExistingCount =
                       selectedRules.length - rulesToAdd.length;
                     if (rulesToAdd.length > 0) {
-                      addModuleRules(group.id, rulesToAdd);
+                      addModuleRules({ kind: "custom", id: group.id }, rulesToAdd);
                       addedCount = rulesToAdd.length;
                     }
                   } else {
@@ -607,7 +607,7 @@ export function ProxyGroupsRulesLibrary() {
                     if (toAdd.length > 0) {
                       if (!enabledProxyGroups.includes(mod.id))
                         toggleProxyGroup(mod.id);
-                      addModuleRules(mod.id, toAdd);
+                      addModuleRules({ kind: "module", id: mod.id }, toAdd);
                       addedCount = toAdd.length;
                     }
                   }

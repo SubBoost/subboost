@@ -523,22 +523,22 @@ export function ProxyGroupsCategories() {
                                 toggleModuleRules(module.id)
                               }
                               onAddRules={(rules) =>
-                                addModuleRules(module.id, rules)
+                                addModuleRules({ kind: "module", id: module.id }, rules)
                               }
                               onAddRulesToModule={(moduleId, rules) => {
-                                addModuleRules(moduleId, rules);
+                                addModuleRules({ kind: "module", id: moduleId }, rules);
                                 if (!enabledProxyGroups.includes(moduleId)) {
                                   toggleProxyGroup(moduleId);
                                 }
                               }}
                               onAddRuleToCustomGroup={(groupId, rule) => {
-                                addModuleRules(groupId, [rule]);
+                                addModuleRules({ kind: "custom", id: groupId }, [rule]);
                               }}
                               onRemoveExtraRule={(ruleId) =>
-                                removeModuleRule(module.id, ruleId)
+                                removeModuleRule({ kind: "module", id: module.id }, ruleId)
                               }
                               onMoveRule={(ruleId, target) =>
-                                moveModuleRule(module.id, ruleId, target)
+                                moveModuleRule({ kind: "module", id: module.id }, ruleId, target)
                               }
                               onMoveManualRule={(ruleId, target) =>
                                 updateCustomRule(ruleId, { target: { kind: target.kind, id: target.id } })

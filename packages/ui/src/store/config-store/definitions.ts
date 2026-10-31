@@ -285,16 +285,16 @@ export interface ConfigActions {
   updateProxyGroupAdvanced: (moduleId: string, patch: Partial<ProxyGroupAdvancedConfig>) => void;
 
   // 规则集与内置规则编辑
-  addModuleRules: (moduleId: string, rules: RuleSetDraft[]) => void;
+  addModuleRules: (moduleId: ProxyGroupRuleTarget, rules: RuleSetDraft[]) => void;
   updateModuleRule: (
-    moduleId: string,
+    moduleId: ProxyGroupRuleTarget,
     ruleId: string,
     rule: Partial<Omit<RuleSetDraft, "id">>,
     sourceTarget?: ProxyGroupRuleTarget
   ) => void;
-  removeModuleRule: (moduleId: string, ruleId: string, sourceTarget?: ProxyGroupRuleTarget) => void;
+  removeModuleRule: (moduleId: ProxyGroupRuleTarget, ruleId: string, sourceTarget?: ProxyGroupRuleTarget) => void;
   moveModuleRule: (
-    moduleId: string,
+    moduleId: ProxyGroupRuleTarget,
     ruleId: string,
     target: { kind: "module" | "custom"; id: string },
     sourceTarget?: ProxyGroupRuleTarget
