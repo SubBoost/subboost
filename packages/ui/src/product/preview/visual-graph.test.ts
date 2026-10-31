@@ -307,6 +307,48 @@ describe("VisualGraph", () => {
     ]);
   });
 
+  it("shows moved builtin rules in their custom destination and omits disabled destinations", () => {
+    mocks.generatedProxyGroups = [
+      { name: "⚡ 自动选择", type: "url-test", proxies: ["DIRECT"] },
+      { name: "🧩 Custom", type: "select", proxies: ["DIRECT"] },
+    ];
+    mocks.store.builtinRuleEdits = { "module:auto:r1": { target: { kind: "custom", id: "custom-1" } } };
+    mocks.store.proxyGroupOrder = [];
+    renderGraph();
+    let groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    expect(groups.find((group: any) => group.id === "custom:custom-1").rules)
+      .toEqual([{ id: "r1", name: "Rule One", behavior: "domain" }]);
+    expect(groups.find((group: any) => group.id === "module:auto").rules).toEqual([]);
+
+    mocks.store.customProxyGroups = [{ ...mocks.store.customProxyGroups[0], enabled: false }];
+    mocks.generatedProxyGroups = [{ name: "⚡ 自动选择", type: "url-test", proxies: ["DIRECT"] }];
+    renderGraph();
+    groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    expect(groups.find((group: any) => group.id === "module:auto").rules).toEqual([]);
+  });
+
+  it("omits custom rules aimed at a disabled builtin group from the preview", () => {
+    mocks.store.enabledProxyGroups = ["select"];
+    mocks.store.customRules = [
+      { id: "inactive", type: "DOMAIN", value: "local.subboost.test", target: { kind: "module", id: "auto" } },
+      { id: "active", type: "DOMAIN", value: "local.subboost.test", target: "DIRECT" },
+    ];
+    renderGraph();
+    expect(mocks.captures.customRulesPreview.customRules.map((rule: any) => rule.id)).toEqual(["active"]);
+  });
+
+  it("treats a shared name as the active custom group when the builtin group is disabled", () => {
+    mocks.store.enabledProxyGroups = ["select"];
+    mocks.store.customProxyGroups = [{ id: "custom-1", name: "⚡ 自动选择", emoji: "", groupType: "select" }];
+    mocks.store.builtinRuleEdits = { "module:select:sel": { target: "⚡ 自动选择" } };
+    mocks.generatedProxyGroups = [{ name: "⚡ 自动选择", type: "select", proxies: ["DIRECT"] }];
+    mocks.store.proxyGroupOrder = [];
+    renderGraph();
+    const groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    expect(groups.find((group: any) => group.id === "custom:custom-1").rules)
+      .toEqual([{ id: "sel", name: "Select Rule", behavior: "classical" }]);
+  });
+
   it("falls back to generated order and truncates long node lists", () => {
     mocks.store.proxyGroupOrder = [];
     mocks.store.dialerProxyGroups = [{ id: "d2", name: "Disabled", enabled: false }];

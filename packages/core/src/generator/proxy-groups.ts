@@ -17,17 +17,15 @@ import type {
 } from "@subboost/core/types/config";
 import { resolveProxyGroupMembers } from "@subboost/core/proxy-group-advanced";
 import { isSubscriptionInfoNodeName } from "@subboost/core/subscription/info-node-name";
-import { isDisabledCustomProxyGroupTarget } from "@subboost/core/proxy-group-targets";
 
 import { PROXY_GROUP_MODULES, type ProxyGroupModule, type ProxyGroupRule } from "./proxy-group-modules";
 import {
   EXPERIMENTAL_CN_RULE,
-  buildModuleNameMap,
   generateRules,
   resolveModuleName,
   resolveModuleNameFromModule,
 } from "./rules";
-import { getModuleRuleOrderKey } from "./module-rules";
+import { createRuleTargetActivation } from "./rule-target-activation";
 import { buildRuleSetUrlFromPath } from "@subboost/core/rules/rule-model";
 import { buildTypedProxyGroup } from "./proxy-group-type";
 
@@ -67,6 +65,7 @@ export interface ProxyGroupGenerateOptions {
   experimentalCnUseCnRuleSet?: boolean;
   proxyGroupNameOverrides?: Record<string, string>;
   ruleOrder?: string[];
+  availablePolicyTargets?: string[];
 }
 
 /** @deprecated Use `ProxyGroupGenerateOptions`; retained for 2.x source compatibility. */
@@ -475,20 +474,18 @@ export function generateRuleProviders(options: ProxyGroupGenerateOptions): Recor
     enabledModules,
     ruleProviderBaseUrl,
     customRuleSets = [],
-    builtinRuleEdits,
-    customProxyGroups = [],
   } = options;
   const providers: Record<string, RuleProvider> = {};
   const enabledSet = new Set(enabledModules);
-  const moduleNames = buildModuleNameMap(options.proxyGroupNameOverrides);
+  const activation = createRuleTargetActivation({
+    ...options,
+    availablePolicyTargets: options.availablePolicyTargets ?? options.nodes.map((node) => node.name),
+  });
 
   // 预设模块的规则
   for (const proxyModule of PROXY_GROUP_MODULES) {
-    if (!enabledSet.has(proxyModule.id)) continue;
-
     for (const rule of proxyModule.rules) {
-      const edit = builtinRuleEdits?.[getModuleRuleOrderKey(proxyModule.id, rule.id)];
-      if (edit?.enabled === false) continue;
+      if (!activation.builtinRuleActive(proxyModule.id, rule.id)) continue;
       providers[rule.id] = {
         type: "http",
         behavior: rule.behavior,
@@ -513,7 +510,7 @@ export function generateRuleProviders(options: ProxyGroupGenerateOptions): Recor
 
   // 用户新增规则集统一由 customRuleSets 提供，不再挂在某个分流组对象上。
   for (const ruleSet of customRuleSets) {
-    if (isDisabledCustomProxyGroupTarget(ruleSet.target, { moduleNames, customProxyGroups })) continue;
+    if (!activation.customTargetActive(ruleSet.target)) continue;
     if (!ruleSet?.id || !ruleSet.path || providers[ruleSet.id]) continue;
     providers[ruleSet.id] = {
       type: "http",

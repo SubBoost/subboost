@@ -578,7 +578,7 @@ export function generateClashConfig(options: GenerateOptions): ClashConfig {
     
     // 规则提供者（包含自定义分流组的规则）
     "rule-providers": {
-      ...generateRuleProviders(generateOpts),
+      ...generateRuleProviders({ ...generateOpts, availablePolicyTargets }),
     },
     
     // 规则（包含自定义分流组的规则）
