@@ -118,7 +118,7 @@ describe("moved rule ownership", () => {
         customRules: [{ id: "logic", type: "AND", value: "((RULE-SET,onedrive),(NETWORK,UDP))", target: "DIRECT" }],
         ruleProviderBaseUrl: "https://local.subboost.test/rules" },
     });
-    expect(config["rule-providers"].onedrive.url).toBe("https://local.subboost.test/rules/geosite/own-onedrive.mrs");
+    expect(config["rule-providers"]).toHaveProperty("onedrive.url", "https://local.subboost.test/rules/geosite/own-onedrive.mrs");
   });
 
   it("retains the experimental CN provider only for an active logical reference", () => {
@@ -131,7 +131,7 @@ describe("moved rule ownership", () => {
     const active = make("DIRECT");
     expect(active.rules).toContain("NOT,((RULE-SET,cn)),DIRECT");
     expect((active.rules as string[]).some((rule) => rule.startsWith("RULE-SET,cn,"))).toBe(false);
-    expect(active["rule-providers"].cn.url).toBe("https://local.subboost.test/rules/geosite/cn.mrs");
+    expect(active["rule-providers"]).toHaveProperty("cn.url", "https://local.subboost.test/rules/geosite/cn.mrs");
     const inactive = make({ kind: "module", id: "cn" });
     expect(inactive.rules).not.toContain("NOT,((RULE-SET,cn)),DIRECT");
     expect(inactive["rule-providers"]).not.toHaveProperty("cn");
@@ -146,7 +146,7 @@ describe("moved rule ownership", () => {
         customRules: [{ id: "logic", type: "NOT", value: "((RULE-SET,cn))", target: "DIRECT" }],
         ruleProviderBaseUrl: "https://local.subboost.test/rules" },
     });
-    expect(config["rule-providers"].cn.url).toBe("https://local.subboost.test/rules/geosite/own-cn.mrs");
+    expect(config["rule-providers"]).toHaveProperty("cn.url", "https://local.subboost.test/rules/geosite/own-cn.mrs");
     expect((config.rules as string[]).some((rule) => rule.startsWith("RULE-SET,cn,"))).toBe(false);
   });
 

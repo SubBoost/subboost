@@ -2,18 +2,27 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initialState } from "@subboost/ui/store/config-store/definitions";
-import type { ConfigState } from "@subboost/ui/store/config-store/definitions";
+import type { ConfigActions, ConfigState } from "@subboost/ui/store/config-store/definitions";
 import { computeGeneratedYaml } from "@subboost/ui/store/config-store/generated-yaml";
 import { resolveModuleName } from "@subboost/core/generator/rules";
 import type { VisualDisplayGroup } from "./preview/visual-graph/proxy-groups-preview";
 
-const mocks = vi.hoisted(() => ({
-  state: {} as Record<string, unknown>,
-  groups: [] as VisualDisplayGroup[],
-  searchResults: [] as Array<Record<string, string>>,
-}));
+type TestStore = ConfigState & Pick<ConfigActions, "setProxyGroupOrder">;
+
+const mocks = vi.hoisted(() => {
+  let state: TestStore | undefined;
+  return {
+    get state(): TestStore {
+      if (!state) throw new Error("Test store not initialized");
+      return state;
+    },
+    set state(value: TestStore) { state = value; },
+    groups: [] as VisualDisplayGroup[],
+    searchResults: [] as Array<Record<string, string>>,
+  };
+});
 vi.mock("@subboost/ui/store/config-store", () => ({
-  useConfigStore: (selector?: (state: Record<string, unknown>) => unknown) => selector ? selector(mocks.state) : mocks.state,
+  useConfigStore: (selector?: (state: TestStore) => unknown) => selector ? selector(mocks.state) : mocks.state,
 }));
 vi.mock("@subboost/ui/product/interactions", () => ({ useProductInteractionAdapter: () => ({}) }));
 vi.mock("./converter/advanced-mode/sections/proxy-groups-added-rule-sets", () => ({ ProxyGroupsAddedRuleSets: () => null }));
@@ -79,7 +88,7 @@ describe("real routing resolution in library and preview", () => {
     mocks.state.customRuleSets = [];
     mocks.state.customRules = [{ id: "plain", type: "DOMAIN", value: "local.subboost.test", target: "module:cn" }];
     mocks.state.builtinRuleEdits = { "module:microsoft:onedrive": { target: "Missing" } };
-    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state as ConfigState);
+    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state);
     const manager = renderToStaticMarkup(React.createElement(RulesManagementSection, { isExpanded: true, onToggle: vi.fn() }));
     expect(manager).toContain("local.subboost.test");
     expect(manager).not.toContain(">Missing<");
@@ -95,7 +104,7 @@ describe("real routing resolution in library and preview", () => {
     mocks.state.customProxyGroups = [];
     mocks.state.customRuleSets = [{ id: "fixture-collision-rule", name: "CollisionFixture", behavior: "domain", path: "geosite/fixture.mrs", target: "module:cn" }];
     mocks.state.builtinRuleEdits = { "module:microsoft:onedrive": { target: "module:cn" } };
-    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state as ConfigState);
+    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state);
     const library = renderToStaticMarkup(React.createElement(ProxyGroupsRulesLibrary));
     expect(library).toContain("已添加");
     expect(library).toContain("module:cn");
@@ -109,7 +118,7 @@ describe("real routing resolution in library and preview", () => {
     mocks.state.customProxyGroups = [{ id: "regional", name: "Regional", emoji: "", groupType: "select", enabled: false }];
     mocks.state.customRuleSets = [{ id: "named", name: "Named Set", behavior: "domain", path: "geosite/named.mrs", target: "Regional" }];
     mocks.state.customRules = [];
-    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state as ConfigState);
+    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state);
     const graph = renderToStaticMarkup(React.createElement(VisualGraph));
     expect(graph).toContain("Named Set");
     expect(graph).toContain('text-purple-500">1</div>');
@@ -122,7 +131,7 @@ describe("real routing resolution in library and preview", () => {
     mocks.state.customProxyGroups = [{ id: "regional", name, emoji: "", groupType: "select" }];
     mocks.state.customRuleSets = [];
     mocks.state.builtinRuleEdits = { "module:microsoft:onedrive": { target: { kind: "module", id: "cn" } } };
-    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state as ConfigState);
+    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state);
     let html = renderToStaticMarkup(React.createElement(ProxyGroupsRulesLibrary));
     expect(html).toContain("开启代理组");
     expect(html).not.toContain("已添加");
@@ -132,7 +141,7 @@ describe("real routing resolution in library and preview", () => {
     mocks.state.customProxyGroups = [{ id: "regional", name, emoji: "", groupType: "select", enabled: false }];
     mocks.state.customRuleSets = [{ id: "fixture-collision-rule", name: "CollisionFixture", behavior: "domain", path: "geosite/fixture.mrs", target: { kind: "custom", id: "regional" } }];
     mocks.state.builtinRuleEdits = {};
-    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state as ConfigState);
+    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state);
     html = renderToStaticMarkup(React.createElement(ProxyGroupsRulesLibrary));
     expect(html).not.toContain("已启用");
     expect(html).not.toContain("已添加");
@@ -144,7 +153,7 @@ describe("real routing resolution in library and preview", () => {
     mocks.state.customRuleSets = [];
     mocks.state.customRules = [];
     mocks.state.builtinRuleEdits = { "module:microsoft:onedrive": { target } };
-    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state as ConfigState);
+    mocks.state.generatedYaml = computeGeneratedYaml(mocks.state);
     expect(String(mocks.state.generatedYaml)).toContain(`RULE-SET,onedrive,${target}`);
     const graph = renderToStaticMarkup(React.createElement(VisualGraph));
     expect(graph).toContain("OneDrive");
