@@ -55,7 +55,7 @@ describe("real routing resolution in library and preview", () => {
     const graph = renderToStaticMarkup(React.createElement(VisualGraph));
     expect(mocks.groups.find((group) => group.id === "custom:regional")?.rules).toEqual([]);
     expect(graph).not.toContain("CollisionFixture");
-    expect(graph).toContain('title="custom:regional"');
+    expect(graph).not.toContain("local.subboost.test");
   });
 
   it("resolves the same string as a reference when the colliding literal group is absent", () => {

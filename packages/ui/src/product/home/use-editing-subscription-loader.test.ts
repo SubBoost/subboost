@@ -293,7 +293,7 @@ describe("useEditingSubscriptionLoader", () => {
       customProxyGroups: [
         { id: "custom-1", name: "Custom", emoji: "", groupType: "select", enabled: false, advanced: {} },
       ],
-      ruleOrder: ["custom-rule:active-target", "custom-rule-set:custom-ai"],
+      ruleOrder: ["custom-rule:disabled-target", "custom-rule:active-target", "custom-rule-set:custom-ai"],
       proxyGroupAdvancedModeEnabled: true,
       customRuleSets: [
         {
