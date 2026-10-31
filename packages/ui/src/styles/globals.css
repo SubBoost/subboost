@@ -244,56 +244,79 @@
 
   .proxy-group-custom-rule-editor-trailing {
     flex: 0 0 auto;
-    grid-template-columns: 120px auto 92px;
+    grid-template-columns: max-content auto 92px;
     min-width: min(329px, 100%);
   }
 
   .proxy-group-custom-rule-editor-target {
-    flex: 0 0 120px !important;
-    min-width: 120px !important;
-    max-width: 120px !important;
-    width: 120px !important;
+    gap: 0.125rem;
+    height: auto !important;
+    min-height: 1.75rem;
+    min-width: 0 !important;
+    padding-block: 0.25rem !important;
+    width: auto !important;
+  }
+
+  .proxy-group-custom-rule-editor-target > span {
+    display: block !important;
+    overflow: visible !important;
+    text-align: left;
+    white-space: normal;
+    -webkit-line-clamp: unset !important;
+  }
+
+  .proxy-group-custom-rule-editor-target > svg {
+    flex-shrink: 0;
+  }
+
+  .proxy-group-rule-no-resolve-label {
+    white-space: nowrap;
+  }
+
+  @container (max-width: 16rem) {
+    .proxy-group-rule-row > :last-child:has(.proxy-group-rule-no-resolve-label) {
+      flex-wrap: wrap;
+      width: 7.25rem;
+    }
   }
 
   @container (max-width: 37rem) {
     .proxy-group-custom-rule-editor-trailing {
-      flex: 1 1 20.5rem;
-      grid-template-columns: minmax(120px, 10rem) auto 92px;
+      flex: 1 1 21rem;
+      grid-template-columns: minmax(0, auto) auto 92px;
       justify-content: space-between;
       width: 100%;
     }
 
     .proxy-group-custom-rule-editor-target {
-      flex: 1 1 120px !important;
-      min-width: 120px !important;
-      max-width: none !important;
-      width: auto !important;
-    }
-  }
-
-  @container (max-width: 24rem) {
-    .proxy-group-rule-no-resolve-label {
-      display: none;
-    }
-
-    .proxy-group-custom-rule-editor-trailing {
-      grid-template-columns: minmax(96px, 8rem) auto 92px;
-    }
-
-    .proxy-group-custom-rule-editor-target {
-      min-width: 96px !important;
-      padding-inline: 0.25rem !important;
+      padding-inline: 0.5rem !important;
     }
 
     .proxy-group-custom-rule-editor-trailing > :nth-child(2) {
       gap: 0.125rem !important;
-      padding-inline: 0.125rem !important;
+      padding-inline: 0.25rem !important;
     }
   }
 
-  .proxy-group-custom-rule-editor-trailing .proxy-group-rule-no-resolve-label {
-    display: inline;
-    white-space: nowrap;
+  /* The primary field (11rem), trailing controls (21rem), and gap no longer fit together. */
+  @container (max-width: 32.25rem) {
+    .proxy-group-custom-rule-editor-trailing {
+      grid-template-columns: minmax(0, 9rem) auto 92px;
+    }
+  }
+
+  @container (max-width: 24rem) {
+    .proxy-group-custom-rule-editor-trailing {
+      grid-template-columns: minmax(0, 8.5rem) auto 92px;
+    }
+
+    .proxy-group-custom-rule-editor-target {
+      padding-inline: 0.25rem !important;
+    }
+
+    .proxy-group-custom-rule-editor-trailing > :nth-child(2) {
+      padding-inline: 0.125rem !important;
+    }
   }
 
   @container (width < 18rem) {
@@ -304,7 +327,8 @@
     .proxy-group-custom-rule-editor-target {
       grid-column: 1 / -1;
       justify-self: start;
-      max-width: 8rem !important;
+      max-width: 100%;
+      width: max-content !important;
     }
 
     .proxy-group-custom-rule-editor-trailing > :nth-child(2) {
