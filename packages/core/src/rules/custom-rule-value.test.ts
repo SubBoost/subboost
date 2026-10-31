@@ -16,6 +16,11 @@ describe("logic rule payload", () => {
     expect(collectLogicRuleSetIds("DOMAIN-REGEX", "(RULE-SET,fake)")).toEqual([]);
     expect(collectLogicRuleSetIds("NOT", "((RULE-SET,broken),(NETWORK,UDP))")).toEqual([]);
   });
+  it("does not collect dependencies from invalid nested conditions", () => {
+    expect(collectLogicRuleSetIds("AND", "((RULE-SET,onedrive),(NOT,((RULE-SET,cn),(NETWORK,UDP))))")).toEqual([]);
+    expect(collectLogicRuleSetIds("AND", "((RULE-SET,onedrive),(DOMAIN-REGEX,))")).toEqual([]);
+    expect(collectLogicRuleSetIds("AND", "((RULE-SET,onedrive),(DOMAIN-REGEX,one,two))")).toEqual(["onedrive"]);
+  });
   it("accepts the Clash Verge payload as-is and strips whitespace around tokens", () => {
     expect(normalizeLogicRulePayload("AND", TAILSCALE_PAYLOAD)).toEqual({ ok: true, value: TAILSCALE_PAYLOAD });
     expect(normalizeLogicRulePayload("AND", " ( (PROCESS-NAME, tailscaled) , (NETWORK,UDP),(SRC-PORT , 41641) ) "))

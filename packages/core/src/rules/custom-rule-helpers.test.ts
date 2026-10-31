@@ -19,6 +19,20 @@ import {
 import type { CustomProxyGroup, CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 
 describe("custom routing rule set helpers", () => {
+  it("retains explicit formats when listing literal and fallback rule sets", () => {
+    const items = collectCustomRoutingRuleSets({
+      customProxyGroups: [], availablePolicyTargets: ["Node", "DIRECT"], fallbackPolicyTarget: "Node",
+      customRuleSets: [
+        { id: "text", name: "Text", behavior: "domain", format: "text", path: "https://local.subboost.test/rules/text.txt", target: "DIRECT" },
+        { id: "fallback", name: "Fallback", behavior: "domain", path: "geosite/fallback.mrs", target: "Missing" },
+      ],
+    });
+    expect(items).toEqual([
+      expect.objectContaining({ id: "text", format: "text", rawTarget: "DIRECT", target: expect.objectContaining({ name: "DIRECT" }) }),
+      expect.objectContaining({ id: "fallback", rawTarget: "Missing", target: expect.objectContaining({ name: "Node" }) }),
+    ]);
+    expect(items[1]).not.toHaveProperty("format");
+  });
   it("keeps literal and fallback policies addressable without converting their stored targets", () => {
     const items = collectCustomRoutingRuleSets({
       customProxyGroups: [], enabledModules: ["select"], availablePolicyTargets: ["🚀 节点选择", "module:cn", "DIRECT", "REJECT"],

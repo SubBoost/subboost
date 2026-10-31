@@ -121,6 +121,35 @@ describe("moved rule ownership", () => {
     expect(config["rule-providers"].onedrive.url).toBe("https://local.subboost.test/rules/geosite/own-onedrive.mrs");
   });
 
+  it("retains the experimental CN provider only for an active logical reference", () => {
+    const make = (target: ProxyGroupRuleTarget) => generateClashConfig({
+      nodes: [], template: "full",
+      userConfig: { enabledGroups: ["select"], enabledRules: ["select"], experimentalCnUseCnRuleSet: false,
+        customRules: [{ id: "logic", type: "NOT", value: "((RULE-SET,cn))", target }],
+        ruleProviderBaseUrl: "https://local.subboost.test/rules" },
+    });
+    const active = make("DIRECT");
+    expect(active.rules).toContain("NOT,((RULE-SET,cn)),DIRECT");
+    expect((active.rules as string[]).some((rule) => rule.startsWith("RULE-SET,cn,"))).toBe(false);
+    expect(active["rule-providers"].cn.url).toBe("https://local.subboost.test/rules/geosite/cn.mrs");
+    const inactive = make({ kind: "module", id: "cn" });
+    expect(inactive.rules).not.toContain("NOT,((RULE-SET,cn)),DIRECT");
+    expect(inactive["rule-providers"]).not.toHaveProperty("cn");
+  });
+
+  it("uses custom CN provider metadata for a logical reference even when its direct target is disabled", () => {
+    const config = generateClashConfig({
+      nodes: [], template: "full",
+      customRuleSets: [{ id: "cn", name: "Custom CN", behavior: "domain", path: "geosite/own-cn.mrs",
+        target: { kind: "module", id: "cn" } }],
+      userConfig: { enabledGroups: ["select"], enabledRules: ["select"], experimentalCnUseCnRuleSet: false,
+        customRules: [{ id: "logic", type: "NOT", value: "((RULE-SET,cn))", target: "DIRECT" }],
+        ruleProviderBaseUrl: "https://local.subboost.test/rules" },
+    });
+    expect(config["rule-providers"].cn.url).toBe("https://local.subboost.test/rules/geosite/own-cn.mrs");
+    expect((config.rules as string[]).some((rule) => rule.startsWith("RULE-SET,cn,"))).toBe(false);
+  });
+
   it("keeps explicit available policy targets and suppresses missing targets", () => {
     const entries = buildGeneratedRuleEntries({
       enabledModules: [], customRules: [], availablePolicyTargets: ["Node A", "DIRECT"],

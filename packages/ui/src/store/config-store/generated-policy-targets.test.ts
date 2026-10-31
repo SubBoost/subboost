@@ -16,4 +16,15 @@ describe("generated policy targets", () => {
     expect(getGeneratedPolicyTargetContext("proxy-groups: [")).toBeUndefined();
     expect(getGeneratedPolicyTargetContext("proxy-groups: []")).toBeUndefined();
   });
+
+  it("ignores malformed generated entries while retaining real groups and nodes", () => {
+    const yaml = [
+      "proxy-groups:", "  - null", "  - not-a-group", "  - name: 42", "  - name: Regional",
+      "proxies:", "  - null", "  - {}", "  - name: module:cn",
+    ].join("\n");
+    expect(getGeneratedPolicyTargetContext(yaml)).toEqual({
+      availablePolicyTargets: ["Regional", "module:cn", "DIRECT", "REJECT"],
+      fallbackPolicyTarget: "Regional",
+    });
+  });
 });

@@ -13,6 +13,19 @@ import {
 } from "./proxy-group-targets";
 
 describe("proxy group target helpers", () => {
+  it("keeps unavailable group identities distinct from active literal policies", () => {
+    const disabled = { id: "regional", name: "Regional", emoji: "", groupType: "select" as const, enabled: false };
+    const options = { moduleNames: { cn: "Domestic" }, enabledModules: [], customProxyGroups: [disabled] };
+    expect(resolveProxyGroupTargetContainer({ kind: "module", id: "missing" }, options)).toBeNull();
+    expect(resolveProxyGroupTargetContainer("Regional", options)).toEqual({ kind: "custom", id: "regional" });
+    expect(resolveProxyGroupTargetContainer("Regional", { ...options, availablePolicyTargets: ["Regional"] })).toBeNull();
+    expect(resolveProxyGroupTargetContainer("Domestic", { moduleNames: options.moduleNames })).toEqual({ kind: "module", id: "cn" });
+    expect(isDisabledCustomProxyGroupTarget("Regional", options)).toBe(true);
+    expect(isDisabledCustomProxyGroupTarget("Other", options)).toBe(false);
+    expect(isDisabledCustomProxyGroupTarget({ kind: "module", id: "cn" }, options)).toBe(false);
+    expect(isDisabledCustomProxyGroupTarget({ kind: "custom", id: "regional" }, options)).toBe(true);
+    expect(isDisabledCustomProxyGroupTarget("Regional", { moduleNames: {} })).toBe(false);
+  });
   it("keeps structured group identity and distinguishes active literal policies", () => {
     const options = { moduleNames: { cn: "Shared" }, enabledModules: [], availablePolicyTargets: ["Shared", "module:cn"],
       literalTargetNames: ["module:cn"], customProxyGroups: [{ id: "custom", name: "Shared", emoji: "", groupType: "select" as const }] };

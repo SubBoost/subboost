@@ -117,6 +117,7 @@ vi.mock("./visual-graph/proxy-groups-preview", () => ({
 }));
 
 import { VisualGraph } from "./visual-graph";
+import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 
 const nodes = [
   { name: "🇭🇰 Alpha", type: "ss" },
@@ -337,6 +338,41 @@ describe("VisualGraph", () => {
     ];
     renderGraph();
     expect(mocks.captures.customRulesPreview.customRules.map((rule: any) => rule.id)).toEqual(["active"]);
+  });
+
+  it("shows a CN IP rule moved to DIRECT with its current no-resolve setting", () => {
+    const cnModule = { id: "cn", name: "Domestic", rules: [{ id: "cn-ip", name: "CN IP", behavior: "ipcidr" }] };
+    (PROXY_GROUP_MODULES as any[]).push(cnModule);
+    try {
+      mocks.store.enabledProxyGroups = ["select"];
+      mocks.store.builtinRuleEdits = { "module:cn:cn-ip": { target: "DIRECT" } };
+      mocks.store.cnIpNoResolve = true;
+      mocks.generatedProxyGroups = [{ name: "🚀 节点选择", type: "select", proxies: ["DIRECT"] }];
+      renderGraph();
+      expect(mocks.captures.customRulesPreview.ruleSets).toContainEqual(
+        expect.objectContaining({ id: "cn-ip", target: "DIRECT", noResolve: true }),
+      );
+      mocks.store.cnIpNoResolve = false;
+      renderGraph();
+      expect(mocks.captures.customRulesPreview.ruleSets).toContainEqual(
+        expect.objectContaining({ id: "cn-ip", target: "DIRECT", noResolve: false }),
+      );
+    } finally {
+      (PROXY_GROUP_MODULES as any[]).pop();
+    }
+  });
+
+  it("shows only active rule sets under a relay target", () => {
+    mocks.store.enabledProxyGroups = ["select"];
+    mocks.store.customRuleSets = [
+      { id: "active", name: "Active", behavior: "domain", path: "geosite/active.mrs", target: "Relay" },
+      { id: "paused", name: "Paused", behavior: "domain", path: "geosite/paused.mrs", target: { kind: "module", id: "cn" } },
+    ];
+    mocks.store.builtinRuleEdits = { "module:auto:r1": { target: "Relay" } };
+    mocks.store.generatedYaml = "proxy-groups:\n  - name: Relay\nproxies:\n  - name: Beta\n";
+    renderGraph();
+    expect(mocks.captures.proxyGroupsPreview.displayGroups.find((group: any) => group.id === "dialer:d1").rules)
+      .toEqual([expect.objectContaining({ id: "r1" }), expect.objectContaining({ id: "active" })]);
   });
 
   it("treats a shared name as the active custom group when the builtin group is disabled", () => {

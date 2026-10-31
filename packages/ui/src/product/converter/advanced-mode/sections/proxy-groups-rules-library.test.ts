@@ -573,6 +573,21 @@ describe("ProxyGroupsRulesLibrary", () => {
     ]));
   });
 
+  it("allows a removed preset to be selected again and ignores a stale disabled destination", () => {
+    mocks.store.builtinRuleEdits = { "module:auto:netflix": { enabled: false } };
+    renderLibrary({ 0: [netflixRule], 1: "custom:custom-1" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" },
+      [expect.objectContaining({ id: "netflix" })]);
+
+    vi.clearAllMocks();
+    mocks.store.customProxyGroups = mocks.store.customProxyGroups.map((group: any) =>
+      group.id === "custom-1" ? { ...group, enabled: false } : group);
+    renderLibrary({ 0: [telegramRule], 1: "custom:custom-1" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+  });
+
   it("covers empty hints, loading-more state, disabled builtin edits, and optional interactions", () => {
     mocks.search.ruleSearchKeyword = "";
     mocks.search.searchResults = [];
