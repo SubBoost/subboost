@@ -259,7 +259,9 @@
 
   .proxy-group-custom-rule-editor-target > span {
     display: block !important;
+    min-width: 0;
     overflow: visible !important;
+    overflow-wrap: anywhere;
     text-align: left;
     white-space: normal;
     -webkit-line-clamp: unset !important;
@@ -277,6 +279,14 @@
     .proxy-group-rule-row > :last-child:has(.proxy-group-rule-no-resolve-label) {
       flex-wrap: wrap;
       width: 7.25rem;
+    }
+  }
+
+  @container (width > 37rem) {
+    .proxy-group-custom-rule-editor-trailing {
+      grid-template-columns: minmax(0, auto) auto 92px;
+      /* Reserve the primary field's 11rem basis and the row gap. */
+      max-width: calc(100% - 11.25rem);
     }
   }
 
