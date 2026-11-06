@@ -169,8 +169,11 @@ describe("moved rule integrity", () => {
       { id: "custom", name: "Custom", behavior: "domain", path: "geosite/custom.mrs", target: name, noResolve: true },
     ] });
     h.groups.updateModuleRule(name, "custom", { noResolve: false }, name);
-    expect(h.state().customRuleSets[0]).toEqual(expect.objectContaining({ target: name }));
-    expect(h.state().customRuleSets[0].noResolve).toBeUndefined();
+    expect(h.state().customRuleSets[0]).toMatchObject({ target: name, noResolve: false });
+    expect(buildGeneratedRuleEntries({ ...h.state(), enabledModules: h.state().enabledProxyGroups, availablePolicyTargets: [name] })
+      .find((entry) => entry.key === "custom-rule-set:custom")).toMatchObject({
+      text: `RULE-SET,custom,${name}`,
+    });
   });
 
   it("keeps the custom group identity for add, edit, move and delete when ids collide", () => {
