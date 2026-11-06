@@ -2,6 +2,8 @@ import type { BuiltinRuleEdits, CustomRule, CustomRuleSet } from "@subboost/core
 import type { CustomProxyGroup, ProxyGroupRuleTarget } from "@subboost/core/types/config";
 import { getCustomRuleOrderKey } from "@subboost/core/rules/custom-rule-utils";
 import { supportsNoResolve } from "@subboost/core/rules/custom-rule-types";
+import { DEFAULT_RULE_PROVIDER_BASE_URL } from "@subboost/core/rules/metadata";
+import { buildRuleSetUrlFromPath } from "@subboost/core/rules/rule-model";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { PROXY_GROUP_MODULES, type ProxyGroupModule, type ProxyGroupRule } from "./proxy-group-modules";
@@ -10,7 +12,7 @@ import { createPolicyTargetResolver } from "./policy-targets";
 import { createRuleTargetActivation } from "./rule-target-activation";
 
 type CustomRuleLike = Pick<CustomRule, "id" | "type" | "value" | "target" | "noResolve">;
-type CustomRuleSetLike = Pick<CustomRuleSet, "id" | "name" | "behavior" | "path" | "target" | "noResolve">;
+type CustomRuleSetLike = Pick<CustomRuleSet, "id" | "name" | "behavior" | "path" | "target" | "noResolve" | "format">;
 
 export type GeneratedRuleEntryKind = "module" | "custom-rule" | "custom-rule-set" | "special";
 
@@ -38,6 +40,7 @@ export interface RulesGenerateOptions {
   ruleOrder?: string[];
   availablePolicyTargets?: string[];
   fallbackPolicyTarget?: string;
+  ruleProviderBaseUrl?: string;
 }
 
 export const EXPERIMENTAL_CN_RULE: ProxyGroupRule = {
@@ -600,7 +603,23 @@ export function buildGeneratedRuleEntries(options: RulesGenerateOptions): Genera
     .map((key) => byKey.get(key))
     .filter((entry): entry is GeneratedRuleEntry => Boolean(entry?.enabled));
 
-  return [...orderedEntries, matchEntry];
+  const providerBase = options.ruleProviderBaseUrl ?? DEFAULT_RULE_PROVIDER_BASE_URL;
+  const activeEntries = new Set(orderedEntries.map((entry) => entry.key));
+  const emitted = orderedEntries.filter((entry) => {
+    if (entry.kind !== "module") return true;
+    const [, moduleId, ruleId] = entry.key.split(":");
+    if (options.enabledModules.includes(moduleId)) return true;
+    const customKey = getCustomRuleSetOrderKey(ruleId);
+    if (!activeEntries.has(customKey) || byKey.get(customKey)?.text !== entry.text) return true;
+
+    // A restored preset and the saved custom rule can reference the same provider.
+    // Keep the existing custom rule at its saved position when they are equivalent.
+    const custom = options.customRuleSets?.find((rule) => rule.id === ruleId);
+    const preset = PROXY_GROUP_MODULES.find((module) => module.id === moduleId)?.rules.find((rule) => rule.id === ruleId);
+    return !custom || !preset || custom.behavior !== preset.behavior || (custom.format ?? "mrs") !== "mrs" ||
+      buildRuleSetUrlFromPath(custom.path, providerBase) !== `${providerBase}/${preset.path}`;
+  });
+  return [...emitted, matchEntry];
 }
 
 export function generateRules(options: RulesGenerateOptions): string[] {

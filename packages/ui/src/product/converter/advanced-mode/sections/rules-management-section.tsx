@@ -51,6 +51,7 @@ export function RulesManagementSection({
     proxyGroupNameOverrides,
     cnIpNoResolve,
     experimentalCnUseCnRuleSet,
+    ruleProviderBaseUrl,
     ruleOrder,
     generatedYaml,
     setRuleOrder,
@@ -70,6 +71,7 @@ export function RulesManagementSection({
         proxyGroupNameOverrides,
         cnIpNoResolve,
         experimentalCnUseCnRuleSet,
+        ruleProviderBaseUrl,
         ruleOrder,
         ...policyContext,
       }),
@@ -82,6 +84,7 @@ export function RulesManagementSection({
       experimentalCnUseCnRuleSet,
       builtinRuleEdits,
       proxyGroupNameOverrides,
+      ruleProviderBaseUrl,
       ruleOrder,
       policyContext,
     ]

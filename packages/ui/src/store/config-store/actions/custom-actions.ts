@@ -140,6 +140,7 @@ export function createCustomActions(
           customRules: state.customRules, customRuleSets: state.customRuleSets,
           builtinRuleEdits: state.builtinRuleEdits, proxyGroupNameOverrides: state.proxyGroupNameOverrides,
           experimentalCnUseCnRuleSet: state.experimentalCnUseCnRuleSet, cnIpNoResolve: state.cnIpNoResolve,
+          ruleProviderBaseUrl: state.ruleProviderBaseUrl,
           ...getGeneratedPolicyTargetContext(state.generatedYaml),
         }).map((entry) => entry.key));
         const wanted = new Set(order);

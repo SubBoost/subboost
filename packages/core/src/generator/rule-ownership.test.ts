@@ -121,6 +121,51 @@ describe("moved rule ownership", () => {
     expect(config["rule-providers"]).toHaveProperty("onedrive.url", "https://local.subboost.test/rules/geosite/own-onedrive.mrs");
   });
 
+  it("keeps the saved custom rule in place when an identical moved preset becomes active", () => {
+    const target = { kind: "module" as const, id: "cn" };
+    const ruleProviderBaseUrl = "https://local.subboost.test/rules";
+    const path = `${ruleProviderBaseUrl}/geosite/onedrive.mrs`;
+    const options = {
+      enabledModules: ["select", "cn"],
+      customRules: [{ id: "anchor", type: "DOMAIN" as const, value: "local.subboost.test", target: "DIRECT" }],
+      customRuleSets: [{
+        id: "onedrive", name: "OneDrive", behavior: "domain" as const, path, target,
+      }],
+      builtinRuleEdits: { "module:microsoft:onedrive": { target } },
+      ruleOrder: ["module:microsoft:onedrive", "custom-rule:anchor", "custom-rule-set:onedrive"],
+      ruleProviderBaseUrl,
+    };
+    const expected = `RULE-SET,onedrive,${resolveModuleName("cn")}`;
+    const config = generateClashConfig({
+      nodes: [],
+      template: "full",
+      userConfig: {
+        enabledGroups: options.enabledModules, customRules: options.customRules,
+        ruleOrder: options.ruleOrder, ruleProviderBaseUrl,
+      },
+      builtinRuleEdits: options.builtinRuleEdits,
+      customRuleSets: options.customRuleSets,
+    });
+    const rules = config.rules ?? [];
+    expect(rules.filter(rule => rule === expected)).toEqual([expected]);
+    expect(rules.indexOf("DOMAIN,local.subboost.test,DIRECT")).toBeLessThan(rules.indexOf(expected));
+    expect(config["rule-providers"]?.onedrive).toMatchObject({ url: path, behavior: "domain", format: "mrs" });
+
+    for (const changed of [
+      { target: "DIRECT" },
+      { noResolve: true },
+      { path: "geosite/different.mrs" },
+      { format: "text" as const },
+    ]) {
+      const entries = buildGeneratedRuleEntries({
+        ...options,
+        customRuleSets: [{ ...options.customRuleSets[0], ...changed }],
+      });
+      expect(entries.filter(entry => entry.text.startsWith("RULE-SET,onedrive,")).map(entry => entry.key))
+        .toEqual(["module:microsoft:onedrive", "custom-rule-set:onedrive"]);
+    }
+  });
+
   it("retains the experimental CN provider only for an active logical reference", () => {
     const make = (target: ProxyGroupRuleTarget) => generateClashConfig({
       nodes: [], template: "full",
