@@ -25,13 +25,14 @@ export function normalizeRuleSetDraft(rule: RuleSetDraft): RuleSetDraft | null {
     ? "ipcidr"
     : rule.behavior;
   if (!isValidRuleSetFormatBehavior(rule.format, behavior)) return null;
+  const noResolve = rule.noResolve ?? (behavior === "ipcidr" ? true : undefined);
   return {
     id,
     name: typeof rule.name === "string" && rule.name.trim() ? rule.name.trim() : id,
     behavior,
     ...(rule.format !== undefined ? { format: rule.format } : {}),
     path,
-    ...(rule.noResolve || behavior === "ipcidr" ? { noResolve: true } : {}),
+    ...(noResolve !== undefined ? { noResolve } : {}),
   };
 }
 

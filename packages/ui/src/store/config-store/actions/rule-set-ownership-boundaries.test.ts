@@ -86,6 +86,22 @@ describe("rule-set ownership boundaries", () => {
     ]);
   });
 
+  it("defaults an unspecified IP rule to no-resolve and preserves an explicit off value on add and edit", () => {
+    const { actions, getState } = harness();
+    actions.addModuleRules(customTarget, [
+      { ...ownDraft, path: "geoip/own.mrs", noResolve: false },
+      { ...ownDraft, id: "default-ip", path: "geoip/default.mrs" },
+    ]);
+    expect(getState().customRuleSets).toEqual([
+      expect.objectContaining({ id: "own", behavior: "ipcidr", noResolve: false }),
+      expect.objectContaining({ id: "default-ip", behavior: "ipcidr", noResolve: true }),
+    ]);
+
+    actions.updateModuleRule(customTarget, "default-ip", { noResolve: false });
+    actions.updateModuleRule(customTarget, "default-ip", { name: "Renamed IP" });
+    expect(getState().customRuleSets[1]).toMatchObject({ name: "Renamed IP", noResolve: false });
+  });
+
   it.each([
     [true, undefined, true],
     [true, "mrs", true],
