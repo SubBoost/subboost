@@ -519,6 +519,7 @@ function normalizeNode(proxy: Record<string, unknown>): ParsedNode | null {
     case "sudoku":
     case "wireguard":
     case "trusttunnel":
+    case "tailscale":
       return { ...(baseNode as Record<string, unknown>), type } as unknown as ParsedNode;
 
     default:

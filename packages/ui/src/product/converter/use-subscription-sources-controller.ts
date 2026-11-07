@@ -10,6 +10,12 @@ import { toast } from "@subboost/ui/components/ui/toaster";
 import { useProductInteractionAdapter, type ProductInteractionResult } from "@subboost/ui/product/interactions";
 import { markSourceAsPendingImport } from "@subboost/ui/product/subscription/source-import-state";
 import { moveSubscriptionSource } from "@subboost/ui/product/subscription/source-order";
+import {
+  createTailscaleDraftContent,
+  createTailscaleStateDir,
+  parseTailscaleSourceDocument,
+  type TailscaleSourceDocument,
+} from "@subboost/core/subscription/tailscale-yaml-source";
 
 export type SubscriptionSourcesMode = "quick" | "advanced";
 
@@ -61,6 +67,13 @@ function sourceMetaNeedsReimport(patch: Partial<SubscriptionSource>): boolean {
   );
 }
 
+/** state-dir values of known Tailscale nodes, excluding those owned by one source. */
+function collectTailscaleStateDirs(nodes: ParsedNode[], excludeSourceId?: string): unknown[] {
+  return nodes
+    .filter((node) => node.type === "tailscale" && !(excludeSourceId && getNodeSourceIds(node).includes(excludeSourceId)))
+    .map((node) => (node as unknown as Record<string, unknown>)["state-dir"]);
+}
+
 export function useSubscriptionSourcesController({ mode }: Options) {
   const { nodes, parseErrors, sources, setSources, parseSingleSource } = useConfigStore();
   const { user } = useUserStore();
@@ -73,6 +86,8 @@ export function useSubscriptionSourcesController({ mode }: Options) {
     [expandedSourceId, sources]
   );
   const [expandedSourceSnapshot, setExpandedSourceSnapshot] = React.useState<ExpandedSourceSnapshot | null>(null);
+  // A form-created Tailscale node stays local until Apply; Cancel leaves no source behind.
+  const [tailscaleDraft, setTailscaleDraft] = React.useState<TailscaleSourceDocument | null>(null);
 
   React.useEffect(() => {
     if (!expandedSource) {
@@ -138,14 +153,22 @@ export function useSubscriptionSourcesController({ mode }: Options) {
     setExpandedSourceId(null);
   }, [expandedSource, expandedSourceSnapshot, parseSingleSource]);
 
+  const ensureSourceQuota = React.useCallback(
+    (type: SourceType): boolean => {
+      const used = sources.filter((source) => source.type === type).length;
+      if (used < maxSourcesPerType) return true;
+      toast({
+        title: user ? `每种导入方式最多 ${maxSourcesPerType} 个` : "未登录用户每种导入方式最多 2 个（登录后可提升）",
+        variant: "warning",
+      });
+      return false;
+    },
+    [maxSourcesPerType, sources, user]
+  );
+
   const addSource = React.useCallback(
     (type: SourceType = "url") => {
-      const used = sources.filter((source) => source.type === type).length;
-      if (used >= maxSourcesPerType) {
-        toast({
-          title: user ? `每种导入方式最多 ${maxSourcesPerType} 个` : "未登录用户每种导入方式最多 2 个（登录后可提升）",
-          variant: "warning",
-        });
+      if (!ensureSourceQuota(type)) {
         setShowAddMenu(false);
         return;
       }
@@ -163,8 +186,57 @@ export function useSubscriptionSourcesController({ mode }: Options) {
       });
       setShowAddMenu(false);
     },
-    [interactions, maxSourcesPerType, mode, setSources, sources, user]
+    [ensureSourceQuota, interactions, mode, setSources, sources]
   );
+
+  const startTailscaleDraft = React.useCallback(() => {
+    setShowAddMenu(false);
+    if (!ensureSourceQuota("yaml")) return;
+    // The directory is generated once here and then lives in the YAML source.
+    const result = parseTailscaleSourceDocument(createTailscaleDraftContent(createTailscaleStateDir()));
+    if (!result.ok) throw new Error(`Tailscale draft is not form-eligible: ${result.reason}`);
+    setTailscaleDraft(result.document);
+  }, [ensureSourceQuota]);
+
+  const cancelTailscaleDraft = React.useCallback(() => setTailscaleDraft(null), []);
+
+  const applyTailscaleDraft = React.useCallback(
+    (content: string) => {
+      if (!ensureSourceQuota("yaml")) return;
+      const newSource: SubscriptionSource = {
+        id: Date.now().toString(),
+        type: "yaml",
+        content,
+        nameTemplate: DEFAULT_NODE_NAME_TEMPLATE,
+      };
+      setSources([...sources, newSource]);
+      setTailscaleDraft(null);
+      interactions.sourceAdded?.({ mode, sourceType: "yaml", sourceCount: sources.length + 1 });
+      void parseSingleSource(newSource.id);
+    },
+    [ensureSourceQuota, interactions, mode, parseSingleSource, setSources, sources]
+  );
+
+  /** Write form-applied content and close the editor, importing at most once. */
+  const applyExpandedSourceContent = React.useCallback(
+    (content: string) => {
+      if (!expandedSource || expandedSource.content === content) {
+        closeExpandedSourceEditor();
+        return;
+      }
+      const sourceId = expandedSource.id;
+      setSources(sources.map((source) => (source.id === sourceId ? markSourceAsPendingImport({ ...source, content }) : source)));
+      setExpandedSourceId(null);
+      if (!expandedSource.parsing) void parseSingleSource(sourceId);
+    },
+    [closeExpandedSourceEditor, expandedSource, parseSingleSource, setSources, sources]
+  );
+
+  const expandedSourceTailscaleStateDirs = React.useMemo(
+    () => collectTailscaleStateDirs(nodes, expandedSource?.id),
+    [expandedSource?.id, nodes]
+  );
+  const tailscaleDraftStateDirs = React.useMemo(() => collectTailscaleStateDirs(nodes), [nodes]);
 
   const removeSource = React.useCallback(
     (id: string) => {
@@ -276,7 +348,14 @@ export function useSubscriptionSourcesController({ mode }: Options) {
 
   return {
     addSource,
+    applyExpandedSourceContent,
+    applyTailscaleDraft,
+    cancelTailscaleDraft,
     closeExpandedSourceEditor,
+    expandedSourceTailscaleStateDirs,
+    startTailscaleDraft,
+    tailscaleDraft,
+    tailscaleDraftStateDirs,
     error,
     expandedSource,
     expandedSourcePreviewName,

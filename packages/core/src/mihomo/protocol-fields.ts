@@ -1,3 +1,5 @@
+import { normalizeTailscaleNodeFields } from "./tailscale";
+
 export function normalizeWireGuardReserved(value: unknown): number[] | undefined {
   if (typeof value === "string" && /^[A-Za-z0-9+/]{4}$/.test(value.trim())) {
     return Array.from(atob(value.trim()), char => char.charCodeAt(0));
@@ -11,6 +13,7 @@ export function normalizeWireGuardReserved(value: unknown): number[] | undefined
 
 /** Normalize import aliases and saved nodes using the same target fields. */
 export function normalizeProtocolFields(node: Record<string, unknown>): Record<string, unknown> {
+  if (node.type === "tailscale") return normalizeTailscaleNodeFields(node);
   const out = { ...node };
   if (out.type === "wireguard") {
     const raw = out["persistent-keepalive"] ?? out.keepalive ?? out.persistent_keepalive ?? out.persistentKeepalive;

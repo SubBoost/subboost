@@ -17,6 +17,7 @@ const PROTOCOL_BADGE_COLORS: Record<string, string> = {
   https: "bg-amber-500/20 text-amber-200 border-amber-500/20",
   ssh: "bg-pink-500/20 text-pink-200 border-pink-500/20",
   relay: "bg-violet-500/20 text-violet-200 border-violet-500/20",
+  tailscale: "bg-sky-500/20 text-sky-200 border-sky-500/20",
 };
 
 const DEFAULT_PROTOCOL_BADGE_CLASS = "bg-slate-500/20 text-slate-200 border-slate-500/20";

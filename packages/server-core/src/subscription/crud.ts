@@ -5,6 +5,7 @@ import { tryNormalizeSubscriptionUrlInput } from "@subboost/core/subscription/ur
 import type { ParsedNode } from "@subboost/core/types/node";
 import { getNodeEndpointError } from "@subboost/core/node-endpoint";
 import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "@subboost/core/mihomo/string-scalar";
+import { normalizeTailscaleNodeFields } from "@subboost/core/mihomo/tailscale";
 import { resolveSubscriptionAutoUpdateState, type SubscriptionAutoUpdateStateFields } from "./auto-update-state";
 import { normalizeSavedSourcesForPersistence, type NormalizeSavedSourcesForPersistenceOptions } from "./saved-sources";
 import { resolveSmartNodeMatchingEnabled } from "./refresh-node-snapshot";
@@ -78,8 +79,10 @@ export function normalizeSubscriptionNodeList(value: unknown): ParsedNode[] {
 export function validateSubscriptionNodeList(value: unknown): ParsedNode[] {
   if (!Array.isArray(value)) throw new Error("节点列表必须是数组");
 
+  const admitted: unknown[] = [];
   for (let index = 0; index < value.length; index += 1) {
-    const item = value[index];
+    let item = value[index];
+    admitted.push(item);
     if (!isRecord(item)) throw new Error(`节点 #${index + 1} 必须是对象`);
 
     const name = typeof item.name === "string" ? item.name.trim() : "";
@@ -94,6 +97,15 @@ export function validateSubscriptionNodeList(value: unknown): ParsedNode[] {
       continue;
     }
 
+    if (type === "tailscale") {
+      try {
+        item = normalizeTailscaleNodeFields(item);
+      } catch (error) {
+        throw new Error(`节点 #${index + 1} 的 ${error instanceof Error ? error.message : "Tailscale 字段无效"}`);
+      }
+      admitted[index] = item;
+    }
+
     const endpointError = getNodeEndpointError(item);
     if (endpointError) throw new Error(`节点 #${index + 1} ${endpointError.startsWith("端口") ? "的" : ""}${endpointError}`);
     for (const field of MIHOMO_STRING_SCALAR_FIELDS) {
@@ -104,7 +116,7 @@ export function validateSubscriptionNodeList(value: unknown): ParsedNode[] {
     }
   }
 
-  return stripImportedNodeControlFieldsFromList(value as ParsedNode[]);
+  return stripImportedNodeControlFieldsFromList(admitted as ParsedNode[]);
 }
 
 export function normalizeSubscriptionInfoForPersistence(value: unknown): Record<string, unknown> | null {

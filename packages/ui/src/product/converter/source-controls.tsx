@@ -1,6 +1,6 @@
 "use client";
 
-import { HelpCircle, Menu, Plus } from "lucide-react";
+import { HelpCircle, Menu, Network, Plus } from "lucide-react";
 import type { ParsedNode } from "@subboost/core/types/node";
 import { Button } from "@subboost/ui/components/ui/button";
 import { ChoiceChip, ChoiceGroup } from "@subboost/ui/components/ui/choice-group";
@@ -114,11 +114,14 @@ export function AddSourceMenu({
   open,
   onOpenChange,
   onAdd,
+  onAddTailscale,
   compact = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdd: (type: SourceType) => void;
+  /** Opens the structured Tailscale editor; the node is stored as an ordinary YAML source. */
+  onAddTailscale?: () => void;
   compact?: boolean;
 }) {
   return (
@@ -154,6 +157,18 @@ export function AddSourceMenu({
             </DropdownMenuItem>
           );
         })}
+        {onAddTailscale ? (
+          <DropdownMenuItem
+            onSelect={onAddTailscale}
+            className={cn("gap-3 focus:bg-ink/5 focus:text-fg", compact ? "py-2" : "py-2.5")}
+          >
+            <Network className="h-4 w-4 text-indigo-400" aria-hidden="true" />
+            <span>
+              <span className="block text-xs font-medium text-fg">Tailscale 节点</span>
+              {!compact ? <span className="block text-[10px] text-fg-40">用表单添加 Tailscale / Headscale 出站，保存为 YAML 源</span> : null}
+            </span>
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

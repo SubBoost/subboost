@@ -87,3 +87,59 @@ describe("subscription snapshot comparison", () => {
     } finally { vi.useRealTimers(); }
   });
 });
+
+describe("Tailscale snapshot anchors", () => {
+  const ts = (extra: Record<string, unknown> = {}): ParsedNode => ({ name: "ts", type: "tailscale", ...extra } as ParsedNode);
+
+  it("keeps credential rotation for one login identity observable", () => {
+    const result = compareSubscriptionSnapshots(
+      snapshot([ts({ "auth-key": "tskey-auth-old", "state-dir": "tailscale/a" })]),
+      snapshot([ts({ "auth-key": "tskey-auth-new", "state-dir": "tailscale/a" })]));
+    expect(result).toMatchObject({ relation: "field-conflict", conflictingNodeCount: 1 });
+    expect(JSON.stringify(result)).not.toContain("tskey");
+  });
+
+  it("keeps routing preference changes for one identity observable", () => {
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "exit-node": "100.64.0.1" })]), snapshot([ts({ "exit-node": "auto:any" })])))
+      .toMatchObject({ relation: "field-conflict", conflictingNodeCount: 1 });
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "accept-routes": true })]), snapshot([ts({ "accept-routes": false })])))
+      .toMatchObject({ relation: "field-conflict", conflictingNodeCount: 1 });
+  });
+
+  it("does not report a credential conflict across distinct control servers", () => {
+    const result = compareSubscriptionSnapshots(
+      snapshot([ts({ "control-url": "https://headscale.one.test", "auth-key": "tskey-auth-a" })]),
+      snapshot([ts({ "control-url": "http://headscale.two.test", "auth-key": "tskey-auth-b" })]));
+    expect(result).toMatchObject({ relation: "divergent", conflictingNodeCount: 0 });
+  });
+
+  it("distinguishes hostnames and state directories as separate identities", () => {
+    expect(compareSubscriptionSnapshots(snapshot([ts({ hostname: "a", "auth-key": "k1" })]), snapshot([ts({ hostname: "b", "auth-key": "k2" })])))
+      .toMatchObject({ conflictingNodeCount: 0 });
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "state-dir": "tailscale/a", "auth-key": "k1" })]), snapshot([ts({ "state-dir": "tailscale/b", "auth-key": "k2" })])))
+      .toMatchObject({ conflictingNodeCount: 0 });
+  });
+
+  it.each(["", "tailscale", "./tailscale", "tailscale/"])("treats default directory spelling %j like omission", (dir) => {
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "state-dir": dir })]), snapshot([ts()])))
+      .toMatchObject({ relation: "equivalent" });
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "state-dir": dir, "auth-key": "k1" })]), snapshot([ts({ "auth-key": "k2" })])))
+      .toMatchObject({ relation: "field-conflict" });
+  });
+
+  it("treats an omitted control-url like the default Tailscale control server", () => {
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "control-url": "https://controlplane.tailscale.com" })]), snapshot([ts()])))
+      .toMatchObject({ relation: "equivalent" });
+  });
+
+  it("keeps identical content from multiple sources deduplicated", () => {
+    const same = ts({ "auth-key": "k", "state-dir": "tailscale/a" });
+    expect(compareSubscriptionSnapshots(snapshot([same, { ...same, name: "copy" } as ParsedNode]), snapshot([same])))
+      .toMatchObject({ relation: "equivalent", currentNodeCount: 1 });
+  });
+
+  it("keeps every other protocol anchored on its endpoint", () => {
+    expect(compareSubscriptionSnapshots(snapshot([node()]), snapshot([node({ password: "different-secret" })])))
+      .toMatchObject({ relation: "field-conflict" });
+  });
+});
