@@ -18,6 +18,7 @@
 ## Highlights & Use Cases
 
 - **Subscription conversion**: Import subscription links, YAML files, node links, and other common formats.
+- **Tailscale outbound**: Add a Tailscale or Headscale outbound through a form; it is stored as an ordinary YAML source. See the [Tailscale guide](docs/tailscale.md).
 - **Node management**: Rename, delete, or configure listening ports for nodes in batches.
 - **Node filtering**: Build `filtered proxy groups` with only selected nodes by source, region, and custom rules.
 - **Chained proxies**: Configure chained proxies and `relay proxy groups` visually in one click.

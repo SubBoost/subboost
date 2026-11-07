@@ -17,6 +17,12 @@ export interface SubscriptionImportErrorInfo {
 }
 
 const SENSITIVE_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  // Tailscale auth keys in YAML snippets: quoted or plain values, then any standalone key token.
+  {
+    pattern: /((?:^|[^A-Za-z0-9_-])["']?auth-key["']?\s*:[ \t]*)("(?:[^"\\\n]|\\.)*"|'(?:[^'\n]|'')*'|[^\s,{}[\]]+)/gi,
+    replacement: "$1***",
+  },
+  { pattern: /\btskey-[A-Za-z0-9_-]+/g, replacement: "tskey-***" },
   { pattern: /token=[^&\s]*/gi, replacement: "token=***" },
   { pattern: /key=[^&\s]*/gi, replacement: "key=***" },
   { pattern: /password=[^&\s]*/gi, replacement: "password=***" },

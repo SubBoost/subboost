@@ -22,7 +22,7 @@ export function buildNodeEndpointKey(node: Record<string, unknown>): string {
 /** Endpoint shape only; protocol keys and transport options have separate owners. */
 export function getNodeEndpointError(node: Record<string, unknown>): string | null {
   const type = typeof node.type === "string" ? node.type.trim().toLowerCase() : "";
-  if (["direct", "dns", "reject", "relay"].includes(type)) return null;
+  if (["direct", "dns", "reject", "relay", "tailscale"].includes(type)) return null;
   if (type === "wireguard" && node.peers !== undefined) {
     if (!Array.isArray(node.peers) || node.peers.length === 0) return "WireGuard peers 必须是非空数组";
     for (let index = 0; index < node.peers.length; index += 1) {

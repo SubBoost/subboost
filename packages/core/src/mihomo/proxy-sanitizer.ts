@@ -8,6 +8,7 @@ import { normalizeProtocolFields } from "./protocol-fields";
 import { normalizeCertificateFingerprint } from "./certificate-fingerprint";
 import { getNodeEndpointError } from "../node-endpoint";
 import { MIHOMO_STRING_SCALAR_FIELDS, normalizeMihomoStringScalar } from "./string-scalar";
+import { parseBoolish } from "./boolish";
 
 const WIREGUARD_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
 const SSH_SERVER_FINGERPRINT_PATTERN = /^SHA256:[A-Za-z0-9+/]{43}=?$/;
@@ -46,21 +47,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function hasOwn(record: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
-}
-
-function parseBoolish(value: unknown): boolean | undefined {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (value === 1) return true;
-    if (value === 0) return false;
-    return undefined;
-  }
-  if (typeof value !== "string") return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return undefined;
 }
 
 function normalizeString(value: unknown): string | null {

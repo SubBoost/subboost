@@ -44,6 +44,21 @@ describe("sanitizePublicErrorText", () => {
     }
   });
 
+  it("redacts Tailscale auth keys in YAML snippets and standalone tokens", () => {
+    const cases = [
+      "bad indentation near:\n  auth-key: tskey-auth-kPlaceholder1CNTRL-Abc123\n",
+      'bad near {name: ts, type: tailscale, "auth-key": "tskey-auth-kPlaceholder1CNTRL-Abc123"}',
+      "bad near {auth-key: 'k-placeholder secret', udp: true}",
+      "unexpected token tskey-client-kPlaceholder1CNTRL-Abc123 in stream",
+    ];
+    for (const text of cases) {
+      const sanitized = sanitizePublicErrorText(text);
+      expect(sanitized).not.toMatch(/tskey-[a-z]+-k|k-placeholder/);
+    }
+    expect(sanitizePublicErrorText("x auth-key: tskey-auth-kPlaceholder1CNTRL-Abc123 y")).toBe("x auth-key: *** y");
+    expect(sanitizePublicErrorText("{\"auth-key\": \"secret value\", udp: true}")).toBe("{\"auth-key\": ***, udp: true}");
+  });
+
   it("still masks sensitive tokens and local paths", () => {
     expect(sanitizePublicErrorText("token=abc key=def password=ghi secret=jkl auth=mno")).toBe(
       "token=*** key=*** password=*** secret=*** auth=***"

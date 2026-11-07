@@ -2,6 +2,8 @@ import type { SubscriptionSource } from "@subboost/ui/store/config-store";
 import { parseSubscription } from "@subboost/core/parser";
 import type { ParsedNode } from "@subboost/core/types/node";
 import { buildNodeEndpointKey } from "@subboost/core/node-endpoint";
+import { buildNodeContentKey } from "@subboost/core/node-identity";
+import { stripImportedNodeControlFields } from "@subboost/core/subscription/imported-node-controls";
 
 const ORIGIN_NAME_KEY = "_originName";
 const SOURCE_IDS_KEY = "_sourceIds";
@@ -44,6 +46,10 @@ function withNodeSourceId(node: ParsedNode, sourceId: string): ParsedNode {
   return ({ ...record, [SOURCE_IDS_KEY]: [...current, sid] } as unknown as ParsedNode);
 }
 
+function isTailscaleNode(node: ParsedNode): boolean {
+  return node.type === "tailscale";
+}
+
 export function ensureNodesHaveValidSourceIds(
   nodes: ParsedNode[],
   sources: SubscriptionSource[],
@@ -54,9 +60,14 @@ export function ensureNodesHaveValidSourceIds(
   );
   const urlSources = sources.filter((s) => s.type === "url");
 
-  const keyOf = (node: ParsedNode) => `${getNodeOriginName(node)}-${buildNodeEndpointKey(node)}`;
+  const keyOf = (node: ParsedNode) => isTailscaleNode(node)
+    // Endpointless: compare admitted content on both sides, never the bare type.
+    ? `tailscale\u0000${buildNodeContentKey(stripImportedNodeControlFields(node))}`
+    : `${getNodeOriginName(node)}-${buildNodeEndpointKey(node)}`;
   const keyToIndices = new Map<string, number[]>();
   nodes.forEach((node, idx) => {
+    // Valid ownership metadata stays authoritative for Tailscale nodes.
+    if (isTailscaleNode(node) && getNodeSourceIds(node).some((id) => validSourceIds.has(id))) return;
     const key = keyOf(node);
     const list = keyToIndices.get(key) ?? [];
     list.push(idx);
