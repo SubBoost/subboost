@@ -1,9 +1,13 @@
 "use client";
 
 import { HomeSurface, type HomeSurfaceAdapter } from "@subboost/ui/product/home/home-surface";
-import { readSourceImportResponse } from "@subboost/ui/product/client-response";
-import { createRulesProductApi } from "@subboost/ui/product/api-adapter";
+import { readJsonResponse, readSourceImportResponse } from "@subboost/ui/product/client-response";
+import { createRulesProductApi, type QuickTemplateDetail } from "@subboost/ui/product/api-adapter";
 import { LOCAL_AUTO_UPDATE_POLICY } from "@local/lib/auto-update-policy";
+
+type TemplateListResponse = {
+  templates?: Array<{ id: string; name?: string; description?: string }>;
+};
 
 const localHomeAdapter: HomeSurfaceAdapter = {
   loginHref: "/login",
@@ -28,6 +32,22 @@ const localHomeAdapter: HomeSurfaceAdapter = {
     templates: {
       catalogEnabled: false,
       builtinEngagementEnabled: false,
+      loadMyTemplates: async () => {
+        const data = await readJsonResponse<TemplateListResponse>(
+          await fetch("/api/templates?type=my", { cache: "no-store" })
+        );
+        return (data.templates || []).map((template) => ({
+          id: template.id,
+          name: template.name || "未命名模板",
+          description: template.description || "",
+        }));
+      },
+      loadTemplateDetail: async (id) => {
+        const response = await fetch(`/api/templates/${encodeURIComponent(id)}`, { cache: "no-store" });
+        if (response.status === 404) return null;
+        const data = await readJsonResponse<{ template?: QuickTemplateDetail }>(response);
+        return data.template ?? null;
+      },
     },
     rules: createRulesProductApi(),
   },

@@ -181,7 +181,7 @@ describe("validateSubBoostTemplateConfig", () => {
     expect(result.config).not.toHaveProperty("allRulesOrderEditingEnabled");
   });
 
-  it("drops ordered rules that target disabled custom proxy groups", () => {
+  it("retains the order of rules targeting disabled custom proxy groups", () => {
     const result = validateSubBoostTemplateConfig(
       validConfig({
         customProxyGroups: [
@@ -213,7 +213,7 @@ describe("validateSubBoostTemplateConfig", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.config.ruleOrder).toEqual(["custom-rule:active-target"]);
+    expect(result.config.ruleOrder).toEqual(["custom-rule:disabled-target", "custom-rule:active-target"]);
   });
 
   it("uses defaults when optional compatibility fields are omitted", () => {

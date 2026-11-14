@@ -37,7 +37,8 @@ vi.mock("@subboost/core/proxy-group-name", () => ({
   resolveProxyGroupModuleName: (module: { name: string }, override?: string) => override || module.name,
 }));
 
-vi.mock("@subboost/core/proxy-group-targets", () => ({
+vi.mock("@subboost/core/proxy-group-targets", async (original) => ({
+  ...await original<typeof import("@subboost/core/proxy-group-targets")>(),
   resolveProxyGroupTargetName: (target: any, options: any) => {
     if (typeof target === "string") return target;
     if (target?.kind === "custom") {

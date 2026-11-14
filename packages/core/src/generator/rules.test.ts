@@ -304,7 +304,7 @@ describe("rule generator", () => {
     ).toEqual(["module:streaming-west:apple-tvplus"]);
   });
 
-  it("keeps module-targeted custom rules while dropping disabled custom-group targets", () => {
+  it("drops custom rules and sets targeted at disabled groups", () => {
     const entries = buildGeneratedRuleEntries({
       enabledModules: ["private", "apple"],
       customProxyGroups: [
@@ -344,8 +344,8 @@ describe("rule generator", () => {
     });
     const texts = entries.map((entry) => entry.text);
 
-    expect(texts).toContain("DOMAIN,module.example,🚀 节点选择");
-    expect(texts).toContain("RULE-SET,module-set,🚀 节点选择");
+    expect(texts.some((text) => text.includes("module.example"))).toBe(false);
+    expect(texts.some((text) => text.startsWith("RULE-SET,module-set,"))).toBe(false);
     expect(texts.some((text) => text.includes("disabled-name.example"))).toBe(false);
     expect(texts.some((text) => text.includes("disabled-ref.example"))).toBe(false);
     expect(texts.some((text) => text.startsWith("RULE-SET,private-ip,🏠 私有网络,no-resolve"))).toBe(true);

@@ -117,6 +117,7 @@ vi.mock("./visual-graph/proxy-groups-preview", () => ({
 }));
 
 import { VisualGraph } from "./visual-graph";
+import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 
 const nodes = [
   { name: "🇭🇰 Alpha", type: "ss" },
@@ -224,7 +225,8 @@ describe("VisualGraph", () => {
       customProxyGroups: [
         expect.objectContaining({ id: "custom-1", name: "🧩 Custom" }),
       ],
-      literalTargetNames: ["🧩 Custom"],
+      literalTargetNames: ["🧩 Custom", "🇭🇰 Alpha", "Beta", "Gamma", "Relay"],
+      policyContext: undefined,
     });
 
     const preview = mocks.captures.proxyGroupsPreview;
@@ -281,7 +283,8 @@ describe("VisualGraph", () => {
         ad: "🛑 广告拦截",
       },
       customProxyGroups: [],
-      literalTargetNames: [],
+      literalTargetNames: ["Only"],
+      policyContext: undefined,
     });
   });
 
@@ -305,6 +308,83 @@ describe("VisualGraph", () => {
       { id: "sel", name: "Select Rule", behavior: "classical" },
       { id: "r1", name: "Rule One", behavior: "domain" },
     ]);
+  });
+
+  it("shows moved builtin rules in their custom destination and omits disabled destinations", () => {
+    mocks.generatedProxyGroups = [
+      { name: "⚡ 自动选择", type: "url-test", proxies: ["DIRECT"] },
+      { name: "🧩 Custom", type: "select", proxies: ["DIRECT"] },
+    ];
+    mocks.store.builtinRuleEdits = { "module:auto:r1": { target: { kind: "custom", id: "custom-1" } } };
+    mocks.store.proxyGroupOrder = [];
+    renderGraph();
+    let groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    expect(groups.find((group: any) => group.id === "custom:custom-1").rules)
+      .toEqual([{ id: "r1", name: "Rule One", behavior: "domain" }]);
+    expect(groups.find((group: any) => group.id === "module:auto").rules).toEqual([]);
+
+    mocks.store.customProxyGroups = [{ ...mocks.store.customProxyGroups[0], enabled: false }];
+    mocks.generatedProxyGroups = [{ name: "⚡ 自动选择", type: "url-test", proxies: ["DIRECT"] }];
+    renderGraph();
+    groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    expect(groups.find((group: any) => group.id === "module:auto").rules).toEqual([]);
+  });
+
+  it("omits custom rules aimed at a disabled builtin group from the preview", () => {
+    mocks.store.enabledProxyGroups = ["select"];
+    mocks.store.customRules = [
+      { id: "inactive", type: "DOMAIN", value: "local.subboost.test", target: { kind: "module", id: "auto" } },
+      { id: "active", type: "DOMAIN", value: "local.subboost.test", target: "DIRECT" },
+    ];
+    renderGraph();
+    expect(mocks.captures.customRulesPreview.customRules.map((rule: any) => rule.id)).toEqual(["active"]);
+  });
+
+  it("shows a CN IP rule moved to DIRECT with its current no-resolve setting", () => {
+    const cnModule = { id: "cn", name: "Domestic", rules: [{ id: "cn-ip", name: "CN IP", behavior: "ipcidr" }] };
+    (PROXY_GROUP_MODULES as any[]).push(cnModule);
+    try {
+      mocks.store.enabledProxyGroups = ["select"];
+      mocks.store.builtinRuleEdits = { "module:cn:cn-ip": { target: "DIRECT" } };
+      mocks.store.cnIpNoResolve = true;
+      mocks.generatedProxyGroups = [{ name: "🚀 节点选择", type: "select", proxies: ["DIRECT"] }];
+      renderGraph();
+      expect(mocks.captures.customRulesPreview.ruleSets).toContainEqual(
+        expect.objectContaining({ id: "cn-ip", target: "DIRECT", noResolve: true }),
+      );
+      mocks.store.cnIpNoResolve = false;
+      renderGraph();
+      expect(mocks.captures.customRulesPreview.ruleSets).toContainEqual(
+        expect.objectContaining({ id: "cn-ip", target: "DIRECT", noResolve: false }),
+      );
+    } finally {
+      (PROXY_GROUP_MODULES as any[]).pop();
+    }
+  });
+
+  it("shows only active rule sets under a relay target", () => {
+    mocks.store.enabledProxyGroups = ["select"];
+    mocks.store.customRuleSets = [
+      { id: "active", name: "Active", behavior: "domain", path: "geosite/active.mrs", target: "Relay" },
+      { id: "paused", name: "Paused", behavior: "domain", path: "geosite/paused.mrs", target: { kind: "module", id: "cn" } },
+    ];
+    mocks.store.builtinRuleEdits = { "module:auto:r1": { target: "Relay" } };
+    mocks.store.generatedYaml = "proxy-groups:\n  - name: Relay\nproxies:\n  - name: Beta\n";
+    renderGraph();
+    expect(mocks.captures.proxyGroupsPreview.displayGroups.find((group: any) => group.id === "dialer:d1").rules)
+      .toEqual([expect.objectContaining({ id: "r1" }), expect.objectContaining({ id: "active" })]);
+  });
+
+  it("treats a shared name as the active custom group when the builtin group is disabled", () => {
+    mocks.store.enabledProxyGroups = ["select"];
+    mocks.store.customProxyGroups = [{ id: "custom-1", name: "⚡ 自动选择", emoji: "", groupType: "select" }];
+    mocks.store.builtinRuleEdits = { "module:select:sel": { target: "⚡ 自动选择" } };
+    mocks.generatedProxyGroups = [{ name: "⚡ 自动选择", type: "select", proxies: ["DIRECT"] }];
+    mocks.store.proxyGroupOrder = [];
+    renderGraph();
+    const groups = mocks.captures.proxyGroupsPreview.displayGroups;
+    expect(groups.find((group: any) => group.id === "custom:custom-1").rules)
+      .toEqual([{ id: "sel", name: "Select Rule", behavior: "classical" }]);
   });
 
   it("falls back to generated order and truncates long node lists", () => {

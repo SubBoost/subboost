@@ -1,13 +1,17 @@
 "use client";
 
 import { SourcesSection } from "./quick-mode/sources-section";
-import { TemplatesSection } from "./quick-mode/templates-section";
+import { TemplatesSection, type QuickTemplateUploadEntry } from "./quick-mode/templates-section";
 
-export function QuickMode() {
+type Props = {
+  templateUpload?: QuickTemplateUploadEntry | null;
+};
+
+export function QuickMode({ templateUpload }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <SourcesSection />
-      <TemplatesSection />
+      <TemplatesSection templateUpload={templateUpload} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
-import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
-import type { CustomProxyGroup, CustomRule } from "@subboost/core/types/config";
+import { resolveProxyGroupTargetContainer, resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
+import type { CustomProxyGroup, CustomRule, ProxyGroupTargetRef } from "@subboost/core/types/config";
 
 export type ProxyGroupRuleTargetKind = "module" | "custom";
 
@@ -22,6 +22,10 @@ export function listCustomRulesForTarget(
   options?: {
     moduleNames?: Record<string, string>;
     customProxyGroups?: CustomProxyGroup[];
+    literalTargetNames?: readonly string[];
+    enabledModules?: readonly string[];
+    availablePolicyTargets?: readonly string[];
+    container?: ProxyGroupTargetRef;
   },
 ): CustomRuleListItem[] {
   const normalizedTarget = targetName.trim();
@@ -30,9 +34,18 @@ export function listCustomRulesForTarget(
   return customRules
     .map((rule, index) => ({ rule, index }))
     .filter(({ rule }) => {
+      if (options?.container) {
+        const target = resolveProxyGroupTargetContainer(rule.target, {
+          moduleNames: options.moduleNames || {}, customProxyGroups: options.customProxyGroups,
+          literalTargetNames: options.literalTargetNames, enabledModules: options.enabledModules,
+          availablePolicyTargets: options.availablePolicyTargets,
+        });
+        return target?.kind === options.container.kind && target.id === options.container.id;
+      }
       const target = resolveProxyGroupTargetName(rule.target, {
         moduleNames: options?.moduleNames || {},
         customProxyGroups: options?.customProxyGroups || [],
+        literalTargetNames: options?.literalTargetNames,
       });
       return target === normalizedTarget;
     });

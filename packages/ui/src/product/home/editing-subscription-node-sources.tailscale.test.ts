@@ -29,7 +29,7 @@ describe("Tailscale source ownership reconstruction", () => {
   });
 
   it("keeps same-name nodes that differ only by exit preference separate", () => {
-    const a = "- {name: ts, type: tailscale, exit-node: 100.64.0.1}";
+    const a = "- {name: ts, type: tailscale, exit-node: 203.0.113.10}";
     const b = "- {name: ts, type: tailscale, exit-node: auto:any}";
     const result = ensureNodesHaveValidSourceIds([...storedNodesFrom(a), ...storedNodesFrom(b)], [yamlSource("a", a), yamlSource("b", b)]);
     expect(result.map(getNodeSourceIds)).toEqual([["a"], ["b"]]);

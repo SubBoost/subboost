@@ -1,15 +1,18 @@
 import type { BuiltinRuleEdits, CustomRule, CustomRuleSet } from "@subboost/core/types/config";
-import type { CustomProxyGroup } from "@subboost/core/types/config";
+import type { CustomProxyGroup, ProxyGroupRuleTarget } from "@subboost/core/types/config";
 import { getCustomRuleOrderKey } from "@subboost/core/rules/custom-rule-utils";
 import { supportsNoResolve } from "@subboost/core/rules/custom-rule-types";
+import { DEFAULT_RULE_PROVIDER_BASE_URL } from "@subboost/core/rules/metadata";
+import { buildRuleSetUrlFromPath } from "@subboost/core/rules/rule-model";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
-import { isDisabledCustomProxyGroupTarget, resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
+import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { PROXY_GROUP_MODULES, type ProxyGroupModule, type ProxyGroupRule } from "./proxy-group-modules";
 import { getEffectiveModuleRules, getModuleRuleOrderKey } from "./module-rules";
 import { createPolicyTargetResolver } from "./policy-targets";
+import { createRuleTargetActivation } from "./rule-target-activation";
 
 type CustomRuleLike = Pick<CustomRule, "id" | "type" | "value" | "target" | "noResolve">;
-type CustomRuleSetLike = Pick<CustomRuleSet, "id" | "name" | "behavior" | "path" | "target" | "noResolve">;
+type CustomRuleSetLike = Pick<CustomRuleSet, "id" | "name" | "behavior" | "path" | "target" | "noResolve" | "format">;
 
 export type GeneratedRuleEntryKind = "module" | "custom-rule" | "custom-rule-set" | "special";
 
@@ -37,6 +40,7 @@ export interface RulesGenerateOptions {
   ruleOrder?: string[];
   availablePolicyTargets?: string[];
   fallbackPolicyTarget?: string;
+  ruleProviderBaseUrl?: string;
 }
 
 export const EXPERIMENTAL_CN_RULE: ProxyGroupRule = {
@@ -217,11 +221,12 @@ function buildOrderedEditableEntries(
   moduleNames: Record<string, string> = {},
   customProxyGroups: CustomProxyGroup[] = [],
   resolvePolicyTarget: (target: string) => string = (target) => target,
-  literalTargetNames?: readonly string[]
+  literalTargetNames?: readonly string[],
+  isTargetActive: (target: ProxyGroupRuleTarget) => boolean = () => true
 ): GeneratedRuleEntry[] {
   const defaultEntries: GeneratedRuleEntry[] = [
-    ...customRules.map((rule) => buildCustomRuleEntry(rule, moduleNames, customProxyGroups, resolvePolicyTarget, literalTargetNames)),
-    ...customRuleSets.map((ruleSet) => buildCustomRuleSetEntry(ruleSet, moduleNames, customProxyGroups, resolvePolicyTarget, literalTargetNames)),
+    ...customRules.map((rule) => ({ ...buildCustomRuleEntry(rule, moduleNames, customProxyGroups, resolvePolicyTarget, literalTargetNames), enabled: isTargetActive(rule.target) })),
+    ...customRuleSets.map((ruleSet) => ({ ...buildCustomRuleSetEntry(ruleSet, moduleNames, customProxyGroups, resolvePolicyTarget, literalTargetNames), enabled: isTargetActive(ruleSet.target) })),
   ];
   const editableKeys = defaultEntries.map((entry) => entry.key);
   const normalizedEditableOrder = normalizeEditableRuleOrderKeys(ruleOrder, editableKeys);
@@ -369,16 +374,18 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
   const enabledSet = new Set(enabledModules);
   const moduleNames = buildModuleNameMap(proxyGroupNameOverrides);
   const activeCustomProxyGroups = getEnabledCustomProxyGroups(customProxyGroups);
-  const literalTargetNames = customProxyGroups.map((group) => group.name);
+  const literalTargetNames = [...customProxyGroups.map((group) => group.name), ...(availablePolicyTargets || [])];
+  const activation = createRuleTargetActivation(options);
   const resolvePolicyTarget = createPolicyTargetResolver({ availablePolicyTargets, fallbackPolicyTarget });
   const editableEntries = buildOrderedEditableEntries(
-    customRules.filter((rule) => !isDisabledCustomProxyGroupTarget(rule.target, { moduleNames, customProxyGroups })),
-    customRuleSets.filter((ruleSet) => !isDisabledCustomProxyGroupTarget(ruleSet.target, { moduleNames, customProxyGroups })),
+    customRules,
+    customRuleSets,
     undefined,
     moduleNames,
     activeCustomProxyGroups,
     resolvePolicyTarget,
-    literalTargetNames
+    literalTargetNames,
+    activation.customTargetActive
   );
   const emittedRuleKeys = new Set<string>();
   let insertedEditableEntries = false;
@@ -390,6 +397,7 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
   };
 
   const pushModuleRuleEntry = (module: ProxyGroupModule, rule: ProxyGroupRule) => {
+    if (!activation.builtinRuleActive(module.id, rule.id)) return;
     const entry = buildModuleRuleEntry(
       module,
       rule,
@@ -406,7 +414,6 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
   };
 
   const pushAppleTvPlusAtCanonicalPosition = () => {
-    if (!enabledSet.has("streaming-west")) return;
     const streamingWestModule = PROXY_GROUP_MODULES.find((item) => item.id === "streaming-west");
     if (!streamingWestModule) return;
 
@@ -428,7 +435,6 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
       pushAppleTvPlusAtCanonicalPosition();
     }
 
-    if (!enabledSet.has(moduleId)) continue;
     processedModules.add(moduleId);
 
     const ruleModule = PROXY_GROUP_MODULES.find((item) => item.id === moduleId);
@@ -440,7 +446,6 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
   }
 
   for (const ruleModule of PROXY_GROUP_MODULES) {
-    if (!enabledSet.has(ruleModule.id)) continue;
     if (processedModules.has(ruleModule.id)) continue;
     if (ruleModule.id === "final") continue;
 
@@ -598,7 +603,23 @@ export function buildGeneratedRuleEntries(options: RulesGenerateOptions): Genera
     .map((key) => byKey.get(key))
     .filter((entry): entry is GeneratedRuleEntry => Boolean(entry?.enabled));
 
-  return [...orderedEntries, matchEntry];
+  const providerBase = options.ruleProviderBaseUrl ?? DEFAULT_RULE_PROVIDER_BASE_URL;
+  const activeEntries = new Set(orderedEntries.map((entry) => entry.key));
+  const emitted = orderedEntries.filter((entry) => {
+    if (entry.kind !== "module") return true;
+    const [, moduleId, ruleId] = entry.key.split(":");
+    if (options.enabledModules.includes(moduleId)) return true;
+    const customKey = getCustomRuleSetOrderKey(ruleId);
+    if (!activeEntries.has(customKey) || byKey.get(customKey)?.text !== entry.text) return true;
+
+    // A restored preset and the saved custom rule can reference the same provider.
+    // Keep the existing custom rule at its saved position when they are equivalent.
+    const custom = options.customRuleSets?.find((rule) => rule.id === ruleId);
+    const preset = PROXY_GROUP_MODULES.find((module) => module.id === moduleId)?.rules.find((rule) => rule.id === ruleId);
+    return !custom || !preset || custom.behavior !== preset.behavior || (custom.format ?? "mrs") !== "mrs" ||
+      buildRuleSetUrlFromPath(custom.path, providerBase) !== `${providerBase}/${preset.path}`;
+  });
+  return [...emitted, matchEntry];
 }
 
 export function generateRules(options: RulesGenerateOptions): string[] {

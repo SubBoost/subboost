@@ -100,32 +100,46 @@ describe("local source-import transport edge behavior", () => {
     }));
   });
 
-  it("falls back to an unpinned request when normalization yields no address", async () => {
-    mocks.lookup.mockResolvedValue([{ address: "93.184.216.34" }]);
+  it("rejects a lookup that normalizes to no validated address", async () => {
+    mocks.lookup.mockResolvedValue([{ address: "203.0.113.1" }]);
     mocks.normalizeResolvedIpAddresses.mockReturnValue([]);
 
-    await expect(runTransport("https://example.test/sub")).resolves.toMatchObject({ ok: true });
-
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      "https://example.test/sub",
-      expect.objectContaining({ method: "GET", redirect: "manual" }),
-    );
+    await expect(runTransport("https://example.test/sub")).resolves.toMatchObject({
+      ok: false, errorInfo: { category: "network" },
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(mocks.requestPinnedText).not.toHaveBeenCalled();
   });
 
-  it("uses original fake-IP answers when a recheck returns no usable address", async () => {
+  it.each(["failed", "empty"])("does not fetch when DNS is %s", async (answer) => {
+    if (answer === "empty") mocks.lookup.mockResolvedValueOnce([]);
+    else mocks.lookup.mockRejectedValueOnce(new Error("dns unavailable"));
+    await expect(runTransport("https://local.subboost.test/sub")).resolves.toMatchObject({
+      ok: false, errorInfo: { category: "network" },
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mocks.requestPinnedText).not.toHaveBeenCalled();
+  });
+
+  it("blocks original fake-IP answers when a recheck returns no usable address", async () => {
     mocks.lookup.mockResolvedValue([{ address: "198.18.3.6" }]);
     mocks.shouldRecheckFakeIpDnsAnswers.mockReturnValue(true);
     mocks.selectDnsAddressesAfterFakeIpRecheck.mockReturnValue([]);
+    mocks.resolveHostnameByDoh.mockResolvedValueOnce([]);
+    mocks.isPrivateOrReservedIp.mockReturnValueOnce(false).mockReturnValueOnce(true);
 
-    await expect(runTransport("https://example.test/sub")).resolves.toMatchObject({ ok: true });
-
-    expect(mocks.requestPinnedText).toHaveBeenCalledWith(expect.objectContaining({
-      addresses: ["198.18.3.6"],
-    }));
+    await expect(runTransport("https://example.test/sub")).resolves.toMatchObject({
+      ok: false, errorInfo: { category: "security" },
+    });
+    expect(mocks.resolveHostnameByDoh).toHaveBeenCalledTimes(1);
+    expect(mocks.selectDnsAddressesAfterFakeIpRecheck).toHaveBeenCalledWith(["198.18.3.6"], []);
+    expect(mocks.isPrivateOrReservedIp).toHaveBeenCalledWith("198.18.3.6");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mocks.requestPinnedText).not.toHaveBeenCalled();
   });
 
   it("uses the stable fallback message for a blank thrown value", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     mocks.sanitizePublicErrorText.mockReturnValue("");
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject("")));
 
@@ -134,18 +148,22 @@ describe("local source-import transport edge behavior", () => {
       error: "获取 url 失败",
       publicReason: "获取 url 失败",
     });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("handles a missing response body without reading a stream", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     vi.stubGlobal("fetch", vi.fn(async () => mockedResponse({ body: null, status: 200 })));
 
     await expect(runTransport("https://example.test/empty")).resolves.toMatchObject({
       ok: true,
       content: "",
     });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("contains redirect-body cancellation failures", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     const cancel = vi.fn(async () => {
       throw new Error("cancel failed");
     });
@@ -162,6 +180,7 @@ describe("local source-import transport edge behavior", () => {
   });
 
   it("contains declared-length cancellation failures", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     const cancel = vi.fn(async () => {
       throw new Error("cancel failed");
     });
@@ -179,6 +198,7 @@ describe("local source-import transport edge behavior", () => {
   });
 
   it("contains streamed-body cancellation failures", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     const cancel = vi.fn(async () => {
       throw new Error("cancel failed");
     });
@@ -198,6 +218,7 @@ describe("local source-import transport edge behavior", () => {
   });
 
   it("aborts a request when the transport timeout expires", async () => {
+    mocks.getAllowUnsafeSubscriptionSources.mockResolvedValue(true);
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn((_url, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new Error("request aborted")));
@@ -210,5 +231,6 @@ describe("local source-import transport edge behavior", () => {
       ok: false,
       error: "request aborted",
     });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 });

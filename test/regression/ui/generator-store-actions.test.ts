@@ -316,13 +316,13 @@ describe("public generator and refresh branch coverage", () => {
     ]);
     expect(getState().builtinRuleEdits["module:ai:openai"]).toBeUndefined();
     expect(getState().customRuleSets).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "new-extra", behavior: "ipcidr", noResolve: true })])
+      expect.arrayContaining([expect.objectContaining({ id: "new-extra", behavior: "ipcidr", noResolve: false })])
     );
 
     actions.updateModuleRule("ai", "missing", { name: "Ignored" });
     actions.updateModuleRule("ai", "custom-a", { path: "geoip/custom-a.mrs", noResolve: false });
     expect(getState().customRuleSets).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: "custom-a", behavior: "ipcidr", noResolve: true })])
+      expect.arrayContaining([expect.objectContaining({ id: "custom-a", behavior: "ipcidr", noResolve: false })])
     );
 
     actions.removeModuleRule("ai", "custom-a");

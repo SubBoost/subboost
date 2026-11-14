@@ -45,6 +45,7 @@ export type ProductTemplateApi = {
   ) => Promise<Record<TemplateType, { id: string; engagementCount: number; isEngaged: boolean }>>;
   toggleTemplateEngagement?: (id: string) => Promise<{ engagementCount: number; isEngaged: boolean }>;
   loadCatalogTemplates?: () => Promise<QuickTemplateSummary[]>;
+  loadMyTemplates?: () => Promise<QuickTemplateSummary[]>;
   loadTemplateDetail?: (id: string) => Promise<QuickTemplateDetail | null>;
 };
 

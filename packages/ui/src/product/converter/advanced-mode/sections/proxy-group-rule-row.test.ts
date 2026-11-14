@@ -218,4 +218,14 @@ describe("proxy group rule row components", () => {
     );
     expect(captures.menuItems[0].disabled).toBe(true);
   });
+
+  it("keeps same-named structured destinations selectable for manual rules", () => {
+    const same = [{ kind: "module" as const, id: "cn", name: "Regional" }, { kind: "custom" as const, id: "cn", name: "Regional" }];
+    renderToStaticMarkup(React.createElement(ProxyGroupManualRuleRow, {
+      item: { index: 0, rule: { id: "manual", type: "DOMAIN", value: "local.subboost.test", target: { kind: "custom", id: "cn" } } },
+      targets: same, currentTargetName: "Regional", currentTarget: same[1], onMove: vi.fn(), onRemove: vi.fn(),
+    }));
+    expect(captures.menuItems[0].disabled).toBe(false);
+    expect(captures.menuItems[1].disabled).toBe(true);
+  });
 });

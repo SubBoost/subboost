@@ -10,12 +10,16 @@ const POSIX_BACKUP_MODE_ASSERTIONS = process.platform === "win32"
       [ "$unsafe_files" = "0" ]
       [ "$unsafe_dirs" = "0" ]`;
 
+function shellTimeout(defaultMs: number): number {
+  return process.platform === "win32" ? 120_000 : defaultMs;
+}
+
 function runBash(script: string) {
   return spawnSync("bash", ["-lc", BASH_NON_INTERACTIVE_COMMAND], {
     cwd: publicRoot,
     encoding: "utf8",
     input: script,
-    timeout: 30_000,
+    timeout: shellTimeout(30_000),
     detached: true,
     env: {
       ...process.env,
@@ -242,6 +246,7 @@ ENV
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       cat > "$home/.env" <<'ENV'
 SUBBOOST_IMAGE=image
 POSTGRES_DB=subboost
@@ -269,6 +274,7 @@ ENV
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull") return 0 ;;
             *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
@@ -315,13 +321,14 @@ ENV
     // wait_for_health checks live once per attempt, then status_cmd performs one final live+ready check.
     expect(result.stdout).toContain("curl_count=8");
     expect(result.stdout).toContain("up -d --no-deps cron");
-  }, 10_000);
+  }, shellTimeout(10_000));
 
   it("restarts rollback cron without recreating the healthy old app", () => {
     const script = `
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       release_dir="$home/release"
       mkdir -p "$release_dir" "$home/bin"
       cat > "$release_dir/release.json" <<'JSON'
@@ -361,6 +368,7 @@ ENV
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config" | *" pull" | *" stop cron app") return 0 ;;
             *"pg_dump -Fc"*) printf 'custom-dump'; return 0 ;;
             *"pg_restore --list"* | *"pg_restore --clean"*) cat >/dev/null; return 0 ;;
@@ -400,13 +408,14 @@ ENV
     expect(result.stdout).toMatch(/image=old-image candidate_image=old-candidate-image command=compose.*old-compose\.yml up -d app$/m);
     expect(result.stdout).toMatch(/image=old-image candidate_image=old-candidate-image command=compose.*old-compose\.yml up -d --no-deps cron$/m);
     expect(result.stdout).not.toMatch(/old-compose\.yml.*up -d cron(?:\s|$)/);
-  }, 10_000);
+  }, shellTimeout(10_000));
 
   it("uses refreshed release metadata before pulling during update", () => {
     const script = `
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       release_dir="$home/release"
       mkdir -p "$release_dir" "$home/bin"
       cat > "$release_dir/release.json" <<'JSON'
@@ -452,6 +461,7 @@ ENV
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull")
               printf 'pull_image=%s\\n' "\${SUBBOOST_IMAGE:-}" >> "$docker_log"
@@ -505,13 +515,14 @@ ENV
     expect(pauseIndex).toBeGreaterThan(pullIndex);
     expect(dumpIndex).toBeGreaterThan(pauseIndex);
     expect(candidateStartIndex).toBeGreaterThan(dumpIndex);
-  }, 10_000);
+  }, shellTimeout(10_000));
 
   it("migrates old fixed official update sources to stable latest", () => {
     const script = `
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       mkdir -p "$home/bin"
       cat > "$home/.env" <<'ENV'
 SUBBOOST_RELEASE_URL=https://github.com/SubBoost/subboost/releases/download/v2.4.0/release.json
@@ -559,6 +570,7 @@ JSON
           case "$*" in
             "compose version"*) return 0 ;;
             *" config --services") printf 'app\\ndb\\ncron\\n'; return 0 ;;
+            *" config --format json") printf '{"services":{"app":{"ports":[{"target":3000,"published":"31000","protocol":"tcp"}]}}}\\n'; return 0 ;;
             *" config") return 0 ;;
             *" pull")
               printf 'pull_image=%s\\n' "\${SUBBOOST_IMAGE:-}" >> "$docker_log"
@@ -598,13 +610,14 @@ JSON
     expect(result.stdout).toContain(
       "SUBBOOST_RELEASE_URL=https://github.com/SubBoost/subboost/releases/latest/download/release.json"
     );
-  }, 10_000);
+  }, shellTimeout(10_000));
 
   it("updates exact env keys without removing similarly prefixed names", () => {
     const script = `
       set -Eeuo pipefail
       home="$(mktemp -d)"
       trap 'rm -rf "$home"' EXIT
+      export TMPDIR="$home"
       export SUBBOOST_SCRIPT_SOURCE_ONLY=1
       export SUBBOOST_HOME="$home"
       source local/scripts/subboost.sh

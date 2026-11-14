@@ -23,11 +23,10 @@ import {
   PROXY_GROUP_MODULES,
   generateProxyGroups,
 } from "@subboost/core/generator/proxy-groups";
-import type { EffectiveModuleRuleSource, HiddenPresetRuleIds } from "@subboost/core/generator/module-rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
-import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
 import { resolveNodeNameFilter } from "@subboost/core/subscription/node-name-filter";
 import { useConfigStore, type RuleSetDraft } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import {
   buildManualRuleTargets,
   listCustomRulesForTarget,
@@ -37,6 +36,7 @@ import { ProxyGroupsCustomRoutingRules } from "./proxy-groups-custom-routing-rul
 import { ProxyGroupAdvancedPanel } from "./proxy-group-advanced-panel";
 import { ProxyGroupsModuleCard } from "./proxy-groups-module-card";
 import { GroupAdvancedSettingsDialog } from "./group-advanced-settings-dialog";
+import { buildTargetRuleView } from "./proxy-group-rule-projection";
 import { findGroupListenerBinding } from "./group-listener-settings";
 
 const PROXY_GROUP_SECTION_LABEL_ROW_CLASS = "flex min-h-7 items-center gap-2";
@@ -85,8 +85,8 @@ export function ProxyGroupsCategories() {
     dnsYaml,
     mixedPort,
     listenerPorts = {},
+    generatedYaml,
   } = useConfigStore();
-
   const [expandedCategories, setExpandedCategories] = React.useState<
     Set<string>
   >(new Set(customProxyGroups.length > 0 ? [CUSTOM_CATEGORY_ID] : []));
@@ -95,6 +95,8 @@ export function ProxyGroupsCategories() {
     () => resolveNodeNameFilter(nodes, nodeNameFilter).effectiveNodes,
     [nodeNameFilter, nodes],
   );
+  const policyContext = React.useMemo(() => getGeneratedPolicyTargetContext(generatedYaml), [generatedYaml]);
+  const literalTargetNames = React.useMemo(() => [...customProxyGroups.map((group) => group.name), ...(policyContext?.availablePolicyTargets || [])], [customProxyGroups, policyContext]);
   const [editingModuleId, setEditingModuleId] = React.useState<string | null>(
     null,
   );
@@ -216,79 +218,12 @@ export function ProxyGroupsCategories() {
     builtinRuleEdits,
     proxyGroupNameOverrides,
   ]);
-  const targetRuleView = React.useMemo(() => {
-    const ruleSetsByTarget: Record<string, RuleSetDraft[]> = {};
-    const hiddenPresetRuleIds: HiddenPresetRuleIds = {};
-    const moduleNameToId = new Map<string, string>();
-    const moduleNames: Record<string, string> = {};
-    for (const proxyModule of PROXY_GROUP_MODULES) {
-      const name = resolveModuleDisplayName(proxyModule).full;
-      moduleNameToId.set(name, proxyModule.id);
-      moduleNames[proxyModule.id] = name;
-    }
-
-    const pushRuleSetForTarget = (moduleId: string, rule: RuleSetDraft & { source?: EffectiveModuleRuleSource }) => {
-      ruleSetsByTarget[moduleId] = [...(ruleSetsByTarget[moduleId] || []), rule];
-    };
-    const hidePresetRule = (moduleId: string, ruleId: string) => {
-      const prev = hiddenPresetRuleIds[moduleId] || [];
-      if (!prev.includes(ruleId)) hiddenPresetRuleIds[moduleId] = [...prev, ruleId];
-    };
-
-    for (const ruleSet of customRuleSets) {
-      const targetName = resolveProxyGroupTargetName(ruleSet.target, {
-        moduleNames,
-        customProxyGroups,
-      });
-      const moduleId = moduleNameToId.get(targetName);
-      if (!moduleId) continue;
-      const { target: _target, ...rule } = ruleSet;
-      pushRuleSetForTarget(moduleId, rule);
-    }
-
-    for (const [key, edit] of Object.entries(builtinRuleEdits || {})) {
-      const match = key.match(/^module:([^:]+):(.+)$/);
-      if (!match) continue;
-      const [, sourceModuleId, ruleId] = match;
-      const sourceModule = PROXY_GROUP_MODULES.find((module) => module.id === sourceModuleId);
-      const sourceRule = sourceModule?.rules?.find((rule) => rule.id === ruleId);
-      if (!sourceModule || !sourceRule) continue;
-      const defaultTarget = resolveModuleDisplayName(sourceModule).full;
-      const editTarget = edit.target
-        ? resolveProxyGroupTargetName(edit.target, {
-            moduleNames,
-            customProxyGroups,
-            fallbackTarget: defaultTarget,
-          })
-        : "";
-
-      if (edit.enabled === false) {
-        hidePresetRule(sourceModuleId, ruleId);
-        continue;
-      }
-      if (editTarget && editTarget !== defaultTarget) {
-        hidePresetRule(sourceModuleId, ruleId);
-        const targetModuleId = moduleNameToId.get(editTarget)
-          || customProxyGroups.find((group) => group.name === editTarget)?.id;
-        if (targetModuleId) {
-          pushRuleSetForTarget(targetModuleId, {
-            ...sourceRule,
-            source: "preset",
-            noResolve: sourceModuleId === "cn" && ruleId === "cn-ip"
-              ? cnIpNoResolve : sourceRule.noResolve,
-          });
-        }
-      }
-    }
-
-    return { ruleSetsByTarget, hiddenPresetRuleIds };
-  }, [
-    builtinRuleEdits,
-    cnIpNoResolve,
-    customRuleSets,
-    customProxyGroups,
-    resolveModuleDisplayName,
-  ]);
+  const targetRuleView = React.useMemo(() => buildTargetRuleView({
+    modules: PROXY_GROUP_MODULES, enabledModules: enabledProxyGroups, customProxyGroups, customRuleSets,
+    builtinRuleEdits, proxyGroupNameOverrides, cnIpNoResolve, literalTargetNames,
+    availablePolicyTargets: policyContext?.availablePolicyTargets,
+  }), [builtinRuleEdits, cnIpNoResolve, customRuleSets, customProxyGroups, enabledProxyGroups,
+    policyContext, literalTargetNames, proxyGroupNameOverrides]);
 
   const hiddenModules = React.useMemo(() => {
     const hidden = new Set(hiddenProxyGroups);
@@ -429,6 +364,10 @@ export function ProxyGroupsCategories() {
                             customRules,
                             display.full,
                             {
+                              literalTargetNames,
+                              enabledModules: enabledProxyGroups,
+                              availablePolicyTargets: policyContext?.availablePolicyTargets,
+                              container: { kind: "module", id: module.id },
                               moduleNames: Object.fromEntries(
                                 PROXY_GROUP_MODULES.map((item) => [
                                   item.id,
@@ -443,7 +382,6 @@ export function ProxyGroupsCategories() {
                           );
                           const advancedConfig = proxyGroupAdvanced[module.id] || {};
                           const effectiveGroupType = advancedConfig.groupType ?? module.groupType;
-
                           const handleHideModule = async () => {
                             const ok = await confirmDialog(
                               isCore
@@ -585,30 +523,34 @@ export function ProxyGroupsCategories() {
                                 toggleModuleRules(module.id)
                               }
                               onAddRules={(rules) =>
-                                addModuleRules(module.id, rules)
+                                addModuleRules({ kind: "module", id: module.id }, rules)
                               }
                               onAddRulesToModule={(moduleId, rules) => {
-                                addModuleRules(moduleId, rules);
+                                addModuleRules({ kind: "module", id: moduleId }, rules);
                                 if (!enabledProxyGroups.includes(moduleId)) {
                                   toggleProxyGroup(moduleId);
                                 }
                               }}
                               onAddRuleToCustomGroup={(groupId, rule) => {
-                                addModuleRules(groupId, [rule]);
+                                addModuleRules({ kind: "custom", id: groupId }, [rule]);
                               }}
                               onRemoveExtraRule={(ruleId) =>
-                                removeModuleRule(module.id, ruleId)
+                                removeModuleRule({ kind: "module", id: module.id }, ruleId)
                               }
                               onMoveRule={(ruleId, target) =>
-                                moveModuleRule(module.id, ruleId, target)
+                                moveModuleRule({ kind: "module", id: module.id }, ruleId, target)
                               }
                               onMoveManualRule={(ruleId, target) =>
                                 updateCustomRule(ruleId, { target: { kind: target.kind, id: target.id } })
                               }
                               onRemoveManualRule={removeCustomRule}
-                              onRestoreRule={(ruleId) =>
-                                restoreModuleRule(module.id, ruleId)
-                              }
+                              onRestoreRule={(ruleId) => {
+                                if (customRuleSets.some((rule) => rule.id === ruleId)) {
+                                  toast({ title: "规则集已在其他分流组中", description: "请先移除同名规则集，再恢复预设。", variant: "warning" });
+                                  return;
+                                }
+                                restoreModuleRule(module.id, ruleId);
+                              }}
                               onResetRuleTarget={(ruleId) =>
                                 resetModuleRuleTarget(module.id, ruleId)
                               }

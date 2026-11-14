@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   textareas: [] as any[],
   chips: [] as any[],
   dialogs: [] as any[],
+  dialogContents: [] as any[],
 }));
 
 const stateMock = vi.hoisted(() => ({
@@ -33,6 +34,12 @@ vi.mock("react", async (importOriginal) => {
       });
       stateMock.setters[index] = setter;
       return [value, setter];
+    },
+    // Server rendering never attaches imperative handles; attach them eagerly for these tests.
+    useImperativeHandle: (ref: any, create: () => unknown, deps?: React.DependencyList) => {
+      if (!stateMock.enabled) return actual.useImperativeHandle(ref, create as any, deps);
+      if (typeof ref === "function") ref(create());
+      else if (ref) ref.current = create();
     },
   };
 });
@@ -98,7 +105,10 @@ vi.mock("@subboost/ui/components/ui/dialog", () => ({
     mocks.dialogs.push(props);
     return React.createElement("div", null, props.children);
   },
-  DialogContent: (props: any) => React.createElement("section", null, props.children),
+  DialogContent: (props: any) => {
+    mocks.dialogContents.push(props);
+    return React.createElement("section", null, props.children);
+  },
   DialogHeader: (props: any) => React.createElement("header", null, props.children),
   DialogTitle: (props: any) => React.createElement("h2", null, props.children),
 }));
@@ -121,6 +131,7 @@ function reset() {
   mocks.textareas = [];
   mocks.chips = [];
   mocks.dialogs = [];
+  mocks.dialogContents = [];
 }
 
 function button(label: string) {
@@ -162,9 +173,18 @@ describe("TailscaleSourceForm", () => {
     expect(html).toContain("登录");
     expect(html).toContain("路由偏好");
     expect(html).toContain("高级设置");
+    expect(html).toContain("认证密钥 auth-key（可选）");
+    expect(html).toContain("持有订阅链接或配置文件的人都能读取");
+    // Routing caveats live in the heading's help popover.
+    expect(mocks.buttons.some((props) => props["aria-label"] === "路由偏好说明")).toBe(true);
     expect(html).toContain("不会把本设备发布为出口节点");
     expect(html).toContain("公网 URL 测速中可能显示失败");
     expect(html).toContain("不一定会重置客户端已保存的运行时偏好");
+    expect(html).not.toContain("只校验本地配置格式");
+    expect(html).not.toContain("不为 Tailscale 启用 UDP");
+    // Choice-group headings are not labels: they have no single control to point at.
+    expect(html).toMatch(/<p[^>]*>接受子网路由 accept-routes<\/p>/);
+    expect(html).not.toMatch(/<label[^>]*>接受子网路由/);
     expect(mocks.inputs.find((props) => props.value === "tskey-auth-placeholder")?.type).toBe("password");
     const selected = mocks.chips.filter((chip) => chip.selected).map((chip) => chip.label);
     // Render order: accept-routes, exit-node-allow-lan-access, ephemeral, udp.
@@ -199,13 +219,57 @@ describe("TailscaleSourceForm", () => {
     expect(handlers.onApply).toHaveBeenCalledTimes(1);
   });
 
+  describe("leaving with unapplied edits", () => {
+    const content = "- {name: ts, type: tailscale}\n";
+    const edited = () => ({ 0: { ...documentOf(content).initial, name: "office" } });
+
+    it("asks before discarding when confirmDiscard is set", () => {
+      const ref = { current: null as any };
+      const { handlers, setters } = renderForm(content, { cancelLabel: "关闭", confirmDiscard: true, ref }, edited());
+      button("关闭").onClick();
+      expect(setters[3]).toHaveBeenCalledWith("close");
+      ref.current.requestClose();
+      expect(setters[3]).toHaveBeenCalledTimes(2);
+      expect(handlers.onCancel).not.toHaveBeenCalled();
+    });
+
+    it("leaves at once when nothing changed or no confirmation is wanted", () => {
+      const clean = renderForm(content, { cancelLabel: "关闭", confirmDiscard: true });
+      button("关闭").onClick();
+      expect(clean.handlers.onCancel).toHaveBeenCalledTimes(1);
+      expect(clean.setters[3]).not.toHaveBeenCalled();
+
+      const draft = renderForm(content, {}, edited());
+      button("取消").onClick();
+      expect(draft.handlers.onCancel).toHaveBeenCalledTimes(1);
+      expect(draft.setters[3]).not.toHaveBeenCalled();
+    });
+
+    it("applies, discards or keeps editing from the close confirmation", () => {
+      const { html, handlers, setters } = renderForm(content, { confirmDiscard: true }, { ...edited(), 3: "close" });
+      expect(html).toContain("表单有未应用的修改");
+      expect(mocks.buttons.some((props) => props.children === "应用并切换")).toBe(false);
+
+      button("应用并关闭").onClick();
+      expect(handlers.onApply).toHaveBeenCalledWith(expect.stringContaining("office"));
+      expect(handlers.onSwitchToRaw).not.toHaveBeenCalled();
+
+      button("放弃修改并关闭").onClick();
+      expect(handlers.onCancel).toHaveBeenCalledTimes(1);
+      expect(handlers.onSwitchToRaw).not.toHaveBeenCalled();
+
+      button("继续编辑").onClick();
+      expect(setters[3]).toHaveBeenCalledWith(null);
+    });
+  });
+
   it("updates fields, clears field errors, and handles dirty raw switching and serialization errors", () => {
     const doc = documentOf("- {name: ts, type: tailscale}\n");
-    const dirtyValues = { ...doc.initial, name: "office", hostname: "dev", authKey: "k", controlUrl: "https://hs.example.com", exitNode: "100.64.0.1", stateDir: "tailscale/dev" };
+    const dirtyValues = { ...doc.initial, name: "office", hostname: "dev", authKey: "k", controlUrl: "https://local.subboost.test", exitNode: "203.0.113.10", stateDir: "tailscale/dev" };
     const { html, handlers, setters } = renderForm(
       "- {name: ts, type: tailscale}\n",
       {},
-      { 0: dirtyValues, 1: { name: "请输入节点名称" }, 2: "生成失败", 3: true }
+      { 0: dirtyValues, 1: { name: "请输入节点名称" }, 2: "生成失败", 3: "raw" }
     );
     expect(html).toContain("表单有未应用的修改");
     expect(html).toContain("生成失败");
@@ -221,7 +285,7 @@ describe("TailscaleSourceForm", () => {
     expect(setters[2]).toHaveBeenCalledWith(null);
 
     button("切换到 YAML").onClick();
-    expect(setters[3]).toHaveBeenCalledWith(true);
+    expect(setters[3]).toHaveBeenCalledWith("raw");
 
     button("应用并切换").onClick();
     expect(handlers.onSwitchToRaw).toHaveBeenCalledWith(expect.stringContaining("office"));
@@ -230,13 +294,13 @@ describe("TailscaleSourceForm", () => {
     expect(handlers.onSwitchToRaw).toHaveBeenCalledWith(null);
 
     button("继续编辑").onClick();
-    expect(setters[3]).toHaveBeenCalledWith(false);
+    expect(setters[3]).toHaveBeenCalledWith(null);
 
     //Without onSwitchToRaw, the switch button is omitted; calling handleSwitchToRaw is a no-op; invalid dirty values do not switch.
     const invalidDirty = renderForm(
       "- {name: ts, type: tailscale}\n",
       { onSwitchToRaw: undefined },
-      { 0: { ...doc.initial, controlUrl: "not-a-url" }, 3: true }
+      { 0: { ...doc.initial, controlUrl: "not-a-url" }, 3: "raw" }
     );
     expect(mocks.buttons.some((b) => b.children === "切换到 YAML")).toBe(false);
     button("应用并切换").onClick();
@@ -283,6 +347,7 @@ describe("AddSourceMenu Tailscale item", () => {
     }));
     expect(full).toContain("Tailscale 节点");
     expect(full).toContain("用表单添加 Tailscale / Headscale 出站");
+    expect(full).not.toContain("保存为 YAML 源");
     mocks.buttons.at(-1)?.onClick();
     expect(onAddTailscale).toHaveBeenCalledTimes(1);
 
@@ -319,6 +384,9 @@ describe("AddSourceMenu Tailscale item", () => {
     }));
     expect(html).toContain("添加 Tailscale 节点");
     expect(html).toContain("添加并导入");
+    expect(html).toContain("取消");
+    // The same form keeps the same width when adding and when editing a source.
+    expect(mocks.dialogContents[0].className).toContain("sm:max-w-4xl");
     mocks.dialogs[0].onOpenChange(true);
     expect(onCancel).not.toHaveBeenCalled();
     mocks.dialogs[0].onOpenChange(false);
@@ -336,6 +404,8 @@ describe("AddSourceMenu Tailscale item", () => {
 });
 
 describe("SourceEditorDialog YAML modes", () => {
+  // The label above the content editor, distinct from the dialog title.
+  const CONTENT_LABEL = '<p class="text-xs text-fg-60">YAML 配置</p>';
   const props = (source: any, onApplyContent: any) => ({
     source,
     previewName: "Node",
@@ -383,7 +453,7 @@ describe("SourceEditorDialog YAML modes", () => {
     reset();
     stateMock.enabled = true;
     stateMock.callIndex = 0;
-    stateMock.overrides = { 0: "form", 1: { ...doc.initial, name: "renamed" }, 4: true };
+    stateMock.overrides = { 0: "form", 1: { ...doc.initial, name: "renamed" }, 4: "raw" };
     stateMock.setters = [];
     try {
       renderToStaticMarkup(React.createElement(SourceEditorDialog, {
@@ -406,7 +476,62 @@ describe("SourceEditorDialog YAML modes", () => {
       reset();
       const html = renderToStaticMarkup(React.createElement(SourceEditorDialog, props({ id: "y", type: "yaml", content }, apply)));
       expect(html).not.toContain("路由偏好");
+      expect(html).toContain(CONTENT_LABEL);
       expect(mocks.textareas[0].value).toBe(content);
     }
+  });
+
+  describe("closing", () => {
+    const tailscaleSource = { id: "y", type: "yaml", content: "- {name: ts, type: tailscale}\n" };
+
+    function renderEditor(source: any, overrides: Record<number, unknown> = {}) {
+      reset();
+      stateMock.enabled = true;
+      stateMock.callIndex = 0;
+      stateMock.overrides = overrides;
+      stateMock.setters = [];
+      const editorProps = props(source, vi.fn());
+      try {
+        const html = renderToStaticMarkup(React.createElement(SourceEditorDialog, editorProps));
+        return { html, onClose: editorProps.onClose };
+      } finally {
+        stateMock.enabled = false;
+      }
+    }
+
+    it("leaves the form's own actions in charge and drops the duplicate label and footer", () => {
+      const { html, onClose } = renderEditor(tailscaleSource);
+      expect(html).toContain("路由偏好");
+      expect(html).not.toContain(CONTENT_LABEL);
+      expect(mocks.buttons.some((props) => props.children === "完成")).toBe(false);
+      expect(mocks.buttons.some((props) => props.children === "取消")).toBe(false);
+      button("关闭").onClick();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks before the dialog's own close drops unapplied form edits", () => {
+      const doc = documentOf(tailscaleSource.content);
+      const { onClose } = renderEditor(tailscaleSource, { 1: { ...doc.initial, name: "renamed" } });
+      mocks.dialogs[0].onOpenChange(false);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(stateMock.setters[4]).toHaveBeenCalledWith("close");
+
+      const clean = renderEditor(tailscaleSource);
+      mocks.dialogs[0].onOpenChange(false);
+      expect(clean.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes at once from raw mode and from other source types", () => {
+      const raw = renderEditor(tailscaleSource, { 0: "raw" });
+      expect(raw.html).toContain(CONTENT_LABEL);
+      mocks.dialogs[0].onOpenChange(false);
+      expect(raw.onClose).toHaveBeenCalledTimes(1);
+      button("完成").onClick();
+      expect(raw.onClose).toHaveBeenCalledTimes(2);
+
+      const nodes = renderEditor({ id: "n", type: "nodes", content: "ss://node" });
+      mocks.dialogs[0].onOpenChange(false);
+      expect(nodes.onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

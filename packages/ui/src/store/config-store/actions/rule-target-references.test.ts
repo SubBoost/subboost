@@ -26,7 +26,7 @@ describe("editing rule-set string references", () => {
   it("updates, moves and removes a rule set imported with a module string reference", () => {
     const { actions, getState } = harness({ customProxyGroups: [media], customRuleSets: [ruleSet] });
     actions.updateModuleRule("cn", "bilibili", { name: "Updated" });
-    expect(getState().customRuleSets[0]).toMatchObject({ name: "Updated", target: { kind: "module", id: "cn" } });
+    expect(getState().customRuleSets[0]).toMatchObject({ name: "Updated", target: "module:cn" });
     actions.moveModuleRule("cn", "bilibili", { kind: "custom", id: "media" });
     expect(getState().customRuleSets[0].target).toEqual({ kind: "custom", id: "media" });
     actions.removeModuleRule("media", "bilibili");

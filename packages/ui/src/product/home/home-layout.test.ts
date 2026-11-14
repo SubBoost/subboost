@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   buttons: [] as any[],
   tabs: [] as any[],
   links: [] as any[],
+  quickMode: undefined as any,
   subscriptionDialog: undefined as any,
   yamlHighlight: undefined as any,
   interactions: {
@@ -84,7 +85,10 @@ vi.mock("@subboost/ui/components/ui/tabs", () => ({
 }));
 
 vi.mock("@subboost/ui/product/converter/quick-mode", () => ({
-  QuickMode: () => React.createElement("div", null, "quick-mode"),
+  QuickMode: (props: any) => {
+    mocks.quickMode = props;
+    return React.createElement("div", null, "quick-mode");
+  },
 }));
 
 vi.mock("@subboost/ui/product/converter/advanced-mode", () => ({
@@ -173,6 +177,7 @@ describe("HomeLayout", () => {
     mocks.buttons = [];
     mocks.tabs = [];
     mocks.links = [];
+    mocks.quickMode = undefined;
     mocks.subscriptionDialog = undefined;
     mocks.yamlHighlight = undefined;
   });
@@ -208,6 +213,7 @@ describe("HomeLayout", () => {
     expect(mocks.buttons[0]).toMatchObject({ disabled: true });
     expect(mocks.buttons[1]).toMatchObject({ disabled: true });
     expect(mocks.buttons[2]).toMatchObject({ disabled: true });
+    expect(mocks.quickMode.templateUpload).toBeNull();
     expect(mocks.subscriptionDialog).toMatchObject({
       open: false,
       subscriptionName: "Primary",
@@ -271,6 +277,11 @@ describe("HomeLayout", () => {
     expect(handleGenerate).toHaveBeenCalledWith("advanced");
     expect(onTemplateUploadOpen).toHaveBeenCalled();
     expect(mocks.interactions.templateUploadOpened).toHaveBeenCalledWith({ entry: "home" });
+    expect(mocks.links[0]).toMatchObject({ href: "/templates?upload=1" });
+    expect(mocks.quickMode.templateUpload).toMatchObject({ href: "/templates?upload=1" });
+    mocks.quickMode.templateUpload.onOpen();
+    expect(onTemplateUploadOpen).toHaveBeenCalledTimes(2);
+    expect(mocks.interactions.templateUploadOpened).toHaveBeenCalledTimes(2);
     expect(handleDownload).toHaveBeenCalledWith("advanced");
     expect(subscription.handleGenerateSubscription).toHaveBeenCalledWith("advanced");
     expect(mocks.subscriptionDialog).toMatchObject({

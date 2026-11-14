@@ -314,7 +314,7 @@ describe("ProxyGroupsRulesLibrary", () => {
 
     mocks.captures.buttons.find((props) => props.children === "添加").onClick();
 
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [
       {
         id: "telegram",
         name: "Telegram",
@@ -335,7 +335,7 @@ describe("ProxyGroupsRulesLibrary", () => {
 
     mocks.captures.buttons.find((props) => props.children === "添加").onClick();
 
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-2", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-2" }, [
       {
         id: "telegram",
         name: "Telegram",
@@ -358,7 +358,7 @@ describe("ProxyGroupsRulesLibrary", () => {
     mocks.captures.buttons.find((props) => props.children === "添加").onClick();
 
     expect(mocks.store.toggleProxyGroup).toHaveBeenCalledWith("auto");
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("auto", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "auto" }, [
       {
         id: "telegram",
         name: "Telegram",
@@ -493,7 +493,7 @@ describe("ProxyGroupsRulesLibrary", () => {
     renderLibrary({ 0: [telegramRule], 1: "module:auto" });
     mocks.captures.buttons.find((props) => props.children === "添加").onClick();
     expect(mocks.store.toggleProxyGroup).not.toHaveBeenCalled();
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("auto", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "auto" }, [
       {
         id: "telegram",
         name: "Telegram",
@@ -535,7 +535,7 @@ describe("ProxyGroupsRulesLibrary", () => {
     mocks.captures.buttons.find((props) => props.children === "添加").onClick();
 
     expect(mocks.store.toggleProxyGroup).toHaveBeenCalledWith("bare");
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("bare", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "bare" }, [
       {
         id: "telegram",
         name: "Telegram",
@@ -544,6 +544,48 @@ describe("ProxyGroupsRulesLibrary", () => {
         noResolve: true,
       },
     ]);
+  });
+
+  it("recognizes a moved builtin after its source is hidden and prevents duplicate additions", () => {
+    mocks.store.enabledProxyGroups = [];
+    mocks.store.hiddenProxyGroups = ["auto"];
+    mocks.store.builtinRuleEdits = { "module:auto:netflix": { target: { kind: "custom", id: "custom-1" } } };
+    mocks.search.searchResults = [netflixRule];
+    const { html } = renderLibrary({ 0: [netflixRule], 1: "custom:custom-1" });
+    expect(html).toContain("Custom");
+    expect(html).toContain("已添加");
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+
+    renderLibrary({ 0: [netflixRule], 1: "custom:custom-2" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "规则集已在其他分流组中" }));
+  });
+
+  it("allows a hidden, unmoved preset to be added as a custom rule set", () => {
+    mocks.store.hiddenProxyGroups = ["auto"];
+    mocks.store.enabledProxyGroups = [];
+    renderLibrary({ 0: [netflixRule], 1: "custom:custom-1" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, expect.arrayContaining([
+      expect.objectContaining({ id: "netflix" }),
+    ]));
+  });
+
+  it("allows a removed preset to be selected again and ignores a stale disabled destination", () => {
+    mocks.store.builtinRuleEdits = { "module:auto:netflix": { enabled: false } };
+    renderLibrary({ 0: [netflixRule], 1: "custom:custom-1" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" },
+      [expect.objectContaining({ id: "netflix" })]);
+
+    vi.clearAllMocks();
+    mocks.store.customProxyGroups = mocks.store.customProxyGroups.map((group: any) =>
+      group.id === "custom-1" ? { ...group, enabled: false } : group);
+    renderLibrary({ 0: [telegramRule], 1: "custom:custom-1" });
+    mocks.captures.buttons.find((props) => props.children === "添加").onClick();
+    expect(mocks.store.addModuleRules).not.toHaveBeenCalled();
   });
 
   it("covers empty hints, loading-more state, disabled builtin edits, and optional interactions", () => {
@@ -577,7 +619,7 @@ describe("ProxyGroupsRulesLibrary", () => {
     mocks.search.searchResults = [telegramRule];
     renderLibrary({ 0: [telegramRule], 1: "custom:custom-1" });
     mocks.captures.buttons.find((props) => props.children === "添加").onClick();
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [
       expect.objectContaining({ id: "telegram" }),
     ]);
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "已添加规则集" }));

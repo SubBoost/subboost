@@ -100,7 +100,7 @@ describe("Tailscale snapshot anchors", () => {
   });
 
   it("keeps routing preference changes for one identity observable", () => {
-    expect(compareSubscriptionSnapshots(snapshot([ts({ "exit-node": "100.64.0.1" })]), snapshot([ts({ "exit-node": "auto:any" })])))
+    expect(compareSubscriptionSnapshots(snapshot([ts({ "exit-node": "203.0.113.10" })]), snapshot([ts({ "exit-node": "auto:any" })])))
       .toMatchObject({ relation: "field-conflict", conflictingNodeCount: 1 });
     expect(compareSubscriptionSnapshots(snapshot([ts({ "accept-routes": true })]), snapshot([ts({ "accept-routes": false })])))
       .toMatchObject({ relation: "field-conflict", conflictingNodeCount: 1 });
@@ -108,8 +108,8 @@ describe("Tailscale snapshot anchors", () => {
 
   it("does not report a credential conflict across distinct control servers", () => {
     const result = compareSubscriptionSnapshots(
-      snapshot([ts({ "control-url": "https://headscale.one.test", "auth-key": "tskey-auth-a" })]),
-      snapshot([ts({ "control-url": "http://headscale.two.test", "auth-key": "tskey-auth-b" })]));
+      snapshot([ts({ "control-url": "https://local.subboost.test", "auth-key": "tskey-auth-a" })]),
+      snapshot([ts({ "control-url": "http://127.0.0.1:8080", "auth-key": "tskey-auth-b" })]));
     expect(result).toMatchObject({ relation: "divergent", conflictingNodeCount: 0 });
   });
 

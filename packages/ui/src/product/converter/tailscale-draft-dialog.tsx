@@ -15,7 +15,7 @@ export type TailscaleDraftDialogProps = {
 export function TailscaleDraftDialog({ draft, knownStateDirs, onApply, onCancel }: TailscaleDraftDialogProps) {
   return (
     <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-3xl">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>添加 Tailscale 节点</DialogTitle>
         </DialogHeader>

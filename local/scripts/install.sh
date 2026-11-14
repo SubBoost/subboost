@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 DEFAULT_HOME="/opt/subboost"
 DEFAULT_BIN="/usr/local/bin/subboost"
@@ -18,30 +19,16 @@ SUBBOOST_DRY_RUN="${SUBBOOST_DRY_RUN:-0}"
 
 ENV_FILE="$SUBBOOST_HOME/.env"
 COMPOSE_FILE="$SUBBOOST_HOME/docker-compose.yml"
-TMP_DIR="${TMPDIR:-/tmp}/subboost-install.$$"
-RELEASE_FILE="$TMP_DIR/release.json"
+TMP_DIR=""
+RELEASE_FILE=""
 
-say() {
-  printf '%s\n' "$*"
-}
-
-warn() {
-  printf 'WARN: %s\n' "$*" >&2
-}
-
-die() {
-  printf 'ERROR: %s\n' "$*" >&2
-  exit 1
-}
-
-is_root() {
-  [ "$(id -u)" = "0" ]
-}
+say() { printf '%s\n' "$*"; }
+warn() { printf 'WARN: %s\n' "$*" >&2; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+is_root() { [ "$(id -u)" = "0" ]; }
 
 sudo_do() {
-  if is_root; then
-    "$@"
-  else
+  if is_root; then "$@"; else
     command -v sudo >/dev/null 2>&1 || die "sudo is required when the installer is not run as root."
     sudo "$@"
   fi
@@ -92,22 +79,12 @@ prompt() {
 }
 
 confirm_or_quit() {
-  local message="$1"
-  local answer
-  answer="$(prompt "$message" "")"
-  case "$answer" in
-    q|Q) exit 0 ;;
-  esac
+  local answer; answer="$(prompt "$1" "")"
+  case "$answer" in q|Q) exit 0 ;; esac
 }
 
-require_linux() {
-  [ "$(uname -s)" = "Linux" ] || die "This installer only supports Linux servers."
-}
-
-require_curl() {
-  command -v curl >/dev/null 2>&1 || die "curl is required. Install curl and run this installer again."
-}
-
+require_linux() { [ "$(uname -s)" = "Linux" ] || die "This installer only supports Linux servers."; }
+require_curl() { command -v curl >/dev/null 2>&1 || die "curl is required. Install curl and run this installer again."; }
 download_to_temp() {
   local url="$1"
   local output="$2"
@@ -179,8 +156,33 @@ resolve_url() {
   esac
 }
 
+temp_directory_identity() { stat -c '%d:%i' -- "$1" 2>/dev/null || stat -f '%d:%i' "$1" 2>/dev/null; }
+prepare_temp_directory() {
+  if [ -z "$TMP_DIR" ]; then
+    TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/subboost-install.XXXXXXXXXX")" || die "Cannot create private temporary directory."
+    # Freeze the path and identity used by cleanup, even if variables change later.
+    local identity quoted_dir quoted_identity; identity="$(temp_directory_identity "$TMP_DIR")" || die "Cannot identify temporary directory: $TMP_DIR"
+    if [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ]; then printf -v quoted_dir '%q' "$TMP_DIR"; printf -v quoted_identity '%q' "$identity"; trap "[ -d $quoted_dir ] && [ ! -L $quoted_dir ] && [ \"\$(temp_directory_identity $quoted_dir)\" = $quoted_identity ] && rm -rf -- $quoted_dir" EXIT; fi
+  fi
+}
+validate_compose_binding() {
+  # The app's published ports must all use the requested host and include the selected port.
+  local bind="${1#[}" port="$2"; bind="${bind%]}"
+  if command -v python3 >/dev/null 2>&1; then python3 -c 'import json,sys; a=json.load(sys.stdin)["services"]["app"]; p=a.get("ports",[]); sys.exit(not (a.get("network_mode")!="host" and isinstance(p,list) and all(isinstance(x,dict) and x.get("host_ip")==sys.argv[1] for x in p) and any(str(x.get("target"))=="3000" and str(x.get("published"))==sys.argv[2] and x.get("protocol","tcp")=="tcp" for x in p)))' "$bind" "$port" 2>/dev/null
+  elif command -v node >/dev/null 2>&1; then node -e 'const a=JSON.parse(require("fs").readFileSync(0,"utf8")).services.app,p=a.ports; process.exit(Array.isArray(p)&&a.network_mode!=="host"&&p.every(x=>x&&x.host_ip===process.argv[1])&&p.some(x=>String(x.target)==="3000"&&String(x.published)===process.argv[2]&&(x.protocol===undefined?"tcp":x.protocol)==="tcp")?0:1)' "$bind" "$port" 2>/dev/null
+  elif command -v jq >/dev/null 2>&1; then jq -e --arg bind "$bind" --arg port "$port" '(.services.app // {}) as $a | ($a.ports | type=="array") and ($a.network_mode != "host") and all($a.ports[]; .host_ip==$bind) and any($a.ports[]; (.target|tostring)=="3000" and (.published|tostring)==$port and (if has("protocol") then .protocol else "tcp" end)=="tcp")' >/dev/null 2>&1
+  else
+    # Without a JSON parser, accept only the canonical single-port Compose output.
+    awk -v bind="$bind" -v port="$port" '
+      NR==1 && $0!="{" {bad=1} {last=$0} /^  "services": \{$/ {s=1;next} s && /^  \},?$/ {s=0} s && /^    "app": \{$/ {a=1;apps++;next} a && /^    \},?$/ {a=0}
+      a && /^      "network_mode":/ {bad=1} a && /^      "ports": \[$/ {p=1;lists++;next} p && /^      \],?$/ {p=0} p && /^        \{$/ {items++}
+      p && /^          "(target|published|protocol|host_ip)":/ {v=$0; sub(/^.*:[[:space:]]*"?/,"",v); sub(/"?,?[[:space:]]*$/,"",v); if ($0 ~ /"target":/) {targets++;if(v!="3000")bad=1} else if ($0 ~ /"published":/) {published++;if(v!=port)bad=1} else if ($0 ~ /"host_ip":/) {hosts++;if(v!=bind)bad=1} else if(v!="tcp")bad=1}
+      END {if(last!="}" || apps!=1 || lists!=1 || items!=1 || targets!=1 || published!=1 || hosts!=1 || bad)exit 1}' || { printf '%s\n' 'Install Python 3, Node.js, or jq to verify this Compose binding.' >&2; return 1; }
+  fi
+}
 fetch_release_manifest() {
-  mkdir -p "$TMP_DIR"
+  prepare_temp_directory
+  RELEASE_FILE="$TMP_DIR/release.json"
   if download_to_temp "$SUBBOOST_RELEASE_URL" "$RELEASE_FILE" 2>/dev/null; then
     return 0
   fi
@@ -199,23 +201,18 @@ random_hex() {
 
 port_number() {
   local value="$1"
-  case "$value" in
-    *:*) value="${value##*:}" ;;
-  esac
+  case "$value" in *:*) value="${value##*:}" ;; esac
   value="${value#[}"
   value="${value%]}"
+  case "$value" in ''|*[!0-9]*) ;; *) value="${value#"${value%%[!0]*}"}"; [ -n "$value" ] || value=0 ;; esac
   printf '%s\n' "$value"
 }
 
 port_is_number() {
-  local port
-  port="$(port_number "$1")"
-  case "$port" in
-    ''|*[!0-9]*) return 1 ;;
-  esac
+  local port; port="$(port_number "$1")"
+  case "$port" in ''|*[!0-9]*) return 1 ;; esac
   [ "$port" -ge 1 ] && [ "$port" -le 65535 ]
 }
-
 port_is_free() {
   local port
   port="$(port_number "$1")"
@@ -298,10 +295,10 @@ env_value() {
 }
 
 write_env_value() {
+  prepare_temp_directory
   local key="$1"
   local value="$2"
   local tmp="$TMP_DIR/env"
-  mkdir -p "$TMP_DIR"
   if [ -f "$ENV_FILE" ]; then
     read_env_file | awk -v key="$key" 'index($0, key "=") != 1 { print }' > "$tmp"
   else
@@ -310,20 +307,12 @@ write_env_value() {
   printf '%s=%s\n' "$key" "$value" >> "$tmp"
   install_secret_file "$tmp" "$ENV_FILE"
 }
-
 ensure_env_value() {
-  local key="$1"
-  local value="$2"
-  local current
-  current="$(env_value "$key" || true)"
-  if [ -z "$current" ]; then
-    write_env_value "$key" "$value"
-  fi
+  local key="$1" value="$2" current; current="$(env_value "$key" || true)"
+  if [ -z "$current" ]; then write_env_value "$key" "$value"; fi
 }
 
-set_env_value() {
-  write_env_value "$1" "$2"
-}
+set_env_value() { write_env_value "$1" "$2"; }
 
 ensure_scheme() {
   local url="$1"
@@ -333,33 +322,31 @@ ensure_scheme() {
   esac
 }
 
-url_has_port() {
-  printf '%s' "$1" | grep -Eq '^https?://\[[^]]+\]:[0-9]+($|/)|^https?://[^/]+:[0-9]+($|/)'
-}
+url_has_port() { printf '%s' "$1" | grep -Eq '^https?://\[[^]]+\]:[0-9]+($|/)|^https?://[^/]+:[0-9]+($|/)'; }
 
-url_without_port() {
-  local url
-  url="$(ensure_scheme "$1")"
-  url="${url%/}"
-  if printf '%s' "$url" | grep -Eq '^https?://\[[^]]+\]:[0-9]+$'; then
-    printf '%s\n' "$url" | sed -E 's#^(https?://\[[^]]+\]):[0-9]+$#\1#'
-  elif printf '%s' "$url" | grep -Eq '^https?://[^/]+:[0-9]+$'; then
-    printf '%s\n' "$url" | sed -E 's#^(https?://[^/:]+):[0-9]+$#\1#'
-  else
-    printf '%s\n' "$url"
-  fi
+valid_web_url() {
+  local LC_ALL=C pattern; pattern="^$2"$'://([a-zA-Z0-9.\200-\377-]+|\\[[0-9A-Fa-f:.]+\\])(:[0-9]{1,5})?$'
+  [[ "$1" =~ $pattern && "$1" != *$'\302'[$'\200'-$'\237']* ]]
 }
-
-normalize_app_url() {
-  local url
-  local port="$2"
-  url="$(ensure_scheme "$1")"
-  url="${url%/}"
-  if url_has_port "$url" || [ "$port" = "80" ] || [ "$port" = "443" ]; then
-    printf '%s\n' "$url"
-  else
-    printf '%s:%s\n' "$url" "$port"
+valid_ipv6_literal() {
+  local address="$1" part count=0 compressed=0; local -a parts
+  if [[ "$address" == *.* ]]; then
+    local suffix="${address##*:}" prefix="${address%:*}" byte; local -a octets
+    [[ "$prefix" =~ (^|:)[fF]{4}$ && "${prefix%:*}" != *[!0:]* && "$suffix" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+    IFS=. read -r -a octets <<< "$suffix"
+    for byte in "${octets[@]}"; do [[ "$byte" =~ ^(0|[1-9][0-9]{0,2})$ ]] && (( byte <= 255 )) || return 1; done
+    printf -v address '%s:%x:%x' "$prefix" "$(( octets[0] * 256 + octets[1] ))" "$(( octets[2] * 256 + octets[3] ))"
   fi
+  [[ ${#address} -le 39 && "$address" =~ ^[0-9A-Fa-f:]+$ && "$address" != *:::* ]] || return 1
+  [[ "$address" != :* || "$address" == ::* ]] && [[ "$address" != *: || "$address" == *:: ]] || return 1
+  if [[ "$address" == *::* ]]; then compressed=1; [[ "${address#*::}" != *::* ]] || return 1; fi
+  IFS=: read -r -a parts <<< "$address"
+  for part in "${parts[@]}"; do
+    [ -z "$part" ] && continue
+    [[ "$part" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+    count=$((count + 1))
+  done
+  if (( compressed )); then (( count < 8 )); else (( count == 8 )); fi
 }
 
 detect_public_host() {
@@ -373,10 +360,10 @@ detect_public_host() {
 }
 
 install_docker_engine() {
+  prepare_temp_directory
   confirm_or_quit "Docker is missing. Press Enter to install Docker automatically, or type q to exit: "
   require_curl
   local script="$TMP_DIR/get-docker.sh"
-  mkdir -p "$TMP_DIR"
   curl -fsSL https://get.docker.com -o "$script"
   run_root sh "$script"
   if command -v systemctl >/dev/null 2>&1; then
@@ -600,7 +587,6 @@ main() {
   COMPOSE_FILE="$TMP_DIR/candidate-compose.yml"
   local candidate_manager="$TMP_DIR/candidate-manager"
   local volumes_before="$TMP_DIR/volumes.before"
-  umask 077
   : > "$ENV_FILE"
   download_to_temp "$compose_url" "$COMPOSE_FILE"
   download_to_temp "$manager_url" "$candidate_manager"
@@ -620,7 +606,7 @@ main() {
   ensure_env_value CRON_SECRET "$(random_hex 32)"
   ensure_env_value LOCAL_SETUP_TOKEN "$(random_hex 32)"
 
-  local db_name db_user db_pass database_url current_url current_port default_host default_url input_url selected_port final_url recommended_port
+  local db_name db_user db_pass database_url current_url current_port selected_port final_url recommended_port access_mode binding
   db_name="$(env_value POSTGRES_DB)"
   db_user="$(env_value POSTGRES_USER)"
   db_pass="$(env_value POSTGRES_PASSWORD)"
@@ -630,20 +616,50 @@ main() {
   current_port="${SUBBOOST_PORT:-$(env_value SUBBOOST_PORT || true)}"
   current_url="${APP_URL:-$(env_value APP_URL || true)}"
 
-  default_host="$(detect_public_host)"
-  if [ -n "$current_url" ]; then
-    default_url="$(url_without_port "$current_url")"
-  else
-    default_url="http://$default_host"
-  fi
   recommended_port="$(recommended_port_from "$current_port")"
-  input_url="$(prompt "请输入 SubBoost 访问地址，直接回车会自动填入服务器 ip [$default_url]: " "$default_url")"
   selected_port="$(prompt_for_port "$recommended_port")"
-  final_url="$(normalize_app_url "$(url_without_port "$input_url")" "$selected_port")"
+  access_mode="${SUBBOOST_ACCESS_MODE:-$(prompt '访问方式 [ssh/https/public-http]，默认 ssh: ' 'ssh')}"
+  binding="127.0.0.1"
+  case "$access_mode" in
+    ssh)
+      final_url="${current_url:-http://127.0.0.1:$selected_port}"
+      case "$final_url" in "http://127.0.0.1:$selected_port"|"http://localhost:$selected_port") ;; *) die "SSH 模式的 APP_URL 必须是本机地址和所选端口。" ;; esac
+      ;;
+    https)
+      final_url="${current_url:-$(prompt '输入已配置 HTTPS 的反向代理地址（例如 https://local.subboost.test）: ' '')}"
+      final_url="${final_url%/}"
+      valid_web_url "$final_url" https || die "请输入有效的 HTTPS 地址，不能包含路径。"
+      warn "请自行配置 HTTPS 证书和反向代理，将请求转发到 http://127.0.0.1:$selected_port；安装器不会配置 TLS。"
+      ;;
+    public-http)
+      final_url="${current_url:-$(prompt '输入服务器地址（HTTP）: ' "http://$(detect_public_host)")}"
+      final_url="$(ensure_scheme "${final_url%/}")"
+      valid_web_url "$final_url" http || die "请输入有效的 HTTP 地址，不能包含路径。"
+      if ! url_has_port "$final_url"; then final_url="$final_url:$selected_port"; fi
+      binding=""
+      warn "HTTP 未加密，设置令牌、密码和会话可能被网络上的其他人读取；只在可信网络使用。"
+      ;;
+    *) die "访问方式须为 ssh、https 或 public-http。" ;;
+  esac
+  if [[ "$final_url" =~ ^https?://\[([0-9A-Fa-f:.]+)\] ]] && ! valid_ipv6_literal "${BASH_REMATCH[1]}"; then die "访问地址的 IPv6 格式无效。"; fi
+  if url_has_port "$final_url" && ! port_is_number "$final_url"; then die "访问地址的端口须为 1-65535。"; fi
+  if [ "$access_mode" != "public-http" ]; then
+    local docker_version docker_major
+    docker_version="$(docker_cmd version --format '{{.Server.Version}}' 2>/dev/null || true)"
+    docker_major="${docker_version%%.*}"
+    if [[ "$docker_major" =~ ^[0-9]+$ ]] && (( docker_major < 28 )); then
+      warn "Docker Engine 28 以下的本机端口可能被同一局域网的其他主机访问；请升级 Docker 或隔离网络。"
+    fi
+  fi
+  export SUBBOOST_PORT="$selected_port" SUBBOOST_BIND_ADDRESS="$binding" APP_URL="$final_url"
   set_env_value SUBBOOST_PORT "$selected_port"
+  set_env_value SUBBOOST_BIND_ADDRESS "$binding"
   set_env_value APP_URL "$final_url"
 
   compose config >/dev/null
+  if [ -n "$binding" ]; then
+    compose config --format json | validate_compose_binding "$binding" "$selected_port" || die "Candidate Compose does not safely publish app on $binding:$selected_port (port 3000/tcp); use a compatible Compose file."
+  fi
   local services
   services="$(compose config --services)"
   for service in app db cron; do
@@ -668,6 +684,7 @@ main() {
   say ""
   say "SubBoost 已启动。"
   say "访问地址: $(env_value APP_URL)"
+  if [ "$access_mode" = "ssh" ]; then say "从远程电脑访问前运行: ssh -L $selected_port:127.0.0.1:$selected_port <用户名>@<服务器地址>"; fi
   say "首次初始化链接: $(env_value APP_URL)/login#setup-token=$(env_value LOCAL_SETUP_TOKEN)"
   say "请通过上面的链接创建第一个管理员；初始化成功后页面会清除令牌片段。"
   say "管理命令: subboost"
@@ -675,7 +692,7 @@ main() {
 }
 
 if [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ]; then
-  trap 'rm -rf "$TMP_DIR"' EXIT
+  trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
   DOCKER_RUNNER="docker"
   main "$@"
 fi

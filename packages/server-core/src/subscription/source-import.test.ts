@@ -21,6 +21,21 @@ function ssLink(name = "SS Node"): string {
 }
 
 describe("importSubscriptionFromUrl", () => {
+  it("keeps an oversized YAML error bounded through the source import response", async () => {
+    const content = `proxies: [*${"g".repeat(1_000_000)}]`;
+    const result = await importSubscriptionFromUrl(
+      { url: "https://local.subboost.test/sub" },
+      { userAgents: ["probe"], fetchText: async () => ({ ok: true, content }) },
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    for (const message of [result.error, result.errorInfo.message, result.errorInfo.detail]) {
+      expect(message).toContain("unidentified alias");
+      expect(message?.length).toBeLessThanOrEqual(512);
+    }
+    expect(JSON.stringify(result).length).toBeLessThan(2_000);
+  });
+
   it("tries client user agents and keeps supplemental userinfo headers", async () => {
     const fetchText = vi.fn(async (request: SourceImportTransportRequest): Promise<SourceImportTransportResult> => {
       if (request.purpose === "userinfo") {

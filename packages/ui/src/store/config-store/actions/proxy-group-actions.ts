@@ -2,12 +2,14 @@ import {
   type CustomProxyGroup,
   type CustomRuleSet,
   type ProxyGroupTargetRef,
+  type ProxyGroupRuleTarget,
 } from "@subboost/core/types/config";
 import { normalizeProxyGroupAdvancedConfig } from "@subboost/core/proxy-group-advanced";
-import { PROXY_GROUP_MODULES } from "@subboost/core/generator/proxy-groups";
+import { PROXY_GROUP_MODULES, type ProxyGroupRule } from "@subboost/core/generator/proxy-groups";
 import { getModuleRuleOrderKey, isPresetModuleRule } from "@subboost/core/generator/module-rules";
 import { resolveProxyGroupModuleName } from "@subboost/core/proxy-group-name";
-import type { ConfigActions, RuleSetDraft } from "../definitions";
+import { buildRuleSetUrlFromPath } from "@subboost/core/rules/rule-model";
+import type { ConfigActions, ConfigState, RuleSetDraft } from "../definitions";
 import type { GetState, SetAndGenerateConfig, SetState } from "../store-types";
 import {
   appendUniqueCustomRuleSets,
@@ -15,9 +17,9 @@ import {
   normalizeRuleOrderForState,
   normalizeRuleSetDraft,
   resolveMoveTargetName,
-  resolveRuleSetContainerTargetName,
   retargetBuiltinRuleEdits,
   ruleTargetMatchesContainer,
+  ruleTargetsEqual,
   updateBuiltinRuleEdit,
 } from "./proxy-group-rule-set-helpers";
 
@@ -57,6 +59,14 @@ function isBuiltinProxyGroup(moduleId: string): boolean {
   return PROXY_GROUP_MODULES.some((proxyModule) => proxyModule.id === moduleId);
 }
 
+function matchesPresetRuleSet(draft: RuleSetDraft, preset: ProxyGroupRule, sourceId: string,
+  state: Pick<ConfigState, "cnIpNoResolve" | "ruleProviderBaseUrl">): boolean {
+  const noResolve = sourceId === "cn" && preset.id === "cn-ip" ? state.cnIpNoResolve : Boolean(preset.noResolve);
+  return draft.behavior === preset.behavior && (draft.format === undefined || draft.format === "mrs") &&
+    Boolean(draft.noResolve) === noResolve &&
+    buildRuleSetUrlFromPath(draft.path, state.ruleProviderBaseUrl) === buildRuleSetUrlFromPath(preset.path, state.ruleProviderBaseUrl);
+}
+
 function isSupportedProxyGroupOrderKey(key: string): boolean {
   return (
     key.startsWith("module:") ||
@@ -67,9 +77,16 @@ function isSupportedProxyGroupOrderKey(key: string): boolean {
 }
 
 function resolveRuleSetContainerTargetRef(
-  id: string,
+  container: ProxyGroupRuleTarget,
   customProxyGroups: CustomProxyGroup[],
 ): ProxyGroupTargetRef | null {
+  const id = typeof container === "string" ? container.trim() : container?.id?.trim();
+  if (!id) return null;
+  if (typeof container !== "string") {
+    if (container.kind === "module") return isBuiltinProxyGroup(id) ? { kind: "module", id } : null;
+    if (container.kind === "custom") return customProxyGroups.some((group) => group.id === id) ? { kind: "custom", id } : null;
+    return null;
+  }
   if (isBuiltinProxyGroup(id)) return { kind: "module", id };
   return customProxyGroups.some((group) => group.id === id) ? { kind: "custom", id } : null;
 }
@@ -172,32 +189,36 @@ export function createProxyGroupActions(
       });
     },
 
-    addModuleRules: (moduleId: string, rules: RuleSetDraft[]) => {
-      const id = (moduleId || "").trim();
+    addModuleRules: (moduleId: ProxyGroupRuleTarget, rules: RuleSetDraft[]) => {
+      const id = typeof moduleId === "string" ? moduleId.trim() : moduleId?.id?.trim();
       if (!id) return;
       if (!Array.isArray(rules) || rules.length === 0) return;
 
       setAndGenerateConfig((state) => {
-        const target = resolveRuleSetContainerTargetName(
-          id,
-          state.customProxyGroups,
-          state.proxyGroupNameOverrides,
-        );
-        const targetRef = resolveRuleSetContainerTargetRef(id, state.customProxyGroups);
+        const targetRef = resolveRuleSetContainerTargetRef(moduleId, state.customProxyGroups);
+        const target = targetRef && resolveMoveTargetName(targetRef, state.customProxyGroups, state.proxyGroupNameOverrides);
         if (!target || !targetRef) return state;
-        const proxyModule = PROXY_GROUP_MODULES.find((item) => item.id === id);
         let nextBuiltinRuleEdits = state.builtinRuleEdits;
         const customDrafts: RuleSetDraft[] = [];
         for (const draft of rules) {
           const normalized = normalizeRuleSetDraft(draft);
           if (!normalized) continue;
-          if (proxyModule && isPresetModuleRule(proxyModule, normalized.id)) {
-            const key = getModuleRuleOrderKey(proxyModule.id, normalized.id);
-            nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, {
-              enabled: true,
-              target: null,
-            });
-            continue;
+          if (state.customRuleSets.some((rule) => rule.id === normalized.id)) continue;
+          const alreadyAssigned = PROXY_GROUP_MODULES.some((source) => {
+            if (!isPresetModuleRule(source, normalized.id)) return false;
+            const edit = nextBuiltinRuleEdits?.[getModuleRuleOrderKey(source.id, normalized.id)];
+            return edit?.enabled !== false && (Boolean(edit?.target) || state.enabledProxyGroups.includes(source.id));
+          });
+          if (alreadyAssigned) continue;
+          const source = PROXY_GROUP_MODULES.find((item) => isPresetModuleRule(item, normalized.id));
+          const preset = source?.rules.find((item) => item.id === normalized.id);
+          if (source && preset) {
+            const key = getModuleRuleOrderKey(source.id, preset.id);
+            const samePreset = matchesPresetRuleSet(normalized, preset, source.id, state);
+            nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, samePreset
+              ? { enabled: true, target: targetRef.kind === "module" && source.id === id ? null : targetRef }
+              : { enabled: false });
+            if (samePreset) continue;
           }
           customDrafts.push(normalized);
         }
@@ -220,24 +241,22 @@ export function createProxyGroupActions(
     },
 
     updateModuleRule: (
-      moduleId: string,
+      moduleId: ProxyGroupRuleTarget,
       ruleId: string,
-      rule: Partial<Omit<RuleSetDraft, "id">>
+      rule: Partial<Omit<RuleSetDraft, "id">>,
+      sourceValue?: ProxyGroupRuleTarget,
     ) => {
-      const id = (moduleId || "").trim();
+      const id = typeof moduleId === "string" ? moduleId.trim() : moduleId?.id?.trim();
       const rid = (ruleId || "").trim();
       if (!id || !rid) return;
 
       setAndGenerateConfig((state) => {
-        const target = resolveRuleSetContainerTargetName(
-          id,
-          state.customProxyGroups,
-          state.proxyGroupNameOverrides,
-        );
-        const targetRef = resolveRuleSetContainerTargetRef(id, state.customProxyGroups);
-        if (!target || !targetRef) return state;
+        const targetRef = resolveRuleSetContainerTargetRef(moduleId, state.customProxyGroups);
+        const target = targetRef && resolveMoveTargetName(targetRef, state.customProxyGroups, state.proxyGroupNameOverrides);
+        if (sourceValue === undefined && (!target || !targetRef)) return state;
         const index = state.customRuleSets.findIndex(
-          (item) => item.id === rid && ruleTargetMatchesContainer(item.target, targetRef, target, state),
+          (item) => item.id === rid && (sourceValue !== undefined ? ruleTargetsEqual(item.target, sourceValue)
+            : Boolean(target && targetRef && ruleTargetMatchesContainer(item.target, targetRef, target, state))),
         );
         if (index < 0) return state;
 
@@ -249,7 +268,7 @@ export function createProxyGroupActions(
         if (!normalized) return state;
 
         const nextCustomRuleSets = state.customRuleSets.map((item, itemIndex) =>
-          itemIndex === index ? { ...normalized, target: targetRef } : item
+          itemIndex === index ? { ...normalized, target: item.target } : item
         );
 
         return {
@@ -262,13 +281,21 @@ export function createProxyGroupActions(
       });
     },
 
-    removeModuleRule: (moduleId: string, ruleId: string) => {
-      const id = (moduleId || "").trim();
+    removeModuleRule: (moduleId: ProxyGroupRuleTarget, ruleId: string, sourceValue?: ProxyGroupRuleTarget) => {
+      const id = typeof moduleId === "string" ? moduleId.trim() : moduleId?.id?.trim();
       const rid = (ruleId || "").trim();
       if (!id || !rid) return;
 
       setAndGenerateConfig((state) => {
-        const mod = PROXY_GROUP_MODULES.find((m) => m.id === id);
+        if (sourceValue !== undefined) {
+          const nextCustomRuleSets = state.customRuleSets.filter((ruleSet) =>
+            !(ruleSet.id === rid && ruleTargetsEqual(ruleSet.target, sourceValue)));
+          if (nextCustomRuleSets.length === state.customRuleSets.length) return state;
+          return { customRuleSets: nextCustomRuleSets,
+            ruleOrder: normalizeRuleOrderForState({ ...state, customRuleSets: nextCustomRuleSets }) };
+        }
+        const targetRef = resolveRuleSetContainerTargetRef(moduleId, state.customProxyGroups);
+        const mod = targetRef?.kind === "module" ? PROXY_GROUP_MODULES.find((m) => m.id === id) : undefined;
         if (mod && isPresetModuleRule(mod, rid)) {
           const key = getModuleRuleOrderKey(id, rid);
           const nextBuiltinRuleEdits = updateBuiltinRuleEdit(state.builtinRuleEdits, key, { enabled: false });
@@ -281,12 +308,7 @@ export function createProxyGroupActions(
           };
         }
 
-        const target = resolveRuleSetContainerTargetName(
-          id,
-          state.customProxyGroups,
-          state.proxyGroupNameOverrides,
-        );
-        const targetRef = resolveRuleSetContainerTargetRef(id, state.customProxyGroups);
+        const target = targetRef && resolveMoveTargetName(targetRef, state.customProxyGroups, state.proxyGroupNameOverrides);
         if (!target || !targetRef) return state;
         const movedBuiltinKey = findBuiltinRuleEditKeyByTarget(state.builtinRuleEdits, targetRef, target, rid, state);
         if (movedBuiltinKey) {
@@ -313,30 +335,25 @@ export function createProxyGroupActions(
       });
     },
 
-    moveModuleRule: (moduleId, ruleId, target) => {
-      const sourceId = (moduleId || "").trim();
+    moveModuleRule: (moduleId, ruleId, target, sourceValue) => {
+      const sourceId = typeof moduleId === "string" ? moduleId.trim() : moduleId?.id?.trim();
       const rid = (ruleId || "").trim();
       const targetId = (target?.id || "").trim();
       if (!sourceId || !rid || !targetId) return;
       if (target.kind !== "module" && target.kind !== "custom") return;
 
       setAndGenerateConfig((state) => {
-        const sourceModule = PROXY_GROUP_MODULES.find((m) => m.id === sourceId);
+        const sourceTargetRef = resolveRuleSetContainerTargetRef(moduleId, state.customProxyGroups);
+        const sourceModule = sourceTargetRef?.kind === "module" ? PROXY_GROUP_MODULES.find((m) => m.id === sourceId) : undefined;
         const targetName = resolveMoveTargetName(
           target,
           state.customProxyGroups,
           state.proxyGroupNameOverrides,
         );
         if (!targetName) return state;
-        const sourceTarget = resolveRuleSetContainerTargetName(
-          sourceId,
-          state.customProxyGroups,
-          state.proxyGroupNameOverrides,
-        );
-        const sourceTargetRef = resolveRuleSetContainerTargetRef(sourceId, state.customProxyGroups);
-        if (!sourceTarget || !sourceTargetRef) return state;
-        if (sourceTarget === targetName) return state;
-        if (target.kind === "module" && targetId === sourceId) return state;
+        const sourceTarget = sourceTargetRef && resolveMoveTargetName(sourceTargetRef, state.customProxyGroups, state.proxyGroupNameOverrides);
+        if (sourceValue === undefined && (!sourceTarget || !sourceTargetRef)) return state;
+        if (sourceValue === undefined && sourceTargetRef?.kind === target.kind && sourceTargetRef.id === targetId) return state;
 
         let nextEnabledProxyGroups = state.enabledProxyGroups;
 
@@ -348,15 +365,17 @@ export function createProxyGroupActions(
 
         const customRuleSetIndex = state.customRuleSets.findIndex(
           (ruleSet) =>
-            ruleSet.id === rid && ruleTargetMatchesContainer(ruleSet.target, sourceTargetRef, sourceTarget, state)
+            ruleSet.id === rid && (sourceValue !== undefined ? ruleTargetsEqual(ruleSet.target, sourceValue)
+              : Boolean(sourceTarget && sourceTargetRef && ruleTargetMatchesContainer(ruleSet.target, sourceTargetRef, sourceTarget, state)))
         );
         if (customRuleSetIndex >= 0) {
           const targetModule = target.kind === "module"
             ? PROXY_GROUP_MODULES.find((proxyModule) => proxyModule.id === targetId)
             : undefined;
+          const targetPreset = targetModule?.rules.find((rule) => rule.id === rid);
           let nextBuiltinRuleEdits = state.builtinRuleEdits;
           let nextCustomRuleSets: CustomRuleSet[];
-          if (targetModule && isPresetModuleRule(targetModule, rid)) {
+          if (targetModule && targetPreset && matchesPresetRuleSet(state.customRuleSets[customRuleSetIndex], targetPreset, targetId, state)) {
             const targetKey = getModuleRuleOrderKey(targetModule.id, rid);
             nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, targetKey, {
               enabled: true,
@@ -373,6 +392,11 @@ export function createProxyGroupActions(
           ) {
             nextCustomRuleSets = state.customRuleSets.filter((_, index) => index !== customRuleSetIndex);
           } else {
+            if (targetModule && targetPreset) {
+              const key = getModuleRuleOrderKey(targetId, rid);
+              if (nextBuiltinRuleEdits?.[key]?.enabled !== false && state.enabledProxyGroups.includes(targetId)) return state;
+              nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, { enabled: false });
+            }
             nextCustomRuleSets = state.customRuleSets.map((ruleSet, index) =>
               index === customRuleSetIndex ? { ...ruleSet, target } : ruleSet
             );
@@ -390,10 +414,11 @@ export function createProxyGroupActions(
           };
         }
 
+        if (sourceValue !== undefined || state.customRuleSets.some((ruleSet) => ruleSet.id === rid)) return state;
         const movedBuiltinKey = findBuiltinRuleEditKeyByTarget(
           state.builtinRuleEdits,
-          sourceTargetRef,
-          sourceTarget,
+          sourceTargetRef!,
+          sourceTarget!,
           rid,
           state,
         );
@@ -439,6 +464,7 @@ export function createProxyGroupActions(
       setAndGenerateConfig((state) => {
         const mod = PROXY_GROUP_MODULES.find((m) => m.id === id);
         if (!mod || !isPresetModuleRule(mod, rid)) return state;
+        if (state.customRuleSets.some((ruleSet) => ruleSet.id === rid)) return state;
 
         const key = getModuleRuleOrderKey(id, rid);
         const currentEdit = state.builtinRuleEdits?.[key];
@@ -485,7 +511,7 @@ export function createProxyGroupActions(
         let nextBuiltinRuleEdits = state.builtinRuleEdits;
         for (const rule of proxyModule.rules) {
           const key = getModuleRuleOrderKey(id, rule.id);
-          if (nextBuiltinRuleEdits?.[key]?.enabled === false) {
+          if (nextBuiltinRuleEdits?.[key]?.enabled === false && !state.customRuleSets.some((item) => item.id === rule.id)) {
             nextBuiltinRuleEdits = updateBuiltinRuleEdit(nextBuiltinRuleEdits, key, {
               enabled: true,
             });

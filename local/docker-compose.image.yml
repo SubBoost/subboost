@@ -21,7 +21,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "${SUBBOOST_PORT:-3000}:3000"
+      - "${SUBBOOST_BIND_ADDRESS:+${SUBBOOST_BIND_ADDRESS}:}${SUBBOOST_PORT:-3000}:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY}

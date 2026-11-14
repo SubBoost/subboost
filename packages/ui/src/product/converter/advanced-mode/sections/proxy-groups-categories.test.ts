@@ -322,20 +322,20 @@ describe("ProxyGroupsCategories", () => {
     card.onToggleRulesExpanded();
     expect(setters[3]).toHaveBeenCalledWith(expect.any(Function));
     card.onAddRules([{ id: "rule-a" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("auto", [{ id: "rule-a" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "auto" }, [{ id: "rule-a" }]);
     card.onAddRulesToModule("fallback", [{ id: "rule-b" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("fallback", [{ id: "rule-b" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "fallback" }, [{ id: "rule-b" }]);
     expect(mocks.store.toggleProxyGroup).toHaveBeenCalledWith("fallback");
 
     mocks.store.toggleProxyGroup.mockClear();
     card.onAddRulesToModule("auto", [{ id: "rule-c" }]);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("auto", [{ id: "rule-c" }]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "module", id: "auto" }, [{ id: "rule-c" }]);
     expect(mocks.store.toggleProxyGroup).not.toHaveBeenCalled();
 
     card.onRemoveExtraRule("rule-a");
-    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith("auto", "rule-a");
+    expect(mocks.store.removeModuleRule).toHaveBeenCalledWith({ kind: "module", id: "auto" }, "rule-a");
     card.onMoveRule("rule-a", "top");
-    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith("auto", "rule-a", "top");
+    expect(mocks.store.moveModuleRule).toHaveBeenCalledWith({ kind: "module", id: "auto" }, "rule-a", "top");
     card.onMoveManualRule("manual-1", { kind: "module", id: "fallback", name: "Fallback" });
     expect(mocks.store.updateCustomRule).toHaveBeenCalledWith("manual-1", {
       target: { kind: "module", id: "fallback" },
@@ -379,13 +379,13 @@ describe("ProxyGroupsCategories", () => {
 
     const customRule = { id: "geo", name: "Geo", behavior: "domain", path: "geo.txt", noResolve: true };
     mocks.captures.moduleCards[0].onAddRuleToCustomGroup("custom-1", customRule);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [customRule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [customRule]);
 
     mocks.store.customRuleSets = [{ id: "geo", name: "Geo", behavior: "domain", path: "geo.txt", target: "Custom" }];
     mocks.store.addModuleRules.mockClear();
     renderCategories({ 0: new Set(["core"]) });
     mocks.captures.moduleCards[0].onAddRuleToCustomGroup("custom-1", customRule);
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [customRule]);
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [customRule]);
 
     mocks.store.customProxyGroups = [{ id: "custom-1", name: "Custom" }];
     renderCategories({ 0: new Set(["core"]) });
@@ -399,7 +399,7 @@ describe("ProxyGroupsCategories", () => {
       path: "/geo-off.txt",
       noResolve: false,
     });
-    expect(mocks.store.addModuleRules).toHaveBeenCalledWith("custom-1", [
+    expect(mocks.store.addModuleRules).toHaveBeenCalledWith({ kind: "custom", id: "custom-1" }, [
       {
         id: "geo-no-resolve-off",
         name: "Geo Off",
@@ -469,6 +469,7 @@ describe("ProxyGroupsCategories", () => {
   it.each(["module", "custom"])("distinguishes moved and removed rules targeting a %s group", (kind) => {
     mocks.store.hiddenProxyGroups = [];
     const targetId = kind === "module" ? "fallback" : "custom-1";
+    const targetKey = kind === "module" ? targetId : `custom:${targetId}`;
     mocks.store.customProxyGroups = [{ id: "custom-1", name: "Custom", groupType: "select" }];
     mocks.store.builtinRuleEdits = {
       "module:auto:moved-rule": { target: { kind, id: targetId } },
@@ -476,7 +477,7 @@ describe("ProxyGroupsCategories", () => {
     renderCategories({ 0: new Set(["core"]) });
     let card = mocks.captures.moduleCards[0];
     expect(isModuleRuleMovedFrom("auto", "moved-rule", card.ruleSetsByTarget)).toBe(true);
-    expect(card.ruleSetsByTarget[targetId].map((rule: any) => rule.id)).toContain("moved-rule");
+    expect(card.ruleSetsByTarget[targetKey].map((rule: any) => rule.id)).toContain("moved-rule");
     if (kind === "module") {
       const targetCard = mocks.captures.moduleCards.find((item: any) => item.module.id === targetId);
       expect(getEffectiveModuleRuleItems(targetCard.module, card.ruleSetsByTarget, card.hiddenPresetRuleIds)
@@ -487,7 +488,7 @@ describe("ProxyGroupsCategories", () => {
     renderCategories({ 0: new Set(["core"]) });
     card = mocks.captures.moduleCards[0];
     expect(card.hiddenPresetRuleIds.auto).toContain("moved-rule");
-    expect(card.ruleSetsByTarget[targetId] ?? []).toEqual([]);
+    expect(card.ruleSetsByTarget[targetKey] ?? []).toEqual([]);
     expect(isModuleRuleMovedFrom("auto", "moved-rule", card.ruleSetsByTarget)).toBe(false);
 
     mocks.store.builtinRuleEdits = {};
@@ -495,7 +496,7 @@ describe("ProxyGroupsCategories", () => {
     card = mocks.captures.moduleCards[0];
     expect(getEffectiveModuleRuleItems(card.module, card.ruleSetsByTarget, card.hiddenPresetRuleIds)
       .map((rule) => rule.id)).toContain("moved-rule");
-    expect(card.ruleSetsByTarget[targetId] ?? []).toEqual([]);
+    expect(card.ruleSetsByTarget[targetKey] ?? []).toEqual([]);
   });
 
   it.each([true, false])("projects moved CN IP no-resolve=%s into the target group", (noResolve) => {
@@ -508,6 +509,25 @@ describe("ProxyGroupsCategories", () => {
     expect(mocks.captures.moduleCards[0].ruleSetsByTarget.auto).toEqual([
       expect.objectContaining({ id: "cn-ip", noResolve }),
     ]);
+  });
+
+  it("projects structured custom targets to their own group when names collide", () => {
+    mocks.store.customProxyGroups = [{ id: "same", name: "CN", groupType: "select" }];
+    mocks.store.customRuleSets = [{ id: "custom-set", name: "Custom Set", behavior: "domain", path: "geosite/custom-set.mrs", target: { kind: "custom", id: "same" } }];
+    mocks.store.builtinRuleEdits = { "module:auto:moved-rule": { target: { kind: "custom", id: "same" } } };
+    renderCategories({ 0: new Set(["core", "service"]) });
+    const view = mocks.captures.moduleCards[0].ruleSetsByTarget;
+    expect(view.cn ?? []).not.toContainEqual(expect.objectContaining({ id: "custom-set" }));
+    expect(view.cn ?? []).not.toContainEqual(expect.objectContaining({ id: "moved-rule" }));
+    expect(view["custom:same"]).toContainEqual(expect.objectContaining({ id: "moved-rule" }));
+  });
+
+  it("warns when restoring a preset would duplicate an existing custom provider", () => {
+    mocks.store.customRuleSets = [{ id: "auto-rule", name: "Custom", behavior: "domain", path: "geosite/custom.mrs", target: "Fallback" }];
+    renderCategories({ 0: new Set(["core"]) });
+    mocks.captures.moduleCards[0].onRestoreRule("auto-rule");
+    expect(mocks.store.restoreModuleRule).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
   });
 
   it.each([{ kind: "module", id: "auto" }, { kind: "custom", id: "missing" }])(

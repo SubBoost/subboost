@@ -12,7 +12,9 @@ import {
 import { MIHOMO_YAML_SCHEMA } from "../config/yaml-schema";
 import { isValidTailscaleControlUrl, tailscaleStateDirComparisonKey } from "../mihomo/tailscale";
 import { parseClashYaml } from "../parser/clash-yaml";
+import { checkSubscriptionInput } from "../parser/limits";
 import { loadSubscriptionYaml } from "../parser/yaml-scalars";
+import { checkYamlSyntaxBudget } from "../parser/yaml-syntax-budget";
 import { stableJsonStringify } from "../node-identity";
 
 /** Explicit three-state value: Default omits the YAML key. */
@@ -76,6 +78,8 @@ function ineligible(reason: string): never {
 }
 
 function parseDocument(content: string): Document {
+  // parseEvents bypasses the subscription loader, so apply its syntax budget here.
+  checkYamlSyntaxBudget(content);
   const events = parseEvents(content, {});
   for (const event of events) {
     if (event.type === EVENT_ID.ALIAS) ineligible("包含 YAML 别名");
@@ -166,9 +170,14 @@ function presentDocument(document: Document): string {
   return present([document], { schema: MIHOMO_YAML_SCHEMA, lineWidth: -1 });
 }
 
+// Cheap gate before parsing; the raw editor re-checks on every change, mostly for other YAML.
+const TAILSCALE_TYPE_HINT = /type["']?\s*:\s*["']?tailscale/i;
+
 /** Offer the form only for exactly one unambiguous Tailscale proxy the importer accepts. */
 export function parseTailscaleSourceDocument(content: string): TailscaleSourceParseResult {
   try {
+    checkSubscriptionInput(content);
+    if (!TAILSCALE_TYPE_HINT.test(content)) ineligible("不是 Tailscale 代理");
     const document = parseDocument(content);
     const initial = readForm(locateProxy(document.contents!));
     assertImportable(content);

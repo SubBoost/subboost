@@ -149,12 +149,14 @@ export function ProxyGroupManualRuleRow({
   item,
   targets,
   currentTargetName,
+  currentTarget,
   onMove,
   onRemove,
 }: {
   item: CustomRuleListItem;
   targets: ProxyGroupRuleTargetOption[];
   currentTargetName: string;
+  currentTarget?: ProxyGroupRuleTargetOption;
   onMove: (item: CustomRuleListItem, target: ProxyGroupRuleTargetOption) => void;
   onRemove: (item: CustomRuleListItem) => void;
 }) {
@@ -180,7 +182,7 @@ export function ProxyGroupManualRuleRow({
             ariaLabel={`移动 ${rule.value} 规则`}
             targets={targets}
             kinds={["module", "custom"]}
-            currentTarget={{ name: currentTargetName }}
+            currentTarget={currentTarget ?? { name: currentTargetName }}
             onMove={(target) => onMove(item, target)}
           />
           <Button

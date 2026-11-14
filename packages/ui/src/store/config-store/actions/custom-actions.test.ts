@@ -217,7 +217,7 @@ describe("custom config-store actions", () => {
     expect(getState().customRules[0].target).toBe("Stable Group");
   });
 
-  it("normalizes rule order with the updated custom proxy group state", () => {
+  it("preserves rule order when a custom proxy group is disabled and re-enabled", () => {
     const { actions, getState } = createHarness({
       customProxyGroups: [
         { id: "custom-1", name: "Custom", emoji: "", groupType: "select" },
@@ -235,6 +235,8 @@ describe("custom config-store actions", () => {
 
     actions.updateCustomProxyGroup("custom-1", { enabled: false });
 
-    expect(getState().ruleOrder).toEqual(["custom-rule:active-target"]);
+    expect(getState().ruleOrder).toEqual(["custom-rule:disabled-target", "custom-rule:active-target"]);
+    actions.updateCustomProxyGroup("custom-1", { enabled: true });
+    expect(getState().ruleOrder).toEqual(["custom-rule:disabled-target", "custom-rule:active-target"]);
   });
 });

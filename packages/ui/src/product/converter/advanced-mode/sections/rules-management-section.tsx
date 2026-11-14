@@ -13,6 +13,7 @@ import {
   type GeneratedRuleEntry,
 } from "@subboost/core/generator/rules";
 import { useConfigStore } from "@subboost/ui/store/config-store";
+import { getGeneratedPolicyTargetContext } from "@subboost/ui/store/config-store/generated-policy-targets";
 import { SectionHeader } from "../section-header";
 
 function clamp(value: number, min: number, max: number): number {
@@ -50,12 +51,15 @@ export function RulesManagementSection({
     proxyGroupNameOverrides,
     cnIpNoResolve,
     experimentalCnUseCnRuleSet,
+    ruleProviderBaseUrl,
     ruleOrder,
+    generatedYaml,
     setRuleOrder,
   } = useConfigStore();
   const [orderDrafts, setOrderDrafts] = React.useState<Record<string, string>>({});
   const allRulesMode = ruleOrder.length === 0 || hasFullRuleOrderKeys(ruleOrder);
 
+  const policyContext = React.useMemo(() => getGeneratedPolicyTargetContext(generatedYaml), [generatedYaml]);
   const entries = React.useMemo(
     () =>
       buildGeneratedRuleEntries({
@@ -67,7 +71,9 @@ export function RulesManagementSection({
         proxyGroupNameOverrides,
         cnIpNoResolve,
         experimentalCnUseCnRuleSet,
+        ruleProviderBaseUrl,
         ruleOrder,
+        ...policyContext,
       }),
     [
       cnIpNoResolve,
@@ -78,7 +84,9 @@ export function RulesManagementSection({
       experimentalCnUseCnRuleSet,
       builtinRuleEdits,
       proxyGroupNameOverrides,
+      ruleProviderBaseUrl,
       ruleOrder,
+      policyContext,
     ]
   );
 
@@ -92,8 +100,9 @@ export function RulesManagementSection({
   const movableKeys = allRulesMode ? preMatchKeys : editableKeys;
 
   const applyRuleOrder = React.useCallback(
-    (nextRuleOrder: string[]) => {
-      setRuleOrder(nextRuleOrder);
+    (nextRuleOrder: string[], allRulesMode?: boolean) => {
+      if (allRulesMode === false) setRuleOrder(nextRuleOrder, false);
+      else setRuleOrder(nextRuleOrder);
       setOrderDrafts((prev) => {
         const next = { ...prev };
         for (const key of Object.keys(next)) {
@@ -136,7 +145,7 @@ export function RulesManagementSection({
   const handleToggleAllRulesMode = React.useCallback(
     async (checked: boolean) => {
       if (!checked) {
-        applyRuleOrder(editableKeys);
+        applyRuleOrder(editableKeys, false);
         return;
       }
 

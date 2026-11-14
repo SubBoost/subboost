@@ -70,4 +70,42 @@ describe("local home page adapter", () => {
     expect((fetch as any).mock.calls.at(-1)[0]).toBe("/api/subscriptions/sub%2F1");
     expect((fetch as any).mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ method: "PUT" }));
   });
+
+  it("loads the signed-in user's templates without enabling the catalog", async () => {
+    const localAdapter = adapter();
+    const templates = localAdapter.productApi.templates;
+
+    expect(templates).toMatchObject({ catalogEnabled: false, builtinEngagementEnabled: false });
+    expect(templates.loadCatalogTemplates).toBeUndefined();
+
+    mocks.readJsonResponse.mockResolvedValueOnce({
+      templates: [
+        { id: "tpl-1", name: "Home", description: "Mine" },
+        { id: "tpl-2" },
+      ],
+    });
+    await expect(templates.loadMyTemplates()).resolves.toEqual([
+      { id: "tpl-1", name: "Home", description: "Mine" },
+      { id: "tpl-2", name: "未命名模板", description: "" },
+    ]);
+    expect(fetch).toHaveBeenLastCalledWith("/api/templates?type=my", { cache: "no-store" });
+
+    mocks.readJsonResponse.mockResolvedValueOnce({});
+    await expect(templates.loadMyTemplates()).resolves.toEqual([]);
+
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+    await expect(templates.loadTemplateDetail("missing")).resolves.toBeNull();
+    expect(mocks.readJsonResponse).toHaveBeenCalledTimes(2);
+
+    mocks.readJsonResponse.mockResolvedValueOnce({ template: { name: "Home", kind: "config", config: { template: "full" } } });
+    await expect(templates.loadTemplateDetail("tpl/1")).resolves.toEqual({
+      name: "Home",
+      kind: "config",
+      config: { template: "full" },
+    });
+    expect(fetch).toHaveBeenLastCalledWith("/api/templates/tpl%2F1", { cache: "no-store" });
+
+    mocks.readJsonResponse.mockResolvedValueOnce({});
+    await expect(templates.loadTemplateDetail("tpl-empty")).resolves.toBeNull();
+  });
 });

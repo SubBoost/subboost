@@ -76,16 +76,16 @@ describe("rule target string references", () => {
     expect(entries).toContainEqual(expect.objectContaining({ key: "custom-rule-set:missing", target: "🚀 节点选择" }));
   });
 
-  it("preserves disabled literal-name precedence and the existing builtin fallback", () => {
+  it("preserves disabled literal-name precedence without emitting a builtin fallback", () => {
     const customProxyGroups = [regional, { ...disabled, id: "literal", name: "custom:regional" }];
     const entries = buildGeneratedRuleEntries({ ...options, customProxyGroups,
       builtinRuleEdits: { "module:cn:cn-ip": { target: "custom:regional" } },
     });
-    expect(entries).toContainEqual(expect.objectContaining({ key: "module:cn:cn-ip", target: "🚀 节点选择" }));
+    expect(entries.some((entry) => entry.key === "module:cn:cn-ip")).toBe(false);
     const objectEntries = buildGeneratedRuleEntries({ ...options, customProxyGroups,
       builtinRuleEdits: { "module:cn:cn-ip": { target: { kind: "custom", id: "literal" } } },
     });
-    expect(objectEntries).toContainEqual(expect.objectContaining({ key: "module:cn:cn-ip", target: "🔒 国内服务" }));
+    expect(objectEntries.some((entry) => entry.key === "module:cn:cn-ip")).toBe(false);
     expect(collectCustomRoutingRuleSets({ customProxyGroups, customRuleSets: [set("custom:regional")] })[0].target.id)
       .toBe("literal");
   });

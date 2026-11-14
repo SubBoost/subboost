@@ -165,7 +165,7 @@ export function AddSourceMenu({
             <Network className="h-4 w-4 text-indigo-400" aria-hidden="true" />
             <span>
               <span className="block text-xs font-medium text-fg">Tailscale 节点</span>
-              {!compact ? <span className="block text-[10px] text-fg-40">用表单添加 Tailscale / Headscale 出站，保存为 YAML 源</span> : null}
+              {!compact ? <span className="block text-[10px] text-fg-40">用表单添加 Tailscale / Headscale 出站</span> : null}
             </span>
           </DropdownMenuItem>
         ) : null}

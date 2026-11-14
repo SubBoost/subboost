@@ -35,8 +35,8 @@ describe("local rate-limit maintenance behavior", () => {
     })).toEqual({ allowed: true, retryAfterSeconds: 0 });
   });
 
-  it("fails safely when malformed timing input leaves no eviction candidate", () => {
-    for (let index = 0; index < 10_000; index += 1) {
+  it("fails closed at capacity even with malformed timing input", () => {
+    for (let index = 0; index < 2_048; index += 1) {
       consumeLocalRateLimit("malformed", String(index), {
         limit: 1,
         windowMs: Number.NaN,
@@ -48,7 +48,7 @@ describe("local rate-limit maintenance behavior", () => {
       limit: 1,
       windowMs: Number.NaN,
       now: 0,
-    })).toEqual({ allowed: true, retryAfterSeconds: 0 });
+    })).toEqual({ allowed: false, retryAfterSeconds: 1 });
   });
 
   it("returns no client key when trusted proxy headers are enabled but absent", () => {

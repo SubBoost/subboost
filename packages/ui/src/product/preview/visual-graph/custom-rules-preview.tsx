@@ -3,8 +3,9 @@
 import * as React from "react";
 import { ArrowRight, Shield } from "lucide-react";
 import { resolveProxyGroupTargetName } from "@subboost/core/proxy-group-targets";
-import type { CustomRoutingRuleSetItem } from "@subboost/core/rules/custom-routing-rule-sets";
-import type { CustomProxyGroup, CustomRule } from "@subboost/core/types/config";
+import { createPolicyTargetResolver } from "@subboost/core/generator/policy-targets";
+import type { CustomRoutingRuleSetItem, CustomRoutingRuleSetTarget } from "@subboost/core/rules/custom-routing-rule-sets";
+import type { CustomProxyGroup, CustomRule, CustomRuleSet } from "@subboost/core/types/config";
 
 const UNAVAILABLE_TARGET_LABEL = "目标分流组不可用";
 
@@ -14,22 +15,26 @@ export function CustomRulesPreview({
   moduleNames,
   customProxyGroups,
   literalTargetNames,
+  policyContext,
+  heading = "自定义规则",
 }: {
   customRules: CustomRule[];
-  ruleSets?: CustomRoutingRuleSetItem[];
+  ruleSets?: Array<CustomRoutingRuleSetItem | (Pick<CustomRuleSet, "id" | "name" | "path" | "target" | "noResolve"> & { key: string })>;
   moduleNames: Record<string, string>;
   customProxyGroups: CustomProxyGroup[];
   literalTargetNames?: readonly string[];
+  policyContext?: { availablePolicyTargets: string[]; fallbackPolicyTarget: string };
+  heading?: string;
 }) {
   const resolveTargetName = React.useCallback(
-    (target: CustomRule["target"]) =>
-      resolveProxyGroupTargetName(target, {
+    (target: CustomRule["target"] | CustomRoutingRuleSetTarget) =>
+      createPolicyTargetResolver(policyContext)(resolveProxyGroupTargetName(typeof target === "object" && target.kind === "literal" ? target.name : target, {
         moduleNames,
         customProxyGroups,
         literalTargetNames,
         fallbackTarget: UNAVAILABLE_TARGET_LABEL,
-      }),
-    [customProxyGroups, moduleNames, literalTargetNames],
+      })),
+    [customProxyGroups, moduleNames, literalTargetNames, policyContext],
   );
 
   const items = React.useMemo(
@@ -60,7 +65,7 @@ export function CustomRulesPreview({
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs font-medium text-fg-60">
         <Shield className="h-3.5 w-3.5" />
-        <span>自定义规则</span>
+        <span>{heading}</span>
         <span className="text-[10px] text-fg-50">
           ({items.length})
         </span>
