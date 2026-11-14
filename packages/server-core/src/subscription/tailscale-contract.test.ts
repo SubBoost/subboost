@@ -30,7 +30,7 @@ const OFFICIAL_EXAMPLE = `proxies:
     ephemeral: false
     udp: true
     accept-routes: true
-    exit-node: 100.64.0.1
+    exit-node: 203.0.113.10
     exit-node-allow-lan-access: false
     dialer-proxy: Relay
     ip-version: ipv4
@@ -60,7 +60,7 @@ describe("Tailscale import, persistence and generation", () => {
       ephemeral: false,
       udp: true,
       "accept-routes": true,
-      "exit-node": "100.64.0.1",
+      "exit-node": "203.0.113.10",
       "exit-node-allow-lan-access": false,
       "ip-version": "ipv4",
       "future-field": "kept",
@@ -96,7 +96,7 @@ describe("Tailscale import, persistence and generation", () => {
     expect(() => validateSubscriptionNodeList([{ name: "ts", type: "tailscale", [field]: { a: 1 } }])).toThrow(field);
   });
 
-  it.each(["ftp://control.example", "not a url", "https://"])("rejects syntactically invalid control-url %s", (url) => {
+  it.each(["ftp://local.subboost.test", "not a url", "https://"])("rejects syntactically invalid control-url %s", (url) => {
     expect(parseClashYaml(`- {name: ts, type: tailscale, control-url: "${url}"}`).errors.join("\n")).toContain("control-url");
     expect(() => validateSubscriptionNodeList([{ name: "ts", type: "tailscale", "control-url": url }])).toThrow("control-url");
   });
@@ -104,16 +104,21 @@ describe("Tailscale import, persistence and generation", () => {
   it("accepts private Headscale URLs and client-local absolute paths without changing them", () => {
     const [proxy] = importSaveGenerate(`- name: ts
   type: tailscale
-  control-url: http://192.168.1.10:8080
+  control-url: http://127.0.0.1:8080
   state-dir: /var/lib/mihomo/tailscale
 `);
-    expect(proxy).toMatchObject({ "control-url": "http://192.168.1.10:8080", "state-dir": "/var/lib/mihomo/tailscale" });
-    expect(importSaveGenerate("- {name: ts, type: tailscale, control-url: 'http://headscale.local', state-dir: 'C:\\mihomo\\ts'}")[0])
-      .toMatchObject({ "control-url": "http://headscale.local", "state-dir": "C:\\mihomo\\ts" });
+    expect(proxy).toMatchObject({ "control-url": "http://127.0.0.1:8080", "state-dir": "/var/lib/mihomo/tailscale" });
+    expect(importSaveGenerate("- {name: ts, type: tailscale, control-url: 'http://local.subboost.test', state-dir: 'C:\\mihomo\\ts'}")[0])
+      .toMatchObject({ "control-url": "http://local.subboost.test", "state-dir": "C:\\mihomo\\ts" });
   });
 
   it("treats null optional fields as absent", () => {
     expect(importSaveGenerate("- {name: ts, type: tailscale, auth-key: null, udp: ~}")).toEqual([{ name: "ts", type: "tailscale" }]);
+  });
+
+  it("stores and generates the canonical type for API saves with other casing", () => {
+    expect(validateSubscriptionNodeList([{ name: "ts", type: " Tailscale ", udp: "yes" }])).toEqual([{ name: "ts", type: "tailscale", udp: true }]);
+    expect(generateFrom([{ name: "ts", type: "TAILSCALE" }])).toEqual([{ name: "ts", type: "tailscale" }]);
   });
 
   it("applies the same rules to direct API saves", () => {

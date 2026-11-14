@@ -99,7 +99,8 @@ export function validateSubscriptionNodeList(value: unknown): ParsedNode[] {
 
     if (type === "tailscale") {
       try {
-        item = normalizeTailscaleNodeFields(item);
+        // Store the canonical type: the endpoint exemption matches any casing, Mihomo does not.
+        item = { ...normalizeTailscaleNodeFields(item), type };
       } catch (error) {
         throw new Error(`节点 #${index + 1} 的 ${error instanceof Error ? error.message : "Tailscale 字段无效"}`);
       }
