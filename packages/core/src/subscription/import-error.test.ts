@@ -93,6 +93,22 @@ describe("sanitizePublicErrorText", () => {
     expect(sanitizePublicErrorText('auth-key: "ts\n\n  key-auth-SYNTHETIC-SECRET"')).toBe("auth-key: ***");
   });
 
+  it("keeps sibling fields after an indented auth key", () => {
+    expect(sanitizePublicErrorText("near:\n  auth-key: synthetic-value\n  udp: true\n  hostname: node")).toBe(
+      "near:\n  auth-key: ***\n  udp: true\n  hostname: node"
+    );
+    expect(sanitizePublicErrorText("near:\n  - auth-key: synthetic-value\n    udp: true")).toBe(
+      "near:\n  - auth-key: ***\n    udp: true"
+    );
+  });
+
+  it("sanitizes long whitespace-only prefixes in linear time", () => {
+    const text = `name\n${" ".repeat(200_000)}y`;
+    const startedAt = performance.now();
+    expect(sanitizePublicErrorText(text)).toBe(text);
+    expect(performance.now() - startedAt).toBeLessThan(2000);
+  });
+
   it("does not leak multiline Tailscale auth-key fragments from parseClashYaml into public error info", () => {
     const result = parseClashYaml(
       [
