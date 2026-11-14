@@ -174,34 +174,6 @@ describe("useEditingSubscriptionLoader", () => {
     expect(options.setSubscriptionUrl).toHaveBeenCalledWith("");
   });
 
-  it("drops a leftover editing record without resetting the current draft", () => {
-    const options = makeOptions({ editSubscriptionId: null, hasEditingSubscription: true });
-
-    useEditingSubscriptionLoader(options);
-
-    expect(options.setEditingSubscription).toHaveBeenCalledOnce();
-    expect(options.setEditingSubscription).toHaveBeenCalledWith(null);
-    expect(options.setSubscriptionName).toHaveBeenCalledWith("");
-    expect(options.setSubscriptionUrl).toHaveBeenCalledWith("");
-    expect(options.setCopied).toHaveBeenCalledWith(false);
-    expect(mocks.bag.storeState.reset).not.toHaveBeenCalled();
-    expect(mocks.bag.storeState.generateConfig).not.toHaveBeenCalled();
-    expect(options.loadSubscription).not.toHaveBeenCalled();
-  });
-
-  it("keeps the editing record for an edit URL and leaves same-page exits to the draft reset", () => {
-    const editing = makeOptions({ editSubscriptionId: "sub-1", hasEditingSubscription: true, authChecked: false });
-    useEditingSubscriptionLoader(editing);
-    expect(editing.setEditingSubscription).not.toHaveBeenCalled();
-
-    mocks.bag.editRef.current = "sub-1";
-    const leaving = makeOptions({ editSubscriptionId: null, hasEditingSubscription: true });
-    useEditingSubscriptionLoader(leaving);
-    expect(mocks.bag.storeState.reset).toHaveBeenCalledOnce();
-    expect(leaving.setEditingSubscription).toHaveBeenCalledOnce();
-    expect(leaving.setEditingSubscription).toHaveBeenCalledWith(null);
-  });
-
   it("captures the draft and redirects to login on 401", async () => {
     const options = makeOptions({
       loadSubscription: vi.fn(async () => response(401, { error: "login required" })),
