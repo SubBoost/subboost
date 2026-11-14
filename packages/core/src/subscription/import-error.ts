@@ -16,7 +16,81 @@ export interface SubscriptionImportErrorInfo {
   at: number;
 }
 
+const CLOSED_QUOTED_AUTH_KEY =
+  /((?:^|[^A-Za-z0-9_-])["']?auth-key["']?\s*:[ \t]*)("(?:[^"\\]|\\[\s\S])*"|'(?:[^']|'')*')/gi;
+
+const BLOCK_AUTH_KEY_LINE =
+  /^([ \t]*(?:\d+[ \t]*\| )?([ \t]*(?:-[ \t]+)?)["']?auth-key["']?[ \t]*:[ \t]*)(.*)$/i;
+
+const MAPPING_KEY_LINE = /^[ \t]*(?:-[ \t]+)?["']?[A-Za-z0-9_-]+["']?[ \t]*:(?:[ \t]|$)/;
+
+function countLeadingSpaces(text: string): number {
+  let index = 0;
+  while (index < text.length && text[index] === " ") index += 1;
+  return index;
+}
+
+function redactBlockAuthKeys(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const output: string[] = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const match = line.match(BLOCK_AUTH_KEY_LINE);
+    if (!match) {
+      output.push(line);
+      continue;
+    }
+
+    const [, prefix, keyOffset, rawValue] = match;
+    const keyIndent = keyOffset.length;
+    const trimmedRaw = rawValue.trim();
+    const inUnclosedQuote = trimmedRaw.startsWith('"') || trimmedRaw.startsWith("'");
+    output.push(`${prefix}***`);
+
+    let continuesAfterBackslash = trimmedRaw.endsWith("\\");
+    while (i + 1 < lines.length) {
+      let lookahead = i + 1;
+      const pendingCarets: string[] = [];
+      while (lookahead < lines.length) {
+        const candidate = lines[lookahead];
+        if (/^[ \t]*-+\^[ \t]*$/.test(candidate)) {
+          pendingCarets.push(candidate);
+          lookahead += 1;
+          continue;
+        }
+        const candidateContent = candidate.replace(/^[ \t]*\d+[ \t]*\| ?/, "");
+        if (!candidateContent.trim()) {
+          lookahead += 1;
+          continue;
+        }
+        break;
+      }
+      if (lookahead >= lines.length) break;
+
+      const nextContent = lines[lookahead].replace(/^[ \t]*\d+[ \t]*\| ?/, "");
+      const trimmedNext = nextContent.trim();
+      const isIndentedContinuation = countLeadingSpaces(nextContent) > keyIndent;
+      const isUnclosedQuoteContinuation = inUnclosedQuote && !MAPPING_KEY_LINE.test(nextContent);
+      if (!continuesAfterBackslash && !isIndentedContinuation && !isUnclosedQuoteContinuation) {
+        break;
+      }
+      output.push(...pendingCarets);
+      i = lookahead;
+      continuesAfterBackslash = trimmedNext.endsWith("\\");
+    }
+  }
+
+  return output.join("\n");
+}
+
 const SENSITIVE_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  // Tailscale auth keys in YAML snippets: quoted (including multiline/escaped line breaks or truncated quotes) or plain values, then any standalone key token.
+  {
+    pattern: /((?:^|[^A-Za-z0-9_-])["']?auth-key["']?\s*:[ \t]*)("(?:[^"\\]|\\[\s\S])*(?:"|$)|'(?:[^']|'')*(?:'|$)|[^\s,{}[\]]+)/gi,
+    replacement: "$1***",
+  },
+  { pattern: /\btskey-[A-Za-z0-9_-]+/g, replacement: "tskey-***" },
   { pattern: /token=[^&\s]*/gi, replacement: "token=***" },
   { pattern: /key=[^&\s]*/gi, replacement: "key=***" },
   { pattern: /password=[^&\s]*/gi, replacement: "password=***" },
@@ -31,7 +105,7 @@ const SENSITIVE_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
 
 export function sanitizePublicErrorText(text: string | undefined | null): string {
   if (!text) return "";
-  let result = text;
+  let result = redactBlockAuthKeys(text.replace(CLOSED_QUOTED_AUTH_KEY, "$1***"));
   for (const { pattern, replacement } of SENSITIVE_PATTERNS) {
     result = result.replace(pattern, replacement);
   }

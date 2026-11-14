@@ -512,7 +512,9 @@ export function VisualGraph() {
                             ? "bg-teal-400"
                             : node.type === "hysteria2"
                               ? "bg-orange-400"
-                              : "bg-gray-400",
+                              : node.type === "tailscale"
+                                ? "bg-sky-400"
+                                : "bg-gray-400",
                 )}
               />
               <span

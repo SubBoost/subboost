@@ -10,12 +10,20 @@ import { buildSourceDisplayLabel } from "@subboost/ui/product/converter/source-d
 import { AddSourceMenu, SourceStatusPopover, SourceTypeChoices } from "@subboost/ui/product/converter/source-controls";
 import { SourceEditorDialog } from "@subboost/ui/product/converter/source-editor-dialog";
 import { useSubscriptionSourcesController } from "@subboost/ui/product/converter/use-subscription-sources-controller";
+import { TailscaleDraftDialog } from "@subboost/ui/product/converter/tailscale-draft-dialog";
 import { sourceTypeInfo } from "./constants";
 
 export function SourcesSection() {
   const {
     addSource,
+    applyExpandedSourceContent,
+    applyTailscaleDraft,
+    cancelTailscaleDraft,
     closeExpandedSourceEditor,
+    expandedSourceTailscaleStateDirs,
+    startTailscaleDraft,
+    tailscaleDraft,
+    tailscaleDraftStateDirs,
     error,
     expandedSource,
     expandedSourcePreviewName,
@@ -149,7 +157,7 @@ export function SourcesSection() {
         })}
 
         <div className="flex-shrink-0">
-          <AddSourceMenu open={showAddMenu} onOpenChange={setShowAddMenu} onAdd={addSource} />
+          <AddSourceMenu open={showAddMenu} onOpenChange={setShowAddMenu} onAdd={addSource} onAddTailscale={startTailscaleDraft} />
         </div>
 
         {/* Status */}
@@ -172,6 +180,14 @@ export function SourcesSection() {
         onClose={closeExpandedSourceEditor}
         onUpdateContent={updateSource}
         onUpdateMeta={updateSourceMeta}
+        onApplyContent={applyExpandedSourceContent}
+        tailscaleStateDirs={expandedSourceTailscaleStateDirs}
+      />
+      <TailscaleDraftDialog
+        draft={tailscaleDraft}
+        knownStateDirs={tailscaleDraftStateDirs}
+        onApply={applyTailscaleDraft}
+        onCancel={cancelTailscaleDraft}
       />
     </>
   );

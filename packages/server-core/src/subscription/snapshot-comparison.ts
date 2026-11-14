@@ -3,6 +3,7 @@ import { isSubscriptionInfoNodeName } from "@subboost/core/subscription/info-nod
 import { stableJsonStringify } from "@subboost/core/node-identity";
 import { isMihomoSupportedProxyNode, sanitizeMihomoProxyNode } from "@subboost/core/mihomo/proxy-sanitizer";
 import { looksLikeClientUpdatePlaceholderNodes } from "@subboost/core/parser/placeholder";
+import { tailscaleComparisonFields } from "@subboost/core/mihomo/tailscale";
 
 export type SnapshotRelation = "equivalent" | "next-superset" | "current-superset" | "divergent" | "field-conflict";
 export type SubscriptionSnapshotComparison = {
@@ -20,8 +21,9 @@ type Snapshot = { nodes: NodeFields[]; protocols: string[]; fieldCount: number; 
 
 function nodeFields(node: ParsedNode): NodeFields | null {
   if (isSubscriptionInfoNodeName(node.name)) return null;
-  const runtime = sanitizeMihomoProxyNode(node);
-  if (!isMihomoSupportedProxyNode(runtime)) return null;
+  const sanitized = sanitizeMihomoProxyNode(node);
+  if (!isMihomoSupportedProxyNode(sanitized)) return null;
+  const runtime = sanitized.type === "tailscale" ? tailscaleComparisonFields(sanitized) : sanitized;
   const fields = new Map<string, string>();
   const seen = new WeakMap<object, string>();
   const visit = (value: unknown, path: string) => {
@@ -42,7 +44,10 @@ function nodeFields(node: ParsedNode): NodeFields | null {
   };
   visit(runtime, "");
   // Credentials are compared as fields so changes remain visible as conflicts.
-  const anchor = stableJsonStringify({ type: runtime.type, server: runtime.server, port: runtime.port,
+  const anchor = runtime.type === "tailscale"
+    // Endpointless: anchor on login/state identity; auth-key and routing preferences stay compared fields.
+    ? stableJsonStringify({ type: runtime.type, "control-url": runtime["control-url"], hostname: runtime.hostname, "state-dir": runtime["state-dir"] })
+    : stableJsonStringify({ type: runtime.type, server: runtime.server, port: runtime.port,
     peers: Array.isArray(runtime.peers) ? runtime.peers.map((peer) => ({ server: peer.server, port: peer.port })) : runtime.peers,
     "port-range": runtime["port-range"] });
   return { anchor, fields };

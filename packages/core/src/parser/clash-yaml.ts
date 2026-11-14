@@ -248,9 +248,10 @@ export function parseClashYaml(content: string): ParseResult {
       totalFailed: errors.length,
     };
   } catch (e) {
+    const reason = e instanceof Error ? e.message.split(/\r?\n\r?\n/, 1)[0] : "未知错误";
     return {
       nodes: [],
-      errors: [`YAML 解析错误: ${e instanceof Error ? e.message : "未知错误"}`],
+      errors: [`YAML 解析错误: ${reason}`],
       totalParsed: 0,
       totalFailed: 1,
     };
@@ -519,6 +520,7 @@ function normalizeNode(proxy: Record<string, unknown>): ParsedNode | null {
     case "sudoku":
     case "wireguard":
     case "trusttunnel":
+    case "tailscale":
       return { ...(baseNode as Record<string, unknown>), type } as unknown as ParsedNode;
 
     default:
