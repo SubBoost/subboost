@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as yaml from "js-yaml";
+import { MAX_SUBSCRIPTION_CONTENT_LENGTH, MAX_SUBSCRIPTION_LINES, MAX_YAML_EXPANDED_NODES } from "../parser/limits";
 import {
   createTailscaleDraftContent,
   createTailscaleStateDir,
@@ -31,25 +32,44 @@ describe("Tailscale YAML source document", () => {
   });
 
   it.each([
-    ["malformed YAML", "proxies: [\n"],
+    ["malformed YAML", "proxies: [{name: ts, type: tailscale}\n"],
     ["multiple documents", "name: ts\ntype: tailscale\n---\nname: b\n"],
     ["multiple proxies", "proxies:\n  - {name: a, type: tailscale}\n  - {name: b, type: tailscale}\n"],
-    ["a non-Tailscale proxy", "proxies:\n  - {name: a, type: ss, server: s.test, port: 1, cipher: aes-128-gcm, password: p}\n"],
+    ["a non-Tailscale proxy", "proxies:\n  - {name: a, type: ss, server: local.subboost.test, port: 1, cipher: aes-128-gcm, password: p}\n"],
+    ["a lookalike proxy type", "proxies:\n  - {name: a, type: tailscale-next}\n"],
     ["anchors and aliases", "x: &a v\nproxies:\n  - {name: ts, type: tailscale, hostname: *a}\n"],
     ["merge keys", "base: &b {udp: true}\nproxies:\n  - {<<: *b, name: ts, type: tailscale}\n"],
     ["explicit scalar tags", "proxies:\n  - {name: ts, type: tailscale, auth-key: !!str 12}\n"],
     ["a non-boolean known boolean", "proxies:\n  - {name: ts, type: tailscale, udp: \"yes\"}\n"],
     ["an integer known string", "proxies:\n  - {name: ts, type: tailscale, auth-key: 123}\n"],
     ["proxy providers", "proxy-providers:\n  p: {type: http, url: 'https://local.subboost.test'}\nproxies:\n  - {name: ts, type: tailscale}\n"],
-    ["an invalid explicit value", "proxies:\n  - {name: ts, type: tailscale, control-url: 'ftp://x'}\n"],
-    ["root scalar", "just-a-string\n"],
-    ["non-mapping proxy item", "proxies:\n  - 123\n"],
+    ["an invalid explicit value", "proxies:\n  - {name: ts, type: tailscale, control-url: 'ftp://local.subboost.test'}\n"],
+    ["root scalar", "'type: tailscale'\n"],
+    ["non-mapping proxy item", "proxies:\n  - 123\n# type: tailscale\n"],
     ["non-string mapping key", "proxies:\n  - {1: a, name: ts, type: tailscale}\n"],
     ["duplicate mapping key", "proxies:\n  - {name: ts, type: tailscale, udp: true, udp: false}\n"],
     ["non-scalar string field", "proxies:\n  - {name: ts, type: tailscale, hostname: [a]}\n"],
     ["non-scalar boolean field", "proxies:\n  - {name: ts, type: tailscale, udp: [true]}\n"],
   ])("keeps %s in raw mode", (_label, content) => {
     expect(parseTailscaleSourceDocument(content).ok).toBe(false);
+  });
+
+  it("skips parsing content that never mentions a Tailscale type", () => {
+    // Malformed YAML would report a parse error if it reached the parser.
+    expect(parseTailscaleSourceDocument("proxies: [{name: a, type: ss}\n")).toEqual({ ok: false, reason: "不是 Tailscale 代理" });
+    expect(parseTailscaleSourceDocument("proxies: [{name: a, type: tailscale}\n")).not.toEqual({ ok: false, reason: "不是 Tailscale 代理" });
+    // Quoted keys and values, other casing and flow mappings still reach the parser.
+    expect(documentOf('{"name": "ts", "type": "tailscale"}\n').initial.name).toBe("ts");
+    expect(documentOf("- {name: ts, type: Tailscale}\n").initial.name).toBe("ts");
+  });
+
+  it("applies the subscription input and syntax budgets before parsing", () => {
+    const tooManyLines = parseTailscaleSourceDocument(`- {name: ts, type: tailscale}${"\n".repeat(MAX_SUBSCRIPTION_LINES)}`);
+    expect(tooManyLines).toEqual({ ok: false, reason: expect.stringMatching(/^订阅解析受限:.*行数/) });
+    const tooLarge = parseTailscaleSourceDocument(`- {name: ts, type: tailscale}\n#${"x".repeat(MAX_SUBSCRIPTION_CONTENT_LENGTH)}`);
+    expect(tooLarge).toEqual({ ok: false, reason: expect.stringMatching(/^订阅解析受限:.*大小/) });
+    const tooManyNodes = parseTailscaleSourceDocument(`- {name: ts, type: tailscale, x: ${"[".repeat(MAX_YAML_EXPANDED_NODES)}`);
+    expect(tooManyNodes).toEqual({ ok: false, reason: expect.stringMatching(/^订阅解析受限:.*结构/) });
   });
 
   it("returns the original bytes when nothing was edited", () => {
@@ -101,8 +121,8 @@ version: "1.10"
 
   it("removes keys for cleared optional inputs and quotes ambiguous strings", () => {
     const document = documentOf("- {name: ts, type: tailscale, hostname: old, state-dir: tailscale/a}\n");
-    const out = serializeTailscaleForm(document, { ...document.initial, hostname: "  ", stateDir: "", name: "true", exitNode: "100.64.0.1" });
-    expect(load(out)).toEqual([{ name: "true", type: "tailscale", "exit-node": "100.64.0.1" }]);
+    const out = serializeTailscaleForm(document, { ...document.initial, hostname: "  ", stateDir: "", name: "true", exitNode: "203.0.113.10" });
+    expect(load(out)).toEqual([{ name: "true", type: "tailscale", "exit-node": "203.0.113.10" }]);
   });
 
   it("rejects invalid drafts without producing content", () => {
@@ -111,7 +131,7 @@ version: "1.10"
       name: expect.any(String), controlUrl: expect.any(String),
     });
     expect(() => serializeTailscaleForm(document, { ...document.initial, controlUrl: "nope" })).toThrow();
-    expect(validateTailscaleForm({ ...document.initial, controlUrl: "http://10.0.0.2:8080" })).toEqual({});
+    expect(validateTailscaleForm({ ...document.initial, controlUrl: "http://127.0.0.1:8080" })).toEqual({});
   });
 
   it("creates a minimal importable draft with a generated directory", () => {
