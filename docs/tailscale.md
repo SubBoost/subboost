@@ -36,6 +36,7 @@ proxies:
 
 ### 注意事项
 
+- `auth-key` 会原样写入生成的配置。任何拿到订阅链接或配置文件的人都能读取它，并可能用它把设备加入你的 Tailnet。建议使用设置了过期时间的临时（ephemeral）密钥或带标签（tagged）的密钥；也可以留空，改在客户端日志中交互登录。
 - 应用表单只代表本地配置有效，不代表设备已经登录或加入 Tailnet。
 - 访问公网目标需要可用的出口节点或已接受的覆盖路由。只能访问 Tailnet 的节点在公网 URL 测速中可能显示失败；节点仍会按现有规则参与分组和自动选择。
 - 从 YAML 中移除 `accept-routes` 等偏好或清空 `exit-node`，不一定会重置客户端已保存的运行时偏好。
@@ -80,6 +81,7 @@ proxies:
 
 ### Notes
 
+- `auth-key` is written into the generated config as is. Anyone with the subscription link or the config file can read it and may use it to add devices to your Tailnet. Prefer an ephemeral or tagged key with an expiry, or leave it empty and log in interactively from the client log.
 - Applying the form validates local configuration only; it does not mean the device has logged in or joined the Tailnet.
 - Public destinations need a usable exit node or an accepted covering route. A node that reaches only Tailnet destinations can fail public URL tests; it still takes part in groups and automatic selection under the existing rules.
 - Removing a preference such as `accept-routes` or clearing `exit-node` does not necessarily reset preferences the client already stored.
