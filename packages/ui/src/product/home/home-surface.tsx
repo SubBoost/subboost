@@ -176,6 +176,7 @@ function HomeSurfaceInner({ adapter }: Props) {
 
   const isLoadingEditingSubscription = useEditingSubscriptionLoader({
     editSubscriptionId,
+    hasEditingSubscription: Boolean(editingSubscription),
     userId,
     authChecked,
     loadSubscription: adapter?.loadSubscription,

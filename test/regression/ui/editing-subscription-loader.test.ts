@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedNode } from "@subboost/core/types/node";
 import { useEditingSubscriptionLoader } from "@subboost/ui/product/home/use-editing-subscription-loader";
+import { useUIStore } from "@subboost/ui/store/ui-store";
 
 const mocks = vi.hoisted(() => {
   const bag: {
@@ -155,6 +156,33 @@ describe("useEditingSubscriptionLoader branch coverage", () => {
       configurable: true,
       value: originalWindow,
     });
+  });
+
+  it("returns to a new subscription with the applied template after coming home without an edit id", () => {
+    useUIStore.getState().setEditingSubscription({
+      id: "sub-1",
+      token: "token-1",
+      name: "Existing",
+      autoUpdateInterval: 3600,
+      smartNodeMatchingEnabled: true,
+    });
+    const { reset, generateConfig } = resetStoreState({ appliedTemplateId: "tpl-applied", template: "full" });
+    const options = makeOptions({
+      editSubscriptionId: null,
+      hasEditingSubscription: Boolean(useUIStore.getState().editingSubscription),
+      setEditingSubscription: useUIStore.getState().setEditingSubscription,
+    });
+
+    useEditingSubscriptionLoader(options);
+
+    expect(useUIStore.getState().editingSubscription).toBeNull();
+    expect(options.setSubscriptionName).toHaveBeenCalledWith("");
+    expect(options.setSubscriptionUrl).toHaveBeenCalledWith("");
+    expect(options.setCopied).toHaveBeenCalledWith(false);
+    expect(reset).not.toHaveBeenCalled();
+    expect(generateConfig).not.toHaveBeenCalled();
+    expect(mocks.bag.storeState).toMatchObject({ appliedTemplateId: "tpl-applied", template: "full" });
+    expect(options.loadSubscription).not.toHaveBeenCalled();
   });
 
   it("uses the fallback error message when a failed response has no public error", async () => {

@@ -32,6 +32,7 @@ import {
 
 export function useEditingSubscriptionLoader({
   editSubscriptionId,
+  hasEditingSubscription = false,
   userId,
   authChecked = true,
   loadSubscription,
@@ -44,6 +45,24 @@ export function useEditingSubscriptionLoader({
 }: EditingSubscriptionLoaderOptions): boolean {
   const [isLoadingEditingSubscription, setIsLoadingEditingSubscription] = React.useState(false);
   const previousEditId = React.useRef<string | null>(null);
+
+  // 编辑状态以网址为准：网址没有 editSubscriptionId 时，丢弃其它页面留下的编辑记录，
+  // 让保存走新建，同时保留当前配置（例如刚从模板库应用的模板）。
+  // 同一页面内退出编辑由下方加载逻辑处理，那里会一并重置配置。
+  React.useEffect(() => {
+    if (editSubscriptionId || !hasEditingSubscription || previousEditId.current) return;
+    setEditingSubscription(null);
+    setSubscriptionName("");
+    setSubscriptionUrl("");
+    setCopied(false);
+  }, [
+    editSubscriptionId,
+    hasEditingSubscription,
+    setCopied,
+    setEditingSubscription,
+    setSubscriptionName,
+    setSubscriptionUrl,
+  ]);
 
   // 从“我的订阅”跳转回来时，加载订阅详情到首页编辑器
   React.useEffect(() => {

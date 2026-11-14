@@ -10,6 +10,7 @@ export type EditingSubscription = {
 
 export type EditingSubscriptionLoaderOptions = {
   editSubscriptionId: string | null;
+  hasEditingSubscription?: boolean;
   userId?: string | null;
   authChecked?: boolean;
   loadSubscription?: (id: string) => Promise<Response>;
