@@ -63,6 +63,7 @@ const PROXY_FIELD_ORDER_PROTOCOL: Partial<Record<KnownNodeType, string[]>> = {
     "custom-tables",
   ],
   relay: ["proxies"],
+  tailscale: ["hostname", "auth-key", "control-url", "state-dir", "ephemeral", "accept-routes", "exit-node", "exit-node-allow-lan-access"],
 };
 const PROXY_FIELD_ORDER_TLS = ["tls", "sni", "servername", "skip-cert-verify", "ech-opts", "client-fingerprint"];
 const PROXY_FIELD_ORDER_TRANSPORT = ["network", "flow", "alpn", "udp"];

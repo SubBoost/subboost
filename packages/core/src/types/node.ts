@@ -26,7 +26,8 @@ export type KnownNodeType =
   | "masque"
   | "sudoku"
   | "trusttunnel"
-  | "relay";
+  | "relay"
+  | "tailscale";
 
 // 支持上游 Clash/Mihomo 新增的代理类型：例如 wireguard / snell / mieru ...
 // 通过 “brand string” 避免破坏已建模类型的 discriminated union 推断（type === "vless" 等仍能精确收敛）。
@@ -398,6 +399,20 @@ export interface SudokuNode extends BaseNode {
   type: "sudoku";
 }
 
+/** Mihomo Tailscale outbound; login state and peers belong to the client runtime. */
+export interface TailscaleNode extends EndpointOptionalNode {
+  type: "tailscale";
+  hostname?: string;
+  "auth-key"?: string;
+  "control-url"?: string;
+  "state-dir"?: string;
+  ephemeral?: boolean;
+  udp?: boolean;
+  "accept-routes"?: boolean;
+  "exit-node"?: string;
+  "exit-node-allow-lan-access"?: boolean;
+}
+
 export interface RelayNode extends BaseNode {
   type: "relay";
   proxies: string[];
@@ -426,6 +441,7 @@ export type ParsedNode =
   | HttpNode
   | SshNode
   | RelayNode
+  | TailscaleNode
   | (BaseNode & { type: UnknownNodeType });
 
 export interface ParseResult {

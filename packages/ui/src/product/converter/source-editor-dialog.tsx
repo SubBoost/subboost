@@ -1,7 +1,9 @@
 "use client";
 
+import * as React from "react";
 import { HelpCircle } from "lucide-react";
 import { DEFAULT_NODE_NAME_TEMPLATE } from "@subboost/core/node-name-template";
+import { parseTailscaleSourceDocument } from "@subboost/core/subscription/tailscale-yaml-source";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
 import { FormField } from "@subboost/ui/components/ui/form-field";
@@ -11,6 +13,7 @@ import { Switch } from "@subboost/ui/components/ui/switch";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 import type { SubscriptionSource } from "@subboost/ui/store/config-store";
 import { sourceTypeInfo } from "./source-type-info";
+import { TailscaleSourceForm } from "./tailscale-source-form";
 
 export type SourceEditorDialogProps = {
   source: SubscriptionSource | null;
@@ -18,7 +21,66 @@ export type SourceEditorDialogProps = {
   onClose: () => void;
   onUpdateContent: (id: string, content: string) => void;
   onUpdateMeta: (id: string, patch: Partial<SubscriptionSource>) => void;
+  /** Writes form-applied YAML once and closes the editor with a single import. */
+  onApplyContent?: (content: string) => void;
+  /** state-dir values of Tailscale nodes owned by other sources. */
+  tailscaleStateDirs?: readonly unknown[];
 };
+
+type YamlEditorMode = "form" | "raw";
+
+/** Compatible YAML sources open in the Tailscale form; everything else keeps the raw editor. */
+function YamlSourceEditor({
+  source,
+  onUpdateContent,
+  onApplyContent,
+  onClose,
+  tailscaleStateDirs,
+}: {
+  source: SubscriptionSource;
+  onUpdateContent: (id: string, content: string) => void;
+  onApplyContent?: (content: string) => void;
+  onClose: () => void;
+  tailscaleStateDirs: readonly unknown[];
+}) {
+  const parsed = React.useMemo(() => parseTailscaleSourceDocument(source.content), [source.content]);
+  const formAvailable = parsed.ok && Boolean(onApplyContent);
+  const [mode, setMode] = React.useState<YamlEditorMode>(formAvailable ? "form" : "raw");
+
+  if (mode === "form" && parsed.ok && onApplyContent) {
+    return (
+      <TailscaleSourceForm
+        // Remount on content changes so the form never shows a stale document.
+        key={source.content}
+        document={parsed.document}
+        knownStateDirs={tailscaleStateDirs}
+        applyLabel="应用"
+        onApply={onApplyContent}
+        onCancel={onClose}
+        onSwitchToRaw={(content) => {
+          if (content !== null) onUpdateContent(source.id, content);
+          setMode("raw");
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {formAvailable ? (
+        <div className="flex justify-end">
+          <Button variant="ghost" size="sm" onClick={() => setMode("form")}>切换到 Tailscale 表单</Button>
+        </div>
+      ) : null}
+      <Textarea
+        value={source.content}
+        onChange={(event) => onUpdateContent(source.id, event.target.value)}
+        placeholder={sourceTypeInfo[source.type].placeholder}
+        className="min-h-[60vh] text-xs font-mono"
+      />
+    </div>
+  );
+}
 
 export function SourceEditorDialog({
   source,
@@ -26,6 +88,8 @@ export function SourceEditorDialog({
   onClose,
   onUpdateContent,
   onUpdateMeta,
+  onApplyContent,
+  tailscaleStateDirs = [],
 }: SourceEditorDialogProps) {
   return (
     <Dialog open={Boolean(source)} onOpenChange={(open) => !open && onClose()}>
@@ -134,6 +198,15 @@ export function SourceEditorDialog({
                     设置后，SubBoost 会在导入/刷新时额外抓取该接口，用来更新这个源自己的流量与到期快照。
                   </p>
                 </div>
+              ) : source.type === "yaml" ? (
+                <YamlSourceEditor
+                  key={source.id}
+                  source={source}
+                  onUpdateContent={onUpdateContent}
+                  onApplyContent={onApplyContent}
+                  onClose={onClose}
+                  tailscaleStateDirs={tailscaleStateDirs}
+                />
               ) : (
                 <Textarea
                   value={source.content}

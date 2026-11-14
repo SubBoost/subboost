@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseClashYaml } from "../parser/clash-yaml";
 import {
   SubscriptionImportError,
   createSubscriptionImportErrorInfo,
@@ -41,6 +42,99 @@ describe("sanitizePublicErrorText", () => {
       const text = `解析失败: ${protocol} - reason`;
       expect(sanitizePublicErrorText(text)).toContain(protocol);
       expect(sanitizePublicErrorText(text)).not.toContain("[path]");
+    }
+  });
+
+  it("redacts Tailscale auth keys in YAML snippets and standalone tokens", () => {
+    const cases = [
+      "bad indentation near:\n  auth-key: tskey-auth-kPlaceholder1CNTRL-Abc123\n",
+      'bad near {name: ts, type: tailscale, "auth-key": "tskey-auth-kPlaceholder1CNTRL-Abc123"}',
+      "bad near {auth-key: 'k-placeholder secret', udp: true}",
+      'bad near {auth-key: "ts\\\nkey-auth-kPlaceholder1CNTRL-Abc123", udp: true}',
+      "bad near {auth-key: 'ts\nkey-auth-kPlaceholder1CNTRL-Abc123', udp: true}",
+      'auth-key: "ts\n\n  key-auth-kPlaceholder1CNTRL-Abc123"',
+      "auth-key: 'ts\n\n  key-auth-kPlaceholder1CNTRL-Abc123'",
+      "auth-key: |\n  ts\n\n  key-auth-kPlaceholder1CNTRL-Abc123\nudp: true",
+      'bad near {auth-key: "key-auth-kPlaceholder1CNTRL-Abc123 ...',
+      "bad near {auth-key: 'key-auth-kPlaceholder1CNTRL-Abc123 ...",
+      [
+        "YAML 解析错误: unexpected end of the stream within a flow collection (6:14)",
+        "",
+        " 3 |     type: tailscale",
+        ' 4 |     auth-key: "ts\\',
+        " 5 |       key-auth-kPlaceholder1CNTRL-123456789 ...",
+        " 6 |     broken: [",
+        "------------------^",
+      ].join("\n"),
+      [
+        " 3 |     type: tailscale",
+        ' 4 |     auth-key: "ts',
+        " 5 | ",
+        " 6 |     key-auth-kPlaceholder1CNTRL-123456789 ...",
+        " 7 |     broken: [",
+      ].join("\n"),
+      [
+        " 4 |     auth-key: |",
+        "------------------^",
+        " 5 |       ts-part-1",
+        " 6 | ",
+        " 7 |       key-auth-kPlaceholder1CNTRL-123456789",
+        " 8 |     broken: [",
+      ].join("\n"),
+      "unexpected token tskey-client-kPlaceholder1CNTRL-Abc123 in stream",
+    ];
+    for (const text of cases) {
+      const sanitized = sanitizePublicErrorText(text);
+      expect(sanitized).not.toMatch(/tskey-[a-z]+-k|k-placeholder|key-auth-kPlaceholder/);
+    }
+    expect(sanitizePublicErrorText("x auth-key: tskey-auth-kPlaceholder1CNTRL-Abc123 y")).toBe("x auth-key: *** y");
+    expect(sanitizePublicErrorText("{\"auth-key\": \"secret value\", udp: true}")).toBe("{\"auth-key\": ***, udp: true}");
+    expect(sanitizePublicErrorText('auth-key: "ts\\\nkey-auth-secret"')).toBe("auth-key: ***");
+    expect(sanitizePublicErrorText('auth-key: "ts\n\n  key-auth-SYNTHETIC-SECRET"')).toBe("auth-key: ***");
+  });
+
+  it("does not leak multiline Tailscale auth-key fragments from parseClashYaml into public error info", () => {
+    const result = parseClashYaml(
+      [
+        "proxies:",
+        "  - name: ts-node",
+        "    type: tailscale",
+        '    auth-key: "ts\\',
+        '      key-auth-SYNTHETIC-CREDENTIAL-12345678901234567890"',
+        "    broken: [",
+      ].join("\n")
+    );
+    expect(result.errors[0]).toContain("YAML 解析错误");
+    expect(result.errors.join("\n")).not.toContain("key-auth-SYNTHETIC-CREDENTIAL");
+
+    const info = createSubscriptionImportErrorInfo({
+      category: "parse",
+      message: result.errors[0],
+      detail: result.errors.join("\n"),
+    });
+    expect(info.message).not.toContain("key-auth-SYNTHETIC-CREDENTIAL");
+    expect(info.detail).not.toContain("key-auth-SYNTHETIC-CREDENTIAL");
+
+    const blankLineInputs = [
+      'auth-key: "ts\n\n  key-auth-SYNTHETIC-SECRET"',
+      "auth-key: |\n  ts\n\n  key-auth-SYNTHETIC-SECRET\nudp: true",
+      [
+        " 3 |     type: tailscale",
+        " 4 |     auth-key: |",
+        " 5 |       ts",
+        " 6 | ",
+        " 7 |       key-auth-SYNTHETIC-SECRET ...",
+        " 8 |     broken: [",
+      ].join("\n"),
+    ];
+    for (const raw of blankLineInputs) {
+      const blankInfo = createSubscriptionImportErrorInfo({
+        category: "parse",
+        message: raw,
+        detail: raw,
+      });
+      expect(blankInfo.message).not.toContain("key-auth-SYNTHETIC-SECRET");
+      expect(blankInfo.detail).not.toContain("key-auth-SYNTHETIC-SECRET");
     }
   });
 

@@ -206,7 +206,7 @@ function highlightYamlValue(value: string): string {
   }
 
   // 协议类型关键词
-  if (/^(ss|ssr|vmess|vless|trojan|anytls|hysteria2|hy2|socks5|socks4|http|https|relay)$/.test(value)) {
+  if (/^(ss|ssr|vmess|vless|trojan|anytls|hysteria2|hy2|socks5|socks4|http|https|relay|tailscale)$/.test(value)) {
     return `<span class="text-pink-400 font-medium">${escapeHtml(value)}</span>`;
   }
 
@@ -265,7 +265,7 @@ function highlightInlineObject(obj: string): string {
     let keyColor = "text-cyan-400";
     if (["name", "type", "server", "port"].includes(key)) {
       keyColor = "text-amber-400 font-medium";
-    } else if (["password", "uuid", "cipher"].includes(key)) {
+    } else if (["password", "uuid", "cipher", "auth-key"].includes(key)) {
       keyColor = "text-violet-400";
     } else if (["tls", "sni", "servername", "skip-cert-verify", "client-fingerprint"].includes(key)) {
       keyColor = "text-teal-400";
