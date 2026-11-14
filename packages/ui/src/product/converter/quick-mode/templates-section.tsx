@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Globe, Heart, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { FileCode, Globe, Heart, Loader2, Upload } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
 import { Input } from "@subboost/ui/components/ui/input";
 import { Card } from "@subboost/ui/components/ui/card";
@@ -10,16 +11,68 @@ import type { TemplateType } from "@subboost/core/types/config";
 import { useUserStore } from "@subboost/ui/store/user-store";
 import { BUILTIN_TEMPLATE_IDS } from "@subboost/core/templates/builtin";
 import { toast } from "@subboost/ui/components/ui/toaster";
-import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
+import { useProductApiAdapter, type QuickTemplateSummary } from "@subboost/ui/product/api-adapter";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
 import { templates } from "./constants";
 
-export function TemplatesSection() {
-  const [catalogOpen, setCatalogOpen] = React.useState(false);
-  const [catalogLoading, setCatalogLoading] = React.useState(false);
-  const [catalogTemplates, setCatalogTemplates] = React.useState<Array<{ id: string; name: string; description: string }>>([]);
-  const [catalogSearch, setCatalogSearch] = React.useState("");
-  const [catalogApplyingId, setCatalogApplyingId] = React.useState<string | null>(null);
+type TemplatePickerSource = "catalog" | "my";
+
+export type QuickTemplateUploadEntry = {
+  href: string;
+  onOpen?: () => void;
+};
+
+type Props = {
+  templateUpload?: QuickTemplateUploadEntry | null;
+};
+
+const MY_TEMPLATES_NAME = "我的模板";
+
+function TemplatePickerEntry({
+  icon,
+  name,
+  description,
+  action,
+  onOpen,
+}: {
+  icon: React.ReactNode;
+  name: string;
+  description: string;
+  action: string;
+  onOpen: () => void;
+}) {
+  return (
+    <Card className="p-2.5 transition-all border-2 border-dashed border-ink/15 hover:border-ink/25 bg-ink/5">
+      <button
+        type="button"
+        aria-label={`打开${name}`}
+        className="flex w-full items-center justify-between gap-3 text-left"
+        onClick={onOpen}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-4 h-4 rounded-full border-2 border-ink/30 flex items-center justify-center flex-shrink-0">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-fg">{name}</span>
+            <p className="text-xs text-fg-40 mt-0.5">{description}</p>
+          </div>
+        </div>
+        <div className="text-right text-xs text-fg-40 flex-shrink-0">
+          <div>{action}</div>
+        </div>
+      </button>
+    </Card>
+  );
+}
+
+export function TemplatesSection({ templateUpload }: Props) {
+  const [pickerSource, setPickerSource] = React.useState<TemplatePickerSource | null>(null);
+  const [pickerLoading, setPickerLoading] = React.useState(false);
+  const [pickerTemplates, setPickerTemplates] = React.useState<QuickTemplateSummary[]>([]);
+  const [pickerLoadFailed, setPickerLoadFailed] = React.useState(false);
+  const [pickerSearch, setPickerSearch] = React.useState("");
+  const [pickerApplyingId, setPickerApplyingId] = React.useState<string | null>(null);
 
   const { template: selectedTemplate, setTemplate, applyTemplateConfig, setAppliedTemplateId } = useConfigStore();
   const { user } = useUserStore();
@@ -33,12 +86,17 @@ export function TemplatesSection() {
   const engagementLoginRequired = templateLabels?.engagementLoginRequired ?? "登录后可收藏";
   const loadBuiltinTemplateEngagement = templateApi?.loadBuiltinTemplateEngagement;
   const loadCatalogTemplates = templateApi?.loadCatalogTemplates;
+  const loadMyTemplates = templateApi?.loadMyTemplates;
   const catalogEnabled =
     templateApi?.catalogEnabled !== false &&
     Boolean(loadCatalogTemplates && templateApi?.loadTemplateDetail);
+  const myTemplatesEnabled = Boolean(user && loadMyTemplates && templateApi?.loadTemplateDetail);
   const builtinEngagementEnabled =
     templateApi?.builtinEngagementEnabled !== false &&
     Boolean(loadBuiltinTemplateEngagement && templateApi?.toggleTemplateEngagement);
+  const pickerName = pickerSource === "my" ? MY_TEMPLATES_NAME : catalogName;
+  const loadPickerTemplates =
+    pickerSource === "my" ? loadMyTemplates : pickerSource === "catalog" ? loadCatalogTemplates : undefined;
 
   const [builtinEngagement, setBuiltinEngagement] = React.useState<Record<TemplateType, { id: string; engagementCount: number; isEngaged: boolean }>>({
     minimal: { id: BUILTIN_TEMPLATE_IDS.minimal, engagementCount: 0, isEngaged: false },
@@ -91,20 +149,33 @@ export function TemplatesSection() {
     }
   };
 
+  const openPicker = (source: TemplatePickerSource) => {
+    setPickerTemplates([]);
+    setPickerLoadFailed(false);
+    setPickerLoading(true);
+    setPickerSearch("");
+    setPickerSource(source);
+    if (source === "catalog") interactions.templateCatalogOpened?.({ mode: "quick" });
+  };
+
   React.useEffect(() => {
-    if (!catalogOpen || !loadCatalogTemplates) return;
+    if (!pickerSource || !loadPickerTemplates) return;
 
     let cancelled = false;
     const run = async () => {
-      setCatalogLoading(true);
+      setPickerLoading(true);
+      setPickerLoadFailed(false);
       try {
-        const templates = await loadCatalogTemplates();
-        if (!cancelled) setCatalogTemplates(templates);
+        const items = await loadPickerTemplates();
+        if (!cancelled) setPickerTemplates(items);
       } catch (e) {
         console.error(e);
-        if (!cancelled) setCatalogTemplates([]);
+        if (!cancelled) {
+          setPickerTemplates([]);
+          setPickerLoadFailed(true);
+        }
       } finally {
-        if (!cancelled) setCatalogLoading(false);
+        if (!cancelled) setPickerLoading(false);
       }
     };
 
@@ -112,40 +183,41 @@ export function TemplatesSection() {
     return () => {
       cancelled = true;
     };
-  }, [loadCatalogTemplates, catalogOpen]);
+  }, [loadPickerTemplates, pickerSource]);
 
-  const filteredCatalogTemplates = React.useMemo(() => {
-    const q = catalogSearch.trim().toLowerCase();
-    if (!q) return catalogTemplates;
-    return catalogTemplates.filter((t) => {
+  const filteredPickerTemplates = React.useMemo(() => {
+    const q = pickerSearch.trim().toLowerCase();
+    if (!q) return pickerTemplates;
+    return pickerTemplates.filter((t) => {
       const name = (t.name || "").toLowerCase();
       const desc = (t.description || "").toLowerCase();
       return name.includes(q) || desc.includes(q);
     });
-  }, [catalogTemplates, catalogSearch]);
+  }, [pickerTemplates, pickerSearch]);
 
   React.useEffect(() => {
-    const q = catalogSearch.trim();
-    if (!catalogOpen || !q) return;
+    const q = pickerSearch.trim();
+    if (!pickerSource || !q) return;
 
     const timer = window.setTimeout(() => {
       interactions.templateSearchCompleted?.({
-        source: "catalog",
-        resultCount: filteredCatalogTemplates.length,
+        source: pickerSource,
+        resultCount: filteredPickerTemplates.length,
       });
     }, 500);
 
     return () => window.clearTimeout(timer);
-  }, [filteredCatalogTemplates.length, catalogOpen, catalogSearch, interactions]);
+  }, [filteredPickerTemplates.length, pickerSource, pickerSearch, interactions]);
 
-  const handleApplyCatalogTemplate = async (id: string) => {
-    if (!templateApi?.loadTemplateDetail) return;
-    setCatalogApplyingId(id);
+  const handleApplyPickerTemplate = async (id: string) => {
+    const source = pickerSource;
+    if (!source || !templateApi?.loadTemplateDetail) return;
+    setPickerApplyingId(id);
     try {
       const tpl = await templateApi.loadTemplateDetail(id);
       if (!tpl) {
         interactions.templateApplied?.({
-          source: "catalog",
+          source,
           kind: "unknown",
           result: "runtimeError",
         });
@@ -156,10 +228,10 @@ export function TemplatesSection() {
       if (tpl.kind === "config" && tpl.config && typeof tpl.config === "object") {
         setAppliedTemplateId(id);
         applyTemplateConfig(tpl.config as SubBoostTemplateConfig);
-        setCatalogOpen(false);
-        setCatalogSearch("");
+        setPickerSource(null);
+        setPickerSearch("");
         interactions.templateApplied?.({
-          source: "catalog",
+          source,
           kind: "config",
           result: "success",
         });
@@ -168,7 +240,7 @@ export function TemplatesSection() {
       }
 
       interactions.templateApplied?.({
-        source: "catalog",
+        source,
         kind: tpl.kind === "yaml" ? "yaml" : "unknown",
         result: "validationError",
       });
@@ -179,14 +251,72 @@ export function TemplatesSection() {
     } catch (e) {
       console.error(e);
       interactions.templateApplied?.({
-        source: "catalog",
+        source,
         kind: "unknown",
         result: "runtimeError",
       });
       toast({ title: "应用模板失败，请稍后重试", variant: "destructive" });
     } finally {
-      setCatalogApplyingId(null);
+      setPickerApplyingId(null);
     }
+  };
+
+  const renderPickerBody = () => {
+    if (pickerLoading) {
+      return (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+        </div>
+      );
+    }
+
+    if (pickerLoadFailed) {
+      return <div className="text-center py-10 text-sm text-fg-50">加载模板失败，请稍后重试</div>;
+    }
+
+    if (pickerSource === "my" && pickerTemplates.length === 0) {
+      return (
+        <div className="text-center py-10 text-sm text-fg-50">
+          <p>暂无模板，可将当前配置上传为模板</p>
+          {templateUpload && (
+            <Button asChild variant="outline" size="sm" className="mt-3 gap-2" onClick={templateUpload.onOpen}>
+              <Link href={templateUpload.href}>
+                <Upload className="h-4 w-4" />
+                上传模板
+              </Link>
+            </Button>
+          )}
+        </div>
+      );
+    }
+
+    if (filteredPickerTemplates.length === 0) {
+      return <div className="text-center py-10 text-sm text-fg-50">暂无可用模板</div>;
+    }
+
+    return (
+      <div className="max-h-[420px] overflow-auto custom-scrollbar space-y-2 pr-1">
+        {filteredPickerTemplates.map((t) => (
+          <div
+            key={t.id}
+            className="p-3 rounded-lg bg-ink/5 border border-ink/10 flex items-start justify-between gap-3"
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-fg truncate">{t.name}</div>
+              <div className="text-xs text-fg-50 mt-1 line-clamp-2">{t.description || ""}</div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => void handleApplyPickerTemplate(t.id)}
+              disabled={pickerApplyingId === t.id}
+              className="flex-shrink-0"
+            >
+              {pickerApplyingId === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "使用"}
+            </Button>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -261,78 +391,46 @@ export function TemplatesSection() {
           ))}
 
           {catalogEnabled && (
-            <Card
-              className="p-2.5 transition-all border-2 border-dashed border-ink/15 hover:border-ink/25 bg-ink/5"
-            >
-              <button
-                type="button"
-                aria-label={`打开${catalogName}`}
-                className="flex w-full items-center justify-between text-left"
-                onClick={() => {
-                  setCatalogOpen(true);
-                  interactions.templateCatalogOpened?.({ mode: "quick" });
-                }}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-4 h-4 rounded-full border-2 border-ink/30 flex items-center justify-center flex-shrink-0">
-                    <Globe className="h-3 w-3 text-indigo-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-fg">{catalogName}</span>
-                    <p className="text-xs text-fg-40 mt-0.5 truncate">{catalogDescription}</p>
-                  </div>
-                </div>
-                <div className="text-right text-xs text-fg-40 flex-shrink-0">
-                  <div>{catalogSelectAction}</div>
-                </div>
-              </button>
-            </Card>
+            <TemplatePickerEntry
+              icon={<Globe className="h-3 w-3 text-indigo-400" />}
+              name={catalogName}
+              description={catalogDescription}
+              action={catalogSelectAction}
+              onOpen={() => openPicker("catalog")}
+            />
+          )}
+
+          {myTemplatesEnabled && (
+            <TemplatePickerEntry
+              icon={<FileCode className="h-3 w-3 text-indigo-400" />}
+              name={MY_TEMPLATES_NAME}
+              description="选择并应用您上传的配置模板"
+              action="从我的模板选择"
+              onOpen={() => openPicker("my")}
+            />
           )}
         </div>
       </div>
 
-      <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
+      <Dialog
+        open={pickerSource !== null}
+        onOpenChange={(open) => {
+          if (!open) setPickerSource(null);
+        }}
+      >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>{catalogName}</DialogTitle>
+            <DialogTitle>{pickerName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input
               placeholder="搜索模板..."
-              value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
               className="text-sm"
             />
 
-            {catalogLoading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
-              </div>
-            ) : filteredCatalogTemplates.length === 0 ? (
-              <div className="text-center py-10 text-sm text-fg-50">暂无可用模板</div>
-            ) : (
-              <div className="max-h-[420px] overflow-auto custom-scrollbar space-y-2 pr-1">
-                {filteredCatalogTemplates.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-3 rounded-lg bg-ink/5 border border-ink/10 flex items-start justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-fg truncate">{t.name}</div>
-                      <div className="text-xs text-fg-50 mt-1 line-clamp-2">{t.description || ""}</div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => void handleApplyCatalogTemplate(t.id)}
-                      disabled={catalogApplyingId === t.id}
-                      className="flex-shrink-0"
-                    >
-                      {catalogApplyingId === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "使用"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+            {renderPickerBody()}
           </div>
         </DialogContent>
       </Dialog>

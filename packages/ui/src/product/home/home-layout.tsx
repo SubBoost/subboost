@@ -125,6 +125,14 @@ export function HomeLayout({
     interactions.modeChanged?.({ mode: nextMode });
   }, [interactions]);
 
+  const handleTemplateUploadOpen = React.useCallback(() => {
+    onTemplateUploadOpen?.();
+    interactions.templateUploadOpened?.({ entry: "home" });
+  }, [interactions, onTemplateUploadOpen]);
+  const templateUpload = user && templateUploadHref
+    ? { href: templateUploadHref, onOpen: handleTemplateUploadOpen }
+    : null;
+
   return (
     <div className="w-full max-w-[clamp(1200px,95vw,2400px)] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-3 lg:py-5 [@media(max-height:1000px)]:py-3 min-h-[calc(100vh-64px)] flex flex-col">
       {renderAnnouncement?.({
@@ -199,7 +207,7 @@ export function HomeLayout({
                   value="quick"
                   className="mt-0 flex flex-col data-[state=inactive]:hidden lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar lg:pr-1"
                 >
-                  <QuickMode />
+                  <QuickMode templateUpload={templateUpload} />
                 </TabsContent>
                 <TabsContent
                   value="advanced"
@@ -222,17 +230,14 @@ export function HomeLayout({
                     </>
                   )}
                 </Button>
-                {user && templateUploadHref && (
+                {templateUpload && (
                   <Button
                     asChild
                       variant="outline"
                       className="h-10 gap-2"
-                      onClick={() => {
-                        onTemplateUploadOpen?.();
-                        interactions.templateUploadOpened?.({ entry: "home" });
-                      }}
+                      onClick={templateUpload.onOpen}
                   >
-                    <Link href={templateUploadHref}>
+                    <Link href={templateUpload.href}>
                       <Upload className="h-4 w-4" />
                       上传模板
                     </Link>
