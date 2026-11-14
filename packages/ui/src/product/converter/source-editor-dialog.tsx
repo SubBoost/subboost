@@ -13,7 +13,7 @@ import { Switch } from "@subboost/ui/components/ui/switch";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
 import type { SubscriptionSource } from "@subboost/ui/store/config-store";
 import { sourceTypeInfo } from "./source-type-info";
-import { TailscaleSourceForm } from "./tailscale-source-form";
+import { TailscaleSourceForm, type TailscaleSourceFormHandle } from "./tailscale-source-form";
 
 export type SourceEditorDialogProps = {
   source: SubscriptionSource | null;
@@ -29,15 +29,24 @@ export type SourceEditorDialogProps = {
 
 type YamlEditorMode = "form" | "raw";
 
-/** Compatible YAML sources open in the Tailscale form; everything else keeps the raw editor. */
+/**
+ * Compatible YAML sources open in the Tailscale form, which brings its own actions; everything else
+ * keeps the raw editor with the content label and the dialog footer.
+ */
 function YamlSourceEditor({
   source,
+  meta,
+  footer,
+  formRef,
   onUpdateContent,
   onApplyContent,
   onClose,
   tailscaleStateDirs,
 }: {
   source: SubscriptionSource;
+  meta: React.ReactNode;
+  footer: React.ReactNode;
+  formRef: React.Ref<TailscaleSourceFormHandle>;
   onUpdateContent: (id: string, content: string) => void;
   onApplyContent?: (content: string) => void;
   onClose: () => void;
@@ -49,36 +58,51 @@ function YamlSourceEditor({
 
   if (mode === "form" && parsed.ok && onApplyContent) {
     return (
-      <TailscaleSourceForm
-        // Remount on content changes so the form never shows a stale document.
-        key={source.content}
-        document={parsed.document}
-        knownStateDirs={tailscaleStateDirs}
-        applyLabel="应用"
-        onApply={onApplyContent}
-        onCancel={onClose}
-        onSwitchToRaw={(content) => {
-          if (content !== null) onUpdateContent(source.id, content);
-          setMode("raw");
-        }}
-      />
+      <div className="space-y-3">
+        {meta}
+        <TailscaleSourceForm
+          // Remount on content changes so the form never shows a stale document.
+          key={source.content}
+          ref={formRef}
+          document={parsed.document}
+          knownStateDirs={tailscaleStateDirs}
+          applyLabel="应用"
+          cancelLabel="关闭"
+          confirmDiscard
+          onApply={onApplyContent}
+          onCancel={onClose}
+          onSwitchToRaw={(content) => {
+            if (content !== null) onUpdateContent(source.id, content);
+            setMode("raw");
+          }}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      {formAvailable ? (
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setMode("form")}>切换到 Tailscale 表单</Button>
+    <>
+      <div className="space-y-3">
+        {meta}
+        <div className="space-y-1">
+          <p className="text-xs text-fg-60">{sourceTypeInfo[source.type].label}</p>
+          <div className="space-y-2">
+            {formAvailable ? (
+              <div className="flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setMode("form")}>切换到 Tailscale 表单</Button>
+              </div>
+            ) : null}
+            <Textarea
+              value={source.content}
+              onChange={(event) => onUpdateContent(source.id, event.target.value)}
+              placeholder={sourceTypeInfo[source.type].placeholder}
+              className="min-h-[60vh] text-xs font-mono"
+            />
+          </div>
         </div>
-      ) : null}
-      <Textarea
-        value={source.content}
-        onChange={(event) => onUpdateContent(source.id, event.target.value)}
-        placeholder={sourceTypeInfo[source.type].placeholder}
-        className="min-h-[60vh] text-xs font-mono"
-      />
-    </div>
+      </div>
+      {footer}
+    </>
   );
 }
 
@@ -91,39 +115,58 @@ export function SourceEditorDialog({
   onApplyContent,
   tailscaleStateDirs = [],
 }: SourceEditorDialogProps) {
+  // Set only while the Tailscale form is shown; the form decides whether closing needs confirmation.
+  const formRef = React.useRef<TailscaleSourceFormHandle>(null);
+  const requestClose = () => {
+    if (formRef.current) formRef.current.requestClose();
+    else onClose();
+  };
+
+  const meta = source ? (
+    <>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <FormField label="标签（tag）">
+          <Input
+            value={source.tag ?? ""}
+            onChange={(event) => onUpdateMeta(source.id, { tag: event.target.value })}
+            placeholder="例如：A / 订阅1 / 自建1"
+            className="text-xs"
+          />
+        </FormField>
+        <FormField label="节点命名模板">
+          <Input
+            value={source.nameTemplate ?? DEFAULT_NODE_NAME_TEMPLATE}
+            onChange={(event) => onUpdateMeta(source.id, { nameTemplate: event.target.value })}
+            className="text-xs font-mono"
+          />
+        </FormField>
+        <FormField label="预览">
+          <Input value={previewName} readOnly className="text-xs font-mono" />
+        </FormField>
+      </div>
+
+      <p className="text-[11px] text-fg-40">
+        可用占位符：{"{tag}"}、{"{name}"}；留空则默认：{DEFAULT_NODE_NAME_TEMPLATE}
+      </p>
+    </>
+  ) : null;
+
+  const footer = (
+    <div className="flex justify-end gap-2">
+      <Button variant="outline" onClick={onClose}>完成</Button>
+    </div>
+  );
+
   return (
-    <Dialog open={Boolean(source)} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={Boolean(source)} onOpenChange={(open) => !open && requestClose()}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{source ? `高级编辑：${sourceTypeInfo[source.type].label}` : "高级编辑"}</DialogTitle>
         </DialogHeader>
 
-        {source ? (
+        {source && source.type !== "yaml" ? (
           <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <FormField label="标签（tag）">
-                <Input
-                  value={source.tag ?? ""}
-                  onChange={(event) => onUpdateMeta(source.id, { tag: event.target.value })}
-                  placeholder="例如：A / 订阅1 / 自建1"
-                  className="text-xs"
-                />
-              </FormField>
-              <FormField label="节点命名模板">
-                <Input
-                  value={source.nameTemplate ?? DEFAULT_NODE_NAME_TEMPLATE}
-                  onChange={(event) => onUpdateMeta(source.id, { nameTemplate: event.target.value })}
-                  className="text-xs font-mono"
-                />
-              </FormField>
-              <FormField label="预览">
-                <Input value={previewName} readOnly className="text-xs font-mono" />
-              </FormField>
-            </div>
-
-            <p className="text-[11px] text-fg-40">
-              可用占位符：{"{tag}"}、{"{name}"}；留空则默认：{DEFAULT_NODE_NAME_TEMPLATE}
-            </p>
+            {meta}
 
             <div className="space-y-1">
               <p className="text-xs text-fg-60">{sourceTypeInfo[source.type].label}</p>
@@ -198,15 +241,6 @@ export function SourceEditorDialog({
                     设置后，SubBoost 会在导入/刷新时额外抓取该接口，用来更新这个源自己的流量与到期快照。
                   </p>
                 </div>
-              ) : source.type === "yaml" ? (
-                <YamlSourceEditor
-                  key={source.id}
-                  source={source}
-                  onUpdateContent={onUpdateContent}
-                  onApplyContent={onApplyContent}
-                  onClose={onClose}
-                  tailscaleStateDirs={tailscaleStateDirs}
-                />
               ) : (
                 <Textarea
                   value={source.content}
@@ -219,9 +253,21 @@ export function SourceEditorDialog({
           </div>
         ) : null}
 
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>完成</Button>
-        </div>
+        {source?.type === "yaml" ? (
+          <YamlSourceEditor
+            key={source.id}
+            source={source}
+            meta={meta}
+            footer={footer}
+            formRef={formRef}
+            onUpdateContent={onUpdateContent}
+            onApplyContent={onApplyContent}
+            onClose={onClose}
+            tailscaleStateDirs={tailscaleStateDirs}
+          />
+        ) : (
+          footer
+        )}
       </DialogContent>
     </Dialog>
   );
