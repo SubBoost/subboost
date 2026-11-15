@@ -10,12 +10,6 @@ import { toast } from "@subboost/ui/components/ui/toaster";
 import { useProductInteractionAdapter, type ProductInteractionResult } from "@subboost/ui/product/interactions";
 import { markSourceAsPendingImport } from "@subboost/ui/product/subscription/source-import-state";
 import { moveSubscriptionSource } from "@subboost/ui/product/subscription/source-order";
-import {
-  createTailscaleDraftContent,
-  createTailscaleStateDir,
-  parseTailscaleSourceDocument,
-  type TailscaleSourceDocument,
-} from "@subboost/core/subscription/tailscale-yaml-source";
 
 export type SubscriptionSourcesMode = "quick" | "advanced";
 
@@ -86,8 +80,6 @@ export function useSubscriptionSourcesController({ mode }: Options) {
     [expandedSourceId, sources]
   );
   const [expandedSourceSnapshot, setExpandedSourceSnapshot] = React.useState<ExpandedSourceSnapshot | null>(null);
-  // A form-created Tailscale node stays local until Apply; Cancel leaves no source behind.
-  const [tailscaleDraft, setTailscaleDraft] = React.useState<TailscaleSourceDocument | null>(null);
 
   React.useEffect(() => {
     if (!expandedSource) {
@@ -189,34 +181,6 @@ export function useSubscriptionSourcesController({ mode }: Options) {
     [ensureSourceQuota, interactions, mode, setSources, sources]
   );
 
-  const startTailscaleDraft = React.useCallback(() => {
-    setShowAddMenu(false);
-    if (!ensureSourceQuota("yaml")) return;
-    // The directory is generated once here and then lives in the YAML source.
-    const result = parseTailscaleSourceDocument(createTailscaleDraftContent(createTailscaleStateDir()));
-    if (!result.ok) throw new Error(`Tailscale draft is not form-eligible: ${result.reason}`);
-    setTailscaleDraft(result.document);
-  }, [ensureSourceQuota]);
-
-  const cancelTailscaleDraft = React.useCallback(() => setTailscaleDraft(null), []);
-
-  const applyTailscaleDraft = React.useCallback(
-    (content: string) => {
-      if (!ensureSourceQuota("yaml")) return;
-      const newSource: SubscriptionSource = {
-        id: Date.now().toString(),
-        type: "yaml",
-        content,
-        nameTemplate: DEFAULT_NODE_NAME_TEMPLATE,
-      };
-      setSources([...sources, newSource]);
-      setTailscaleDraft(null);
-      interactions.sourceAdded?.({ mode, sourceType: "yaml", sourceCount: sources.length + 1 });
-      void parseSingleSource(newSource.id);
-    },
-    [ensureSourceQuota, interactions, mode, parseSingleSource, setSources, sources]
-  );
-
   /** Write form-applied content and close the editor, importing at most once. */
   const applyExpandedSourceContent = React.useCallback(
     (content: string) => {
@@ -236,7 +200,6 @@ export function useSubscriptionSourcesController({ mode }: Options) {
     () => collectTailscaleStateDirs(nodes, expandedSource?.id),
     [expandedSource?.id, nodes]
   );
-  const tailscaleDraftStateDirs = React.useMemo(() => collectTailscaleStateDirs(nodes), [nodes]);
 
   const removeSource = React.useCallback(
     (id: string) => {
@@ -349,13 +312,8 @@ export function useSubscriptionSourcesController({ mode }: Options) {
   return {
     addSource,
     applyExpandedSourceContent,
-    applyTailscaleDraft,
-    cancelTailscaleDraft,
     closeExpandedSourceEditor,
     expandedSourceTailscaleStateDirs,
-    startTailscaleDraft,
-    tailscaleDraft,
-    tailscaleDraftStateDirs,
     error,
     expandedSource,
     expandedSourcePreviewName,

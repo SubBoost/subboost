@@ -5,11 +5,9 @@ import { HelpCircle } from "lucide-react";
 import {
   hasDuplicateTailscaleStateDir,
   isTailscaleFormDirty,
-  serializeTailscaleForm,
   validateTailscaleForm,
   type TailscaleFormErrors,
   type TailscaleFormValues,
-  type TailscaleSourceDocument,
   type TailscaleTriState,
 } from "@subboost/core/subscription/tailscale-yaml-source";
 import { Button } from "@subboost/ui/components/ui/button";
@@ -26,36 +24,27 @@ const TRI_STATE_OPTIONS: Array<{ value: TailscaleTriState; label: string }> = [
 ];
 
 type TriStateField = "ephemeral" | "udp" | "acceptRoutes" | "exitNodeAllowLanAccess";
-type PendingAction = "raw" | "close";
 
-const PENDING_ACTION_LABELS: Record<PendingAction, { apply: string; discard: string }> = {
-  raw: { apply: "应用并切换", discard: "放弃修改并切换" },
-  close: { apply: "应用并关闭", discard: "放弃修改并关闭" },
-};
+/** Where leaving the form goes, once with the applied content and once without it. */
+export type TailscaleFormLeave = { apply: (content: string) => void; discard: () => void };
 
 export type TailscaleSourceFormHandle = {
-  /** Leaves through onCancel, asking first when edits are unapplied. */
-  requestClose: () => void;
+  /** Leaves through `leave`, asking first when edits are unapplied. */
+  requestClose: (leave: TailscaleFormLeave) => void;
 };
 
 export type TailscaleSourceFormProps = {
-  document: TailscaleSourceDocument;
+  initial: TailscaleFormValues;
   /** state-dir values of other known Tailscale nodes, for the non-blocking duplicate warning. */
   knownStateDirs: readonly unknown[];
   applyLabel: string;
+  /** Turns valid values into the source's new YAML; a thrown message is shown in the form. */
+  toContent: (values: TailscaleFormValues) => string;
   onApply: (content: string) => void;
-  onCancel: () => void;
-  /** Text of the button that leaves without applying. */
-  cancelLabel?: string;
-  /** Receives applied content, or null when nothing needs to be written before raw editing. */
-  onSwitchToRaw?: (appliedContent: string | null) => void;
+  /** Shown before the apply button, e.g. the surrounding dialog's close button. */
+  secondaryAction?: React.ReactNode;
   ref?: React.Ref<TailscaleSourceFormHandle>;
 };
-
-// A close request can come from the dialog header while the form is scrolled away.
-function revealConfirmation(node: HTMLDivElement | null) {
-  node?.scrollIntoView({ block: "nearest" });
-}
 
 function TriStateField({
   label,
@@ -122,21 +111,21 @@ function RoutingHelp() {
 }
 
 export function TailscaleSourceForm({
-  document,
+  initial,
   knownStateDirs,
   applyLabel,
+  toContent,
   onApply,
-  onCancel,
-  cancelLabel = "取消",
-  onSwitchToRaw,
+  secondaryAction,
   ref,
 }: TailscaleSourceFormProps) {
-  const [values, setValues] = React.useState<TailscaleFormValues>(document.initial);
+  const [values, setValues] = React.useState<TailscaleFormValues>(initial);
   const [errors, setErrors] = React.useState<TailscaleFormErrors>({});
   const [applyError, setApplyError] = React.useState<string | null>(null);
-  const [pendingAction, setPendingAction] = React.useState<PendingAction | null>(null);
+  const [confirming, setConfirming] = React.useState(false);
+  const leaveRef = React.useRef<TailscaleFormLeave | null>(null);
 
-  const dirty = isTailscaleFormDirty(document, values);
+  const dirty = isTailscaleFormDirty(initial, values);
   const duplicateStateDir = hasDuplicateTailscaleStateDir(values.stateDir, knownStateDirs);
 
   const update = <K extends keyof TailscaleFormValues>(field: K, value: TailscaleFormValues[K]) => {
@@ -145,13 +134,13 @@ export function TailscaleSourceForm({
     setApplyError(null);
   };
 
-  // Validate and serialize once; an invalid draft never reaches the saved source.
+  // Validate and write once; an invalid draft never reaches the saved source.
   const serialize = (): string | null => {
     const nextErrors = validateTailscaleForm(values);
     setErrors(nextErrors);
     if (Object.values(nextErrors).some(Boolean)) return null;
     try {
-      return serializeTailscaleForm(document, values);
+      return toContent(values);
     } catch (error) {
       setApplyError(error instanceof Error ? error.message : "无法生成 Tailscale YAML");
       return null;
@@ -163,33 +152,19 @@ export function TailscaleSourceForm({
     if (content !== null) onApply(content);
   };
 
-  const handleSwitchToRaw = () => {
-    if (!onSwitchToRaw) return;
+  const requestClose = (leave: TailscaleFormLeave) => {
     if (!dirty) {
-      onSwitchToRaw(null);
+      leave.discard();
       return;
     }
-    setPendingAction("raw");
-  };
-
-  const requestClose = () => {
-    if (dirty) setPendingAction("close");
-    else onCancel();
+    leaveRef.current = leave;
+    setConfirming(true);
   };
   React.useImperativeHandle(ref, () => ({ requestClose }));
 
   const applyPending = () => {
-    if (pendingAction === "close") {
-      handleApply();
-      return;
-    }
     const content = serialize();
-    if (content !== null) onSwitchToRaw?.(content);
-  };
-
-  const discardPending = () => {
-    if (pendingAction === "close") onCancel();
-    else onSwitchToRaw?.(null);
+    if (content !== null) leaveRef.current?.apply(content);
   };
 
   const triState = (field: TriStateField) => ({
@@ -198,100 +173,95 @@ export function TailscaleSourceForm({
   });
 
   return (
-    <div className="space-y-3 text-xs">
-      <FormSection title="登录">
-        {/* Top-align cells so a field description never pushes its neighbour's input down. */}
-        <div className="grid items-start gap-3 sm:grid-cols-2">
-          <FormField label="节点名称" required error={errors.name}>
-            <Input value={values.name} onChange={(event) => update("name", event.target.value)} className="text-xs" />
-          </FormField>
-          <PasswordField
-            label="认证密钥 auth-key（可选）"
-            description="密钥会写入生成的配置，持有订阅链接或配置文件的人都能读取。"
-            value={values.authKey}
-            onChange={(event) => update("authKey", event.target.value)}
-            placeholder="留空则在 Mihomo 日志中交互登录"
-            autoComplete="off"
-            className="text-xs font-mono"
-          />
-          <FormField label="设备名 hostname（可选）">
-            <Input
-              value={values.hostname}
-              onChange={(event) => update("hostname", event.target.value)}
-              placeholder="留空由客户端决定"
-              className="text-xs"
+    <div className="flex min-h-0 flex-1 flex-col gap-3 text-xs">
+      {/* Fields scroll on short screens; the confirmation and actions below stay in view. */}
+      <div className="custom-scrollbar -mr-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
+        <FormSection title="登录">
+          {/* Top-align cells so a field description never pushes its neighbour's input down. */}
+          <div className="grid items-start gap-3 sm:grid-cols-2">
+            <FormField label="节点名称" required error={errors.name}>
+              <Input value={values.name} onChange={(event) => update("name", event.target.value)} className="text-xs" />
+            </FormField>
+            <PasswordField
+              label="认证密钥 auth-key（可选）"
+              description="密钥会写入生成的配置，持有订阅链接或配置文件的人都能读取。"
+              value={values.authKey}
+              onChange={(event) => update("authKey", event.target.value)}
+              placeholder="留空则在 Mihomo 日志中交互登录"
+              autoComplete="off"
+              className="text-xs font-mono"
             />
-          </FormField>
-          <FormField label="控制服务器 control-url（可选）" error={errors.controlUrl}>
+            <FormField label="设备名 hostname（可选）">
+              <Input
+                value={values.hostname}
+                onChange={(event) => update("hostname", event.target.value)}
+                placeholder="留空由客户端决定"
+                className="text-xs"
+              />
+            </FormField>
+            <FormField label="控制服务器 control-url（可选）" error={errors.controlUrl}>
+              <Input
+                value={values.controlUrl}
+                onChange={(event) => update("controlUrl", event.target.value)}
+                placeholder="留空使用官方；可填 Headscale 地址"
+                className="text-xs font-mono"
+              />
+            </FormField>
+          </div>
+        </FormSection>
+
+        <FormSection title="路由偏好" help={<RoutingHelp />}>
+          <FormField label="出口节点 exit-node（可选）" description="填写出口节点的 IP、设备名或 auto:any。">
             <Input
-              value={values.controlUrl}
-              onChange={(event) => update("controlUrl", event.target.value)}
-              placeholder="留空使用官方；可填 Headscale 地址"
+              value={values.exitNode}
+              onChange={(event) => update("exitNode", event.target.value)}
+              placeholder="例如 100.64.0.1 / auto:any"
               className="text-xs font-mono"
             />
           </FormField>
-        </div>
-      </FormSection>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TriStateField label="接受子网路由 accept-routes" {...triState("acceptRoutes")} />
+            <TriStateField label="出口节点可访问局域网 exit-node-allow-lan-access" {...triState("exitNodeAllowLanAccess")} />
+          </div>
+        </FormSection>
 
-      <FormSection title="路由偏好" help={<RoutingHelp />}>
-        <FormField label="出口节点 exit-node（可选）" description="填写出口节点的 IP、设备名或 auto:any。">
-          <Input
-            value={values.exitNode}
-            onChange={(event) => update("exitNode", event.target.value)}
-            placeholder="例如 100.64.0.1 / auto:any"
-            className="text-xs font-mono"
-          />
-        </FormField>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TriStateField label="接受子网路由 accept-routes" {...triState("acceptRoutes")} />
-          <TriStateField label="出口节点可访问局域网 exit-node-allow-lan-access" {...triState("exitNodeAllowLanAccess")} />
-        </div>
-      </FormSection>
+        <FormSection title="高级设置">
+          <FormField label="状态目录 state-dir" description="客户端本机目录；相对路径基于 Mihomo 工作目录。">
+            <Input
+              value={values.stateDir}
+              onChange={(event) => update("stateDir", event.target.value)}
+              placeholder="留空使用默认目录 tailscale"
+              className="text-xs font-mono"
+            />
+          </FormField>
+          {duplicateStateDir ? (
+            <p
+              className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 leading-relaxed text-amber-100/90"
+              role="status"
+            >
+              另一个已知的 Tailscale 节点看起来使用同一状态目录，它们可能共享登录状态。
+            </p>
+          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TriStateField label="临时设备 ephemeral" {...triState("ephemeral")} />
+            <TriStateField label="UDP" {...triState("udp")} />
+          </div>
+        </FormSection>
+      </div>
 
-      <FormSection title="高级设置">
-        <FormField label="状态目录 state-dir" description="客户端本机目录；相对路径基于 Mihomo 工作目录。">
-          <Input
-            value={values.stateDir}
-            onChange={(event) => update("stateDir", event.target.value)}
-            placeholder="留空使用默认目录 tailscale"
-            className="text-xs font-mono"
-          />
-        </FormField>
-        {duplicateStateDir ? (
-          <p
-            className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 leading-relaxed text-amber-100/90"
-            role="status"
-          >
-            另一个已知的 Tailscale 节点看起来使用同一状态目录，它们可能共享登录状态。
-          </p>
-        ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TriStateField label="临时设备 ephemeral" {...triState("ephemeral")} />
-          <TriStateField label="UDP" {...triState("udp")} />
-        </div>
-      </FormSection>
+      {applyError ? <p className="shrink-0 text-xs leading-relaxed text-red-400" role="alert">{applyError}</p> : null}
 
-      {applyError ? <p className="text-xs leading-relaxed text-red-400" role="alert">{applyError}</p> : null}
-
-      {pendingAction ? (
-        <div
-          key={pendingAction}
-          ref={revealConfirmation}
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-ink/10 bg-ink/5 p-3"
-          role="alert"
-        >
+      {confirming ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-ink/10 bg-ink/5 p-3" role="alert">
           <span className="text-fg-70">表单有未应用的修改。</span>
-          <Button size="sm" onClick={applyPending}>{PENDING_ACTION_LABELS[pendingAction].apply}</Button>
-          <Button size="sm" variant="outline" onClick={discardPending}>{PENDING_ACTION_LABELS[pendingAction].discard}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setPendingAction(null)}>继续编辑</Button>
+          <Button size="sm" onClick={applyPending}>应用修改</Button>
+          <Button size="sm" variant="outline" onClick={() => leaveRef.current?.discard()}>放弃修改</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>继续编辑</Button>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap justify-end gap-2">
-        {onSwitchToRaw ? (
-          <Button variant="ghost" onClick={handleSwitchToRaw} className="mr-auto">切换到 YAML</Button>
-        ) : null}
-        <Button variant="outline" onClick={requestClose}>{cancelLabel}</Button>
+      <div className="flex shrink-0 flex-wrap justify-end gap-2">
+        {secondaryAction}
         <Button onClick={handleApply}>{applyLabel}</Button>
       </div>
     </div>

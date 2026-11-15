@@ -1,21 +1,7 @@
-import {
-  EVENT_ID,
-  eventsToAst,
-  parseEvents,
-  present,
-  SCALAR_STYLE,
-  type Document,
-  type MappingNode,
-  type Node,
-  type ScalarNode,
-} from "js-yaml";
-import { MIHOMO_YAML_SCHEMA } from "../config/yaml-schema";
+import { COLLECTION_STYLE, SCALAR_STYLE, type MappingNode, type Node, type ScalarNode } from "js-yaml";
 import { isValidTailscaleControlUrl, tailscaleStateDirComparisonKey } from "../mihomo/tailscale";
 import { parseClashYaml } from "../parser/clash-yaml";
-import { checkSubscriptionInput } from "../parser/limits";
-import { loadSubscriptionYaml } from "../parser/yaml-scalars";
-import { checkYamlSyntaxBudget } from "../parser/yaml-syntax-budget";
-import { stableJsonStringify } from "../node-identity";
+import { appendYamlSourceNode, readYamlSource, replaceYamlSourceNode } from "./yaml-source-nodes";
 
 /** Explicit three-state value: Default omits the YAML key. */
 export type TailscaleTriState = "default" | "true" | "false";
@@ -36,15 +22,13 @@ export interface TailscaleFormValues {
 export type TailscaleFormField = keyof TailscaleFormValues;
 export type TailscaleFormErrors = Partial<Record<TailscaleFormField, string>>;
 
-/** A parsed, form-eligible YAML document. The source text stays the persisted authority. */
-export interface TailscaleSourceDocument {
-  readonly content: string;
+export type TailscaleFormRead = { ok: true; values: TailscaleFormValues } | { ok: false; reason: string };
+
+/** An existing node by its position in the source, with the values the form started from. */
+export interface TailscaleNodeTarget {
+  readonly index: number;
   readonly initial: TailscaleFormValues;
 }
-
-export type TailscaleSourceParseResult =
-  | { ok: true; document: TailscaleSourceDocument }
-  | { ok: false; reason: string };
 
 const STRING_FIELDS = {
   name: "name",
@@ -69,26 +53,11 @@ const TAG_STR = "tag:yaml.org,2002:str";
 const TAG_BOOL = "tag:yaml.org,2002:bool";
 const TAG_NULL = "tag:yaml.org,2002:null";
 const TAG_MAP = "tag:yaml.org,2002:map";
-const TAG_SEQ = "tag:yaml.org,2002:seq";
 
 class IneligibleDocument extends Error {}
 
 function ineligible(reason: string): never {
   throw new IneligibleDocument(reason);
-}
-
-function parseDocument(content: string): Document {
-  // parseEvents bypasses the subscription loader, so apply its syntax budget here.
-  checkYamlSyntaxBudget(content);
-  const events = parseEvents(content, {});
-  for (const event of events) {
-    if (event.type === EVENT_ID.ALIAS) ineligible("包含 YAML 别名");
-    if ("anchorStart" in event && event.anchorStart >= 0) ineligible("包含 YAML 锚点");
-    if ("tagStart" in event && event.tagStart >= 0) ineligible("包含显式 YAML 标签");
-  }
-  const documents = eventsToAst(events, { source: content, schema: MIHOMO_YAML_SCHEMA });
-  if (documents.length !== 1 || !documents[0].contents) ineligible("必须是单个 YAML 文档");
-  return documents[0];
 }
 
 function scalarKey(node: Node): string | null {
@@ -108,21 +77,6 @@ function assertPlainMapping(mapping: MappingNode): void {
     if (keys.has(key)) ineligible(`字段 ${key} 重复`);
     keys.add(key);
   }
-}
-
-function locateProxy(root: Node): MappingNode {
-  if (root.kind === "sequence") {
-    if (root.tag !== TAG_SEQ || root.items.length !== 1) ineligible("必须只包含一个代理");
-    const [proxy] = root.items;
-    if (proxy.kind !== "mapping" || proxy.tag !== TAG_MAP) ineligible("代理必须是映射");
-    return proxy;
-  }
-  if (root.kind !== "mapping" || root.tag !== TAG_MAP) ineligible("无法识别的 YAML 结构");
-  assertPlainMapping(root);
-  if (findPair(root, "proxy-providers")) ineligible("包含 proxy-providers");
-  const proxies = findPair(root, "proxies");
-  if (!proxies) return root;
-  return locateProxy(proxies.value);
 }
 
 function readString(proxy: MappingNode, key: string): string {
@@ -155,42 +109,18 @@ function readForm(proxy: MappingNode): TailscaleFormValues {
   return values;
 }
 
-function semanticKey(content: string): string {
-  return stableJsonStringify(loadSubscriptionYaml(content));
-}
-
-function assertImportable(content: string): void {
-  const parsed = parseClashYaml(content);
-  if (parsed.errors.length > 0 || parsed.nodes.length !== 1 || parsed.nodes[0].type !== "tailscale") {
-    ineligible("导入器无法将其识别为单个 Tailscale 节点");
-  }
-}
-
-function presentDocument(document: Document): string {
-  return present([document], { schema: MIHOMO_YAML_SCHEMA, lineWidth: -1 });
-}
-
-// Cheap gate before parsing; the raw editor re-checks on every change, mostly for other YAML.
-const TAILSCALE_TYPE_HINT = /type["']?\s*:\s*["']?tailscale/i;
-
-/** Offer the form only for exactly one unambiguous Tailscale proxy the importer accepts. */
-export function parseTailscaleSourceDocument(content: string): TailscaleSourceParseResult {
+/** Form values for a YAML node the form can represent without losing anything it shows. */
+export function readTailscaleFormValues(node: Node): TailscaleFormRead {
   try {
-    checkSubscriptionInput(content);
-    if (!TAILSCALE_TYPE_HINT.test(content)) ineligible("不是 Tailscale 代理");
-    const document = parseDocument(content);
-    const initial = readForm(locateProxy(document.contents!));
-    assertImportable(content);
-    // Keep documents whose values the serializer cannot reproduce in raw mode.
-    if (semanticKey(presentDocument(document)) !== semanticKey(content)) ineligible("YAML 内容无法无损保留");
-    return { ok: true, document: { content, initial } };
+    if (node.kind !== "mapping" || node.tag !== TAG_MAP) ineligible("代理必须是映射");
+    return { ok: true, values: readForm(node) };
   } catch (error) {
-    return { ok: false, reason: error instanceof Error ? error.message : "YAML 无法解析" };
+    return { ok: false, reason: error instanceof Error ? error.message : "无法读取 Tailscale 节点" };
   }
 }
 
-export function isTailscaleFormDirty(document: TailscaleSourceDocument, values: TailscaleFormValues): boolean {
-  return FORM_FIELDS.some((field) => document.initial[field] !== values[field]);
+export function isTailscaleFormDirty(initial: TailscaleFormValues, values: TailscaleFormValues): boolean {
+  return FORM_FIELDS.some((field) => initial[field] !== values[field]);
 }
 
 export function validateTailscaleForm(values: TailscaleFormValues): TailscaleFormErrors {
@@ -230,53 +160,72 @@ function setField(proxy: MappingNode, key: string, value: ScalarNode | null): vo
   else proxy.items.push({ key: stringNode(key), value });
 }
 
-/**
- * Serialize a valid form once. Untouched fields, sibling root keys and unknown proxy fields keep
- * their YAML values; an unchanged form returns the original bytes.
- */
-export function serializeTailscaleForm(document: TailscaleSourceDocument, values: TailscaleFormValues): string {
-  const errors = validateTailscaleForm(values);
-  const firstError = Object.values(errors)[0];
-  if (firstError) throw new Error(firstError);
-  if (!isTailscaleFormDirty(document, values)) return document.content;
-
-  const parsed = parseDocument(document.content);
-  const proxy = locateProxy(parsed.contents!);
+function newProxyNode(values: TailscaleFormValues): MappingNode {
+  const items: MappingNode["items"] = [
+    { key: stringNode("name"), value: stringNode(values.name) },
+    { key: stringNode("type"), value: stringNode("tailscale") },
+  ];
   for (const field of FORM_FIELDS) {
-    if (document.initial[field] === values[field]) continue;
-    setField(proxy, KEY_BY_FIELD[field], valueNode(field, values));
+    if (field === "name") continue;
+    const value = valueNode(field, values);
+    if (value) items.push({ key: stringNode(KEY_BY_FIELD[field]), value });
   }
-  const output = presentDocument(parsed);
-  try {
-    assertImportable(output);
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : "无法生成有效的 Tailscale YAML");
+  return { kind: "mapping", tag: TAG_MAP, tagged: false, style: COLLECTION_STYLE.BLOCK, items };
+}
+
+/**
+ * Write a valid form into the YAML source: edit the node at `target`, or append a new node when it
+ * is null. Untouched fields, unknown fields and every other part of the source keep their text; an
+ * unchanged edit returns the original content.
+ */
+export function writeTailscaleNode(content: string, target: TailscaleNodeTarget | null, values: TailscaleFormValues): string {
+  const firstError = Object.values(validateTailscaleForm(values))[0];
+  if (firstError) throw new Error(firstError);
+  if (target && !isTailscaleFormDirty(target.initial, values)) return content;
+
+  const read = readYamlSource(content);
+  if (!read.ok) throw new Error(read.reason);
+  const { document } = read;
+  if (document.entries.some((entry) => entry.index !== target?.index && entry.name === values.name)) {
+    throw new Error("本 YAML 中已有同名节点");
+  }
+
+  let output: string;
+  if (target) {
+    const entry = document.entries[target.index];
+    const current = entry ? readTailscaleFormValues(entry.node) : null;
+    if (!current?.ok || isTailscaleFormDirty(current.values, target.initial)) {
+      throw new Error("YAML 内容已变化，请返回后重新打开该节点");
+    }
+    const proxy = { ...(entry.node as MappingNode), items: [...(entry.node as MappingNode).items] };
+    for (const field of FORM_FIELDS) {
+      if (target.initial[field] !== values[field]) setField(proxy, KEY_BY_FIELD[field], valueNode(field, values));
+    }
+    output = replaceYamlSourceNode(document, target.index, proxy);
+  } else {
+    output = appendYamlSourceNode(document, newProxyNode(values));
+  }
+
+  const before = parseClashYaml(content);
+  const after = parseClashYaml(output);
+  if (
+    after.errors.length > before.errors.length ||
+    after.nodes.length !== before.nodes.length + (target ? 0 : 1) ||
+    !after.nodes.some((node) => node.type === "tailscale")
+  ) {
+    throw new Error("导入器无法识别写入后的 Tailscale 节点");
   }
   return output;
 }
 
-/** Initial YAML for a node created through the form; the state directory is generated once. */
-export function createTailscaleDraftContent(stateDir: string): string {
-  return presentDocument({
-    directives: [],
-    contents: {
-      kind: "mapping", tag: TAG_MAP, tagged: false, style: 1,
-      items: [{
-        key: stringNode("proxies"),
-        value: {
-          kind: "sequence", tag: TAG_SEQ, tagged: false, style: 1,
-          items: [{
-            kind: "mapping", tag: TAG_MAP, tagged: false, style: 1,
-            items: [
-              { key: stringNode("name"), value: stringNode("tailscale") },
-              { key: stringNode("type"), value: stringNode("tailscale") },
-              { key: stringNode("state-dir"), value: stringNode(stateDir) },
-            ],
-          }],
-        },
-      }],
-    },
-  });
+/** Values for a new node: a free name and a generated state directory. */
+export function newTailscaleFormValues(takenNames: readonly string[], stateDir: string): TailscaleFormValues {
+  let name = "tailscale";
+  for (let suffix = 2; takenNames.includes(name); suffix++) name = `tailscale-${suffix}`;
+  return {
+    name, hostname: "", authKey: "", controlUrl: "", stateDir, exitNode: "",
+    ephemeral: "default", udp: "default", acceptRoutes: "default", exitNodeAllowLanAccess: "default",
+  };
 }
 
 function randomUuid(): string {

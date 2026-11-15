@@ -24,6 +24,7 @@ vi.mock("lucide-react", () => ({
   FileCode: () => React.createElement("span", null, "file-code-icon"),
   HelpCircle: () => React.createElement("span", null, "help-icon"),
   Link2: () => React.createElement("span", null, "link-icon"),
+  Plus: () => React.createElement("span", null, "plus-icon"),
   Server: () => React.createElement("span", null, "server-icon"),
 }));
 vi.mock("@subboost/ui/components/ui/button", () => ({
@@ -38,6 +39,7 @@ vi.mock("@subboost/ui/components/ui/dialog", () => ({
     return React.createElement("div", null, props.children);
   },
   DialogContent: (props: any) => React.createElement("section", props, props.children),
+  DialogBody: (props: any) => React.createElement("div", props, props.children),
   DialogHeader: (props: any) => React.createElement("header", props, props.children),
   DialogTitle: (props: any) => React.createElement("h2", props, props.children),
 }));

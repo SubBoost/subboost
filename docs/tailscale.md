@@ -11,11 +11,11 @@ SubBoost 可以生成 Mihomo 的 `type: tailscale` 出站节点。该节点没�
 
 ### 添加节点
 
-1. 在“添加订阅/节点源”菜单中选择 **Tailscale 节点**。
-2. 填写表单后点击“添加并导入”。点击“取消”不会创建任何导入源。
-3. 节点保存为普通的 YAML 导入源，占用 YAML 源的数量配额。重新打开该源的高级编辑时会显示同一表单，也可以切换到 YAML 直接编辑。
+1. 添加或选择一个 YAML 配置源，打开它的“高级编辑”，切换到顶部的 **Tailscale** 页。
+2. 选中“新建节点”，填写表单后点击“添加到 YAML”。节点追加到该 YAML 的 `proxies` 列表末尾，其余内容（包括注释）保持原样，然后回到 YAML 页。
+3. 该 YAML 里已有的 Tailscale 节点会列在“新建节点”旁边，选中后用同一表单修改，点击“应用到 YAML”写回。点“完成”关闭高级编辑后导入该源。
 
-也可以直接粘贴 YAML，最小写法为：
+也可以直接在 YAML 中书写，最小写法为：
 
 ```yaml
 proxies:
@@ -38,6 +38,7 @@ proxies:
 
 - `auth-key` 会原样写入生成的配置。任何拿到订阅链接或配置文件的人都能读取它，并可能用它把设备加入你的 Tailnet。建议使用设置了过期时间的临时（ephemeral）密钥或带标签（tagged）的密钥；也可以留空，改在客户端日志中交互登录。
 - 应用表单只代表本地配置有效，不代表设备已经登录或加入 Tailnet。
+- 表单无法安全改写的写法（行内 `proxies: [...]`、YAML 锚点或别名）只能直接编辑 YAML。用表单修改已有节点时，该节点内部的注释不会保留，其它节点和注释不受影响。
 - 访问公网目标需要可用的出口节点或已接受的覆盖路由。只能访问 Tailnet 的节点在公网 URL 测速中可能显示失败；节点仍会按现有规则参与分组和自动选择。
 - 从 YAML 中移除 `accept-routes` 等偏好或清空 `exit-node`，不一定会重置客户端已保存的运行时偏好。
 - 每台下载订阅的设备使用各自的本地状态目录，各自需要可用的登录方式。
@@ -56,11 +57,11 @@ SubBoost can generate a Mihomo `type: tailscale` outbound. It has no `server` or
 
 ### Adding a node
 
-1. Choose **Tailscale 节点** in the add-source menu.
-2. Fill in the form and select “添加并导入” (add and import). Cancel creates no source.
-3. The node is stored as an ordinary YAML source and counts toward the YAML source quota. Reopening the source shows the same form; you can also switch to raw YAML.
+1. Add or pick a YAML source, open its advanced editor (“高级编辑”) and switch to the **Tailscale** page at the top.
+2. With “新建节点” (new node) selected, fill in the form and select “添加到 YAML” (add to YAML). The node is appended to that YAML's `proxies` list; the rest of the YAML, comments included, stays as written, and the editor returns to the YAML page.
+3. Tailscale nodes already in that YAML are listed next to “新建节点”. Select one to change it with the same form, then select “应用到 YAML” (apply to YAML). Closing the editor with “完成” (done) imports the source.
 
-You can also paste YAML directly. The minimal form is:
+You can also write the YAML directly. The minimal form is:
 
 ```yaml
 proxies:
@@ -83,6 +84,7 @@ proxies:
 
 - `auth-key` is written into the generated config as is. Anyone with the subscription link or the config file can read it and may use it to add devices to your Tailnet. Prefer an ephemeral or tagged key with an expiry, or leave it empty and log in interactively from the client log.
 - Applying the form validates local configuration only; it does not mean the device has logged in or joined the Tailnet.
+- Layouts the form cannot rewrite safely (an inline `proxies: [...]`, YAML anchors or aliases) are edited as YAML only. Changing an existing node with the form drops comments inside that node; other nodes and comments are untouched.
 - Public destinations need a usable exit node or an accepted covering route. A node that reaches only Tailnet destinations can fail public URL tests; it still takes part in groups and automatic selection under the existing rules.
 - Removing a preference such as `accept-routes` or clearing `exit-node` does not necessarily reset preferences the client already stored.
 - Each device that downloads the subscription uses its own local state directory and needs its own usable login method.

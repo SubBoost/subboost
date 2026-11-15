@@ -9,7 +9,6 @@ import { cn } from "@subboost/ui/lib/utils";
 import { buildSourceDisplayLabel } from "@subboost/ui/product/converter/source-display-label";
 import { AddSourceMenu, SourceStatusPopover, SourceTypeChoices } from "@subboost/ui/product/converter/source-controls";
 import { useSubscriptionSourcesController } from "@subboost/ui/product/converter/use-subscription-sources-controller";
-import { TailscaleDraftDialog } from "@subboost/ui/product/converter/tailscale-draft-dialog";
 import { sourceTypeInfo } from "../constants";
 import { SectionHeader } from "../section-header";
 import { SubscriptionImportErrorBadge } from "@subboost/ui/product/converter/subscription-import-error";
@@ -25,13 +24,8 @@ export function InputSection({
   const {
     addSource,
     applyExpandedSourceContent,
-    applyTailscaleDraft,
-    cancelTailscaleDraft,
     closeExpandedSourceEditor,
     expandedSourceTailscaleStateDirs,
-    startTailscaleDraft,
-    tailscaleDraft,
-    tailscaleDraftStateDirs,
     error: globalError,
     expandedSource,
     expandedSourcePreviewName,
@@ -181,7 +175,7 @@ export function InputSection({
               <span className="break-all">{globalError}</span>
             </div>
           )}
-          <AddSourceMenu open={showAddMenu} onOpenChange={setShowAddMenu} onAdd={addSource} onAddTailscale={startTailscaleDraft} compact />
+          <AddSourceMenu open={showAddMenu} onOpenChange={setShowAddMenu} onAdd={addSource} compact />
         </div>
       )}
 
@@ -193,12 +187,6 @@ export function InputSection({
         onUpdateMeta={updateSourceMeta}
         onApplyContent={applyExpandedSourceContent}
         tailscaleStateDirs={expandedSourceTailscaleStateDirs}
-      />
-      <TailscaleDraftDialog
-        draft={tailscaleDraft}
-        knownStateDirs={tailscaleDraftStateDirs}
-        onApply={applyTailscaleDraft}
-        onCancel={cancelTailscaleDraft}
       />
     </div>
   );

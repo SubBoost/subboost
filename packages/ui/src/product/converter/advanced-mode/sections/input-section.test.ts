@@ -195,12 +195,6 @@ vi.mock("./input-source-editor-dialog", () => ({
   },
 }));
 
-vi.mock("@subboost/ui/product/converter/tailscale-draft-dialog", () => ({
-  TailscaleDraftDialog: (props: any) => {
-    mocks.captures.tailscaleDraftDialog = props;
-    return null;
-  },
-}));
 
 import { InputSection } from "./input-section";
 

@@ -1,16 +1,27 @@
 "use client";
 
 import * as React from "react";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Plus } from "lucide-react";
 import { DEFAULT_NODE_NAME_TEMPLATE } from "@subboost/core/node-name-template";
-import { parseTailscaleSourceDocument } from "@subboost/core/subscription/tailscale-yaml-source";
+import {
+  createTailscaleStateDir,
+  newTailscaleFormValues,
+  readTailscaleFormValues,
+  writeTailscaleNode,
+  type TailscaleFormValues,
+  type TailscaleNodeTarget,
+} from "@subboost/core/subscription/tailscale-yaml-source";
+import { readYamlSource, type YamlSourceReadResult } from "@subboost/core/subscription/yaml-source-nodes";
 import { Button } from "@subboost/ui/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
+import { ChoiceChip, ChoiceGroup } from "@subboost/ui/components/ui/choice-group";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
 import { FormField } from "@subboost/ui/components/ui/form-field";
 import { HelpPopover } from "@subboost/ui/components/ui/popover";
 import { Input } from "@subboost/ui/components/ui/input";
 import { Switch } from "@subboost/ui/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@subboost/ui/components/ui/tabs";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
+import { cn } from "@subboost/ui/lib/utils";
 import type { SubscriptionSource } from "@subboost/ui/store/config-store";
 import { sourceTypeInfo } from "./source-type-info";
 import { TailscaleSourceForm, type TailscaleSourceFormHandle } from "./tailscale-source-form";
@@ -21,87 +32,189 @@ export type SourceEditorDialogProps = {
   onClose: () => void;
   onUpdateContent: (id: string, content: string) => void;
   onUpdateMeta: (id: string, patch: Partial<SubscriptionSource>) => void;
-  /** Writes form-applied YAML once and closes the editor with a single import. */
-  onApplyContent?: (content: string) => void;
+  /** Writes form-applied YAML and closes the editor with a single import. */
+  onApplyContent: (content: string) => void;
   /** state-dir values of Tailscale nodes owned by other sources. */
   tailscaleStateDirs?: readonly unknown[];
 };
 
-type YamlEditorMode = "form" | "raw";
+type EditorPage = "yaml" | "tailscale";
+/** The Tailscale page edits a new node or an existing one, by its entry index. */
+type TailscaleSelection = "new" | number;
+type TailscaleView =
+  | { kind: "blocked"; reason: string }
+  | { kind: "form"; target: TailscaleNodeTarget | null; initial: TailscaleFormValues };
+
+const CHIP_CLASS = "min-h-8 px-2.5 py-1 text-xs";
+
+function newTailscaleDraft(content: string): TailscaleFormValues {
+  const read = readYamlSource(content);
+  const taken = read.ok ? read.document.entries.map((entry) => entry.name) : [];
+  return newTailscaleFormValues(taken, createTailscaleStateDir());
+}
+
+function tailscaleView(read: YamlSourceReadResult, selection: TailscaleSelection, draft: TailscaleFormValues): TailscaleView {
+  if (!read.ok) return { kind: "blocked", reason: read.reason };
+  const { document } = read;
+  if (selection === "new") {
+    const reason = document.appendBlockedReason;
+    return reason ? { kind: "blocked", reason } : { kind: "form", target: null, initial: draft };
+  }
+  const entry = document.entries.find((item) => item.index === selection);
+  if (!entry) return { kind: "blocked", reason: "找不到该节点" };
+  const values = readTailscaleFormValues(entry.node);
+  if (!values.ok) return { kind: "blocked", reason: values.reason };
+  if (document.replaceBlockedReason) return { kind: "blocked", reason: document.replaceBlockedReason };
+  return { kind: "form", target: { index: selection, initial: values.values }, initial: values.values };
+}
 
 /**
- * Compatible YAML sources open in the Tailscale form, which brings its own actions; everything else
- * keeps the raw editor with the content label and the dialog footer.
+ * The YAML text, and a Tailscale page whose form writes nodes into that same text. Other protocols
+ * are still edited as text.
  */
 function YamlSourceEditor({
   source,
   meta,
-  footer,
   formRef,
   onUpdateContent,
-  onApplyContent,
-  onClose,
+  onDone,
   tailscaleStateDirs,
 }: {
   source: SubscriptionSource;
   meta: React.ReactNode;
-  footer: React.ReactNode;
-  formRef: React.Ref<TailscaleSourceFormHandle>;
+  formRef: React.RefObject<TailscaleSourceFormHandle | null>;
   onUpdateContent: (id: string, content: string) => void;
-  onApplyContent?: (content: string) => void;
-  onClose: () => void;
+  /** Closes the dialog, asking first when the form has unapplied edits. */
+  onDone: () => void;
   tailscaleStateDirs: readonly unknown[];
 }) {
-  const parsed = React.useMemo(() => parseTailscaleSourceDocument(source.content), [source.content]);
-  const formAvailable = parsed.ok && Boolean(onApplyContent);
-  const [mode, setMode] = React.useState<YamlEditorMode>(formAvailable ? "form" : "raw");
+  const [page, setPage] = React.useState<EditorPage>("yaml");
+  const [selection, setSelection] = React.useState<TailscaleSelection>("new");
+  const [draft, setDraft] = React.useState<TailscaleFormValues | null>(null);
+  // Parsed only on the Tailscale page, where the text cannot change underneath the form.
+  const read = React.useMemo(() => (page === "tailscale" ? readYamlSource(source.content) : null), [page, source.content]);
 
-  if (mode === "form" && parsed.ok && onApplyContent) {
-    return (
-      <div className="space-y-3">
-        {meta}
-        <TailscaleSourceForm
-          // Remount on content changes so the form never shows a stale document.
-          key={source.content}
-          ref={formRef}
-          document={parsed.document}
-          knownStateDirs={tailscaleStateDirs}
-          applyLabel="应用"
-          cancelLabel="关闭"
-          onApply={onApplyContent}
-          onCancel={onClose}
-          onSwitchToRaw={(content) => {
-            if (content !== null) onUpdateContent(source.id, content);
-            setMode("raw");
-          }}
-        />
-      </div>
-    );
-  }
+  const write = (content: string) => {
+    if (content !== source.content) onUpdateContent(source.id, content);
+  };
+  // Leaving the form asks about unapplied edits first; `go` gets the text as it is afterwards.
+  const leaveForm = (go: (content: string) => void) => {
+    if (!formRef.current) {
+      go(source.content);
+      return;
+    }
+    formRef.current.requestClose({
+      apply: (content) => {
+        write(content);
+        go(content);
+      },
+      discard: () => go(source.content),
+    });
+  };
+  const choose = (next: TailscaleSelection, content: string) => {
+    setSelection(next);
+    if (next === "new") setDraft(newTailscaleDraft(content));
+  };
+  const showPage = (next: EditorPage) => {
+    if (next === page) return;
+    if (next === "yaml") {
+      leaveForm(() => setPage("yaml"));
+      return;
+    }
+    choose("new", source.content);
+    setPage("tailscale");
+  };
+  const select = (next: TailscaleSelection) => {
+    if (next !== selection) leaveForm((content) => choose(next, content));
+  };
+
+  const entries = read?.ok ? read.document.entries : [];
+  const nodes = entries.filter((entry) => entry.type === "tailscale");
+  const view = read && draft ? tailscaleView(read, selection, draft) : null;
+  const ownStateDirs = entries.flatMap((entry) => {
+    if (entry.type !== "tailscale" || entry.index === selection) return [];
+    const values = readTailscaleFormValues(entry.node);
+    return values.ok ? [values.values.stateDir] : [];
+  });
+  const done = <Button variant="outline" onClick={onDone}>完成</Button>;
 
   return (
-    <>
-      <div className="space-y-3">
-        {meta}
-        <div className="space-y-1">
-          <p className="text-xs text-fg-60">{sourceTypeInfo[source.type].label}</p>
-          <div className="space-y-2">
-            {formAvailable ? (
-              <div className="flex justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setMode("form")}>切换到 Tailscale 表单</Button>
-              </div>
-            ) : null}
+    <Tabs value={page} onValueChange={(value) => showPage(value as EditorPage)} className="flex min-h-0 flex-1 flex-col gap-3">
+      <TabsList className="h-8 shrink-0 self-start">
+        <TabsTrigger value="yaml" className="h-6 px-3 text-xs">YAML</TabsTrigger>
+        <TabsTrigger value="tailscale" className="h-6 px-3 text-xs">Tailscale</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="yaml" className="mt-0 flex min-h-0 flex-1 flex-col gap-3">
+        <DialogBody className="flex flex-col gap-3">
+          {meta}
+          <div className="flex min-h-[9rem] flex-1 flex-col gap-1">
+            <p className="text-xs text-fg-60">{sourceTypeInfo[source.type].label}</p>
             <Textarea
               value={source.content}
               onChange={(event) => onUpdateContent(source.id, event.target.value)}
               placeholder={sourceTypeInfo[source.type].placeholder}
-              className="min-h-[60vh] text-xs font-mono"
+              className="min-h-0 flex-1 text-xs font-mono"
             />
           </div>
-        </div>
-      </div>
-      {footer}
-    </>
+        </DialogBody>
+        <div className="flex shrink-0 justify-end gap-2">{done}</div>
+      </TabsContent>
+
+      <TabsContent value="tailscale" className="mt-0 flex min-h-0 flex-1 flex-col gap-3">
+        <p className="shrink-0 text-xs leading-relaxed text-fg-60">
+          用表单添加或修改 Tailscale / Headscale 出站，应用后写入这份 YAML 的 proxies 列表。
+        </p>
+        {nodes.length > 0 ? (
+          <ChoiceGroup label="选择 Tailscale 节点" className="shrink-0 gap-1">
+            <ChoiceChip
+              selected={selection === "new"}
+              onClick={() => select("new")}
+              label={
+                <>
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  新建节点
+                </>
+              }
+              className={CHIP_CLASS}
+            />
+            {nodes.map((entry) => (
+              <ChoiceChip
+                key={entry.index}
+                selected={selection === entry.index}
+                onClick={() => select(entry.index)}
+                label={<span className="max-w-40 truncate">{entry.name || "（未命名）"}</span>}
+                title={entry.name}
+                className={CHIP_CLASS}
+              />
+            ))}
+          </ChoiceGroup>
+        ) : null}
+        {view?.kind === "form" ? (
+          <TailscaleSourceForm
+            key={String(selection)}
+            ref={formRef}
+            initial={view.initial}
+            knownStateDirs={[...tailscaleStateDirs, ...ownStateDirs]}
+            applyLabel={view.target ? "应用到 YAML" : "添加到 YAML"}
+            toContent={(values) => writeTailscaleNode(source.content, view.target, values)}
+            onApply={(content) => {
+              write(content);
+              setPage("yaml");
+            }}
+            secondaryAction={done}
+          />
+        ) : (
+          <>
+            <div className="shrink-0 space-y-1 rounded-xl border border-ink/10 bg-ink/5 px-3 py-2 text-xs leading-relaxed" role="status">
+              <p className="font-medium text-fg-80">无法用表单写入这份 YAML</p>
+              <p className="text-fg-60">{view?.reason}</p>
+            </div>
+            <div className="mt-auto flex shrink-0 justify-end gap-2">{done}</div>
+          </>
+        )}
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -115,9 +228,9 @@ export function SourceEditorDialog({
   tailscaleStateDirs = [],
 }: SourceEditorDialogProps) {
   // Set only while the Tailscale form is shown; the form decides whether closing needs confirmation.
-  const formRef = React.useRef<TailscaleSourceFormHandle>(null);
+  const formRef = React.useRef<TailscaleSourceFormHandle | null>(null);
   const requestClose = () => {
-    if (formRef.current) formRef.current.requestClose();
+    if (formRef.current) formRef.current.requestClose({ apply: onApplyContent, discard: onClose });
     else onClose();
   };
 
@@ -151,23 +264,29 @@ export function SourceEditorDialog({
   ) : null;
 
   const footer = (
-    <div className="flex justify-end gap-2">
+    <div className="flex shrink-0 justify-end gap-2">
       <Button variant="outline" onClick={onClose}>完成</Button>
     </div>
   );
 
   return (
     <Dialog open={Boolean(source)} onOpenChange={(open) => !open && requestClose()}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl">
-        <DialogHeader>
+      {/* Text editors take a fixed share of the screen so the text area, not the dialog, absorbs height. */}
+      <DialogContent
+        className={cn(
+          "flex w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-4xl",
+          source && source.type !== "url" && "h-[85dvh]"
+        )}
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>{source ? `高级编辑：${sourceTypeInfo[source.type].label}` : "高级编辑"}</DialogTitle>
         </DialogHeader>
 
         {source && source.type !== "yaml" ? (
-          <div className="space-y-3">
+          <DialogBody className="flex flex-col gap-3">
             {meta}
 
-            <div className="space-y-1">
+            <div className="flex min-h-0 flex-1 flex-col gap-1">
               <p className="text-xs text-fg-60">{sourceTypeInfo[source.type].label}</p>
               {source.type === "url" ? (
                 <div className="space-y-3">
@@ -245,11 +364,11 @@ export function SourceEditorDialog({
                   value={source.content}
                   onChange={(event) => onUpdateContent(source.id, event.target.value)}
                   placeholder={sourceTypeInfo[source.type].placeholder}
-                  className="min-h-[60vh] text-xs font-mono"
+                  className="min-h-[9rem] flex-1 text-xs font-mono"
                 />
               )}
             </div>
-          </div>
+          </DialogBody>
         ) : null}
 
         {source?.type === "yaml" ? (
@@ -257,11 +376,9 @@ export function SourceEditorDialog({
             key={source.id}
             source={source}
             meta={meta}
-            footer={footer}
             formRef={formRef}
             onUpdateContent={onUpdateContent}
-            onApplyContent={onApplyContent}
-            onClose={onClose}
+            onDone={requestClose}
             tailscaleStateDirs={tailscaleStateDirs}
           />
         ) : (
