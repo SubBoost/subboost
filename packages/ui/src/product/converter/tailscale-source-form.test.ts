@@ -377,6 +377,8 @@ describe("SourceEditorDialog", () => {
   it("adds a node from the Tailscale page and returns to the YAML", () => {
     const { html, props, setters } = renderEditor(yamlSource(MIXED), onPage("new"));
     expect(html).toContain("写入这份 YAML 的 proxies 列表");
+    // The client requirement lives on the page rather than in a separate document.
+    expect(html).toContain("v1.19.25");
     expect(html).not.toContain(CONTENT_LABEL);
     expect(chip("新建节点").selected).toBe(true);
     expect(chip("ts").selected).toBe(false);

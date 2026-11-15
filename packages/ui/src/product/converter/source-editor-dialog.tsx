@@ -162,9 +162,10 @@ function YamlSourceEditor({
       </TabsContent>
 
       <TabsContent value="tailscale" className="mt-0 flex min-h-0 flex-1 flex-col gap-3">
-        <p className="shrink-0 text-xs leading-relaxed text-fg-60">
-          用表单添加或修改 Tailscale / Headscale 出站，应用后写入这份 YAML 的 proxies 列表。
-        </p>
+        <div className="shrink-0 space-y-0.5 text-xs leading-relaxed">
+          <p className="text-fg-60">用表单添加或修改 Tailscale / Headscale 出站，应用后写入这份 YAML 的 proxies 列表。</p>
+          <p className="text-fg-40">客户端需要包含 Tailscale 的 Mihomo 内核：官方构建 v1.19.25 起支持，推荐 v1.19.26 或更新。</p>
+        </div>
         {nodes.length > 0 ? (
           <ChoiceGroup label="选择 Tailscale 节点" className="shrink-0 gap-1">
             <ChoiceChip
