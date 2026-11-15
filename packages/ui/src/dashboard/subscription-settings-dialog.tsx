@@ -3,6 +3,7 @@
 import { Button } from "@subboost/ui/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -71,7 +72,7 @@ export function SubscriptionSettingsDialog({
   const quotaDisabled = subscription ? isNodeQuotaAutoUpdateDisabled(subscription.autoUpdateState) : false;
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex flex-col overflow-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle>订阅设置</DialogTitle>
           <DialogDescription>
@@ -79,7 +80,7 @@ export function SubscriptionSettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <DialogBody className="space-y-4 py-2">
           <FormField label="订阅名称" className="grid-cols-[9rem_minmax(0,1fr)] items-center">
             <Input
               value={settingsName}
@@ -139,7 +140,7 @@ export function SubscriptionSettingsDialog({
               />
             </FormField>
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2 sm:justify-between">
           {onResetLink && (

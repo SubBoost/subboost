@@ -13,6 +13,7 @@ import type { ParsedNode } from "@subboost/core/types/node";
 import { Button } from "@subboost/ui/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -113,7 +114,7 @@ export function NodeManagementAutoProcessingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%_-_2rem)] max-w-xl gap-4 p-4 sm:p-6">
+      <DialogContent className="flex w-[calc(100%_-_2rem)] max-w-xl flex-col gap-4 overflow-hidden p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>自动处理</DialogTitle>
           <DialogDescription className="sr-only">
@@ -121,97 +122,99 @@ export function NodeManagementAutoProcessingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <SwitchField
-          label="启用"
-          checked={enabled}
-          onCheckedChange={setEnabled}
-        />
-
-        <FormField
-          label="保留正则"
-          className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3"
-          labelAction={<Switch aria-label="启用保留正则" checked={includeEnabled} onCheckedChange={setIncludeEnabled} />}
-          description="每行一条，匹配任意一条即可保留。"
-          descriptionPlacement="before-control"
-        >
-          <Textarea
-            value={includeRegexText}
-            onChange={(event) => setIncludeRegexText(event.target.value)}
-            placeholder="日本|新加坡"
-            rows={3}
-            className="min-h-20 resize-y break-words [overflow-wrap:anywhere]"
+        <DialogBody className="space-y-4">
+          <SwitchField
+            label="启用"
+            checked={enabled}
+            onCheckedChange={setEnabled}
           />
-        </FormField>
 
-        <FormField
-          label="排除正则"
-          className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3"
-          labelAction={<Switch aria-label="启用排除正则" checked={excludeEnabled} onCheckedChange={setExcludeEnabled} />}
-          description="每行一条，命中节点会被全局排除。"
-          descriptionPlacement="before-control"
-          error={validationMessage}
-        >
-          <Textarea
-            value={excludeRegexText}
-            onChange={(event) => setExcludeRegexText(event.target.value)}
-            placeholder="剩余流量|套餐到期|注意事项"
-            rows={3}
-            className="min-h-20 resize-y break-words [overflow-wrap:anywhere]"
-          />
-        </FormField>
+          <FormField
+            label="保留正则"
+            className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3"
+            labelAction={<Switch aria-label="启用保留正则" checked={includeEnabled} onCheckedChange={setIncludeEnabled} />}
+            description="每行一条，匹配任意一条即可保留。"
+            descriptionPlacement="before-control"
+          >
+            <Textarea
+              value={includeRegexText}
+              onChange={(event) => setIncludeRegexText(event.target.value)}
+              placeholder="日本|新加坡"
+              rows={3}
+              className="min-h-20 resize-y break-words [overflow-wrap:anywhere]"
+            />
+          </FormField>
 
-        <div
-          className="space-y-2 rounded-xl border border-ink/10 bg-ink/[0.03] p-3"
-          aria-live="polite"
-        >
-          <p className="text-xs leading-relaxed text-fg-60">
-            导入 {plan.result?.rawCount ?? nodes.length} · 排除{" "}
-            {plan.result?.excludedCount ?? "—"} · 保留{" "}
-            {plan.result?.effectiveCount ?? "—"}
-          </p>
+          <FormField
+            label="排除正则"
+            className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3"
+            labelAction={<Switch aria-label="启用排除正则" checked={excludeEnabled} onCheckedChange={setExcludeEnabled} />}
+            description="每行一条，命中节点会被全局排除。"
+            descriptionPlacement="before-control"
+            error={validationMessage}
+          >
+            <Textarea
+              value={excludeRegexText}
+              onChange={(event) => setExcludeRegexText(event.target.value)}
+              placeholder="剩余流量|套餐到期|注意事项"
+              rows={3}
+              className="min-h-20 resize-y break-words [overflow-wrap:anywhere]"
+            />
+          </FormField>
 
-          {hasProxyProviders ? (
-            <p className="text-xs leading-relaxed text-fg-40">
-              proxy-providers 不参与。
+          <div
+            className="space-y-2 rounded-xl border border-ink/10 bg-ink/[0.03] p-3"
+            aria-live="polite"
+          >
+            <p className="text-xs leading-relaxed text-fg-60">
+              导入 {plan.result?.rawCount ?? nodes.length} · 排除{" "}
+              {plan.result?.excludedCount ?? "—"} · 保留{" "}
+              {plan.result?.effectiveCount ?? "—"}
             </p>
-          ) : null}
 
-          {blocksEmptyResult ? (
-            <p className="text-xs leading-relaxed text-red-400" role="alert">
-              过滤后没有可用节点，请调整规则或关闭过滤。
-            </p>
-          ) : null}
+            {hasProxyProviders ? (
+              <p className="text-xs leading-relaxed text-fg-40">
+                proxy-providers 不参与。
+              </p>
+            ) : null}
 
-          {plan.result ? (
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-fg-60">排除的节点</p>
-              {plan.result.excludedNodes.length > 0 ? (
-                <div className="max-h-48 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
-                  {plan.result.excludedNodes.map((node, index) => {
-                    const originName = getNodeOriginName(node);
-                    return (
-                      <div
-                        key={`${node.name}:${index}`}
-                        className="rounded-lg border border-red-500/15 bg-red-500/[0.06] px-2.5 py-2"
-                      >
-                        <p className="break-words text-xs leading-relaxed text-fg-75 [overflow-wrap:anywhere]">
-                          {node.name}
-                        </p>
-                        {originName !== node.name ? (
-                          <p className="mt-0.5 break-words text-[11px] leading-relaxed text-fg-40 [overflow-wrap:anywhere]">
-                            原名：{originName}
+            {blocksEmptyResult ? (
+              <p className="text-xs leading-relaxed text-red-400" role="alert">
+                过滤后没有可用节点，请调整规则或关闭过滤。
+              </p>
+            ) : null}
+
+            {plan.result ? (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-fg-60">排除的节点</p>
+                {plan.result.excludedNodes.length > 0 ? (
+                  <div className="max-h-48 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
+                    {plan.result.excludedNodes.map((node, index) => {
+                      const originName = getNodeOriginName(node);
+                      return (
+                        <div
+                          key={`${node.name}:${index}`}
+                          className="rounded-lg border border-red-500/15 bg-red-500/[0.06] px-2.5 py-2"
+                        >
+                          <p className="break-words text-xs leading-relaxed text-fg-75 [overflow-wrap:anywhere]">
+                            {node.name}
                           </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-fg-40">没有排除的节点</p>
-              )}
-            </div>
-          ) : null}
-        </div>
+                          {originName !== node.name ? (
+                            <p className="mt-0.5 break-words text-[11px] leading-relaxed text-fg-40 [overflow-wrap:anywhere]">
+                              原名：{originName}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-fg-40">没有排除的节点</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2 sm:space-x-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

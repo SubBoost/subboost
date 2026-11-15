@@ -58,7 +58,7 @@ const DialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left",
+      "flex shrink-0 flex-col space-y-1.5 text-center sm:text-left",
       className
     )}
     {...props}
@@ -72,13 +72,28 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+      "flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end",
       className
     )}
     {...props}
   />
 );
 DialogFooter.displayName = "DialogFooter";
+
+/**
+ * The part of a dialog that scrolls on short screens while the header and footer stay in view.
+ * Give the DialogContent `flex flex-col overflow-hidden` so this body, not the whole dialog, scrolls.
+ */
+const DialogBody = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn("custom-scrollbar -mr-2 min-h-0 flex-1 overflow-y-auto pr-2", className)}
+    {...props}
+  />
+);
+DialogBody.displayName = "DialogBody";
 
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
@@ -116,6 +131,7 @@ export {
   DialogContent,
   DialogHeader,
   DialogFooter,
+  DialogBody,
   DialogTitle,
   DialogDescription,
 };

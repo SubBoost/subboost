@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@subboost/ui/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -114,12 +115,12 @@ export function GroupAdvancedSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
+      <DialogContent className="flex flex-col overflow-hidden w-[calc(100vw-2rem)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="break-words pr-6 text-fg">{groupName} · 高级设置</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <DialogBody className="space-y-5">
           <FormField label="代理组类型">
             <ProxyGroupTypeMenu
               value={draftType}
@@ -179,7 +180,7 @@ export function GroupAdvancedSettingsDialog({
               </div>
             )}
           </div>
-        </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2">
           <Button

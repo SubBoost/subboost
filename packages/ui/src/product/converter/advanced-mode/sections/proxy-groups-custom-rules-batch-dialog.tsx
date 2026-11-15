@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRight, Upload } from "lucide-react";
 import { Button } from "@subboost/ui/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -174,7 +175,7 @@ export function ProxyGroupsCustomRulesBatchDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl">
+      <DialogContent className="flex flex-col overflow-hidden w-[calc(100vw-2rem)] sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-indigo-300" />
@@ -182,7 +183,7 @@ export function ProxyGroupsCustomRulesBatchDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs text-fg-60">规则行</div>
@@ -282,20 +283,20 @@ export function ProxyGroupsCustomRulesBatchDialog({
               </div>
             )}
           </div>
+        </DialogBody>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" onClick={close} className="h-8">
-              取消
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={!importPlan.canImport}
-              className="h-8"
-            >
-              <Upload className="mr-2 h-3.5 w-3.5" />
-              导入
-            </Button>
-          </div>
+        <div className="flex shrink-0 justify-end gap-2">
+          <Button variant="secondary" onClick={close} className="h-8">
+            取消
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={!importPlan.canImport}
+            className="h-8"
+          >
+            <Upload className="mr-2 h-3.5 w-3.5" />
+            导入
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
