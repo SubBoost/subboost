@@ -223,9 +223,9 @@ describe("TailscaleSourceForm", () => {
     const content = "- {name: ts, type: tailscale}\n";
     const edited = () => ({ 0: { ...documentOf(content).initial, name: "office" } });
 
-    it("asks before discarding when confirmDiscard is set", () => {
+    it("asks before discarding unapplied edits", () => {
       const ref = { current: null as any };
-      const { handlers, setters } = renderForm(content, { cancelLabel: "关闭", confirmDiscard: true, ref }, edited());
+      const { handlers, setters } = renderForm(content, { cancelLabel: "关闭", ref }, edited());
       button("关闭").onClick();
       expect(setters[3]).toHaveBeenCalledWith("close");
       ref.current.requestClose();
@@ -233,20 +233,15 @@ describe("TailscaleSourceForm", () => {
       expect(handlers.onCancel).not.toHaveBeenCalled();
     });
 
-    it("leaves at once when nothing changed or no confirmation is wanted", () => {
-      const clean = renderForm(content, { cancelLabel: "关闭", confirmDiscard: true });
+    it("leaves at once when nothing changed", () => {
+      const clean = renderForm(content, { cancelLabel: "关闭" });
       button("关闭").onClick();
       expect(clean.handlers.onCancel).toHaveBeenCalledTimes(1);
       expect(clean.setters[3]).not.toHaveBeenCalled();
-
-      const draft = renderForm(content, {}, edited());
-      button("取消").onClick();
-      expect(draft.handlers.onCancel).toHaveBeenCalledTimes(1);
-      expect(draft.setters[3]).not.toHaveBeenCalled();
     });
 
     it("applies, discards or keeps editing from the close confirmation", () => {
-      const { html, handlers, setters } = renderForm(content, { confirmDiscard: true }, { ...edited(), 3: "close" });
+      const { html, handlers, setters } = renderForm(content, {}, { ...edited(), 3: "close" });
       expect(html).toContain("表单有未应用的修改");
       expect(mocks.buttons.some((props) => props.children === "应用并切换")).toBe(false);
 
@@ -400,6 +395,35 @@ describe("AddSourceMenu Tailscale item", () => {
       onCancel,
     }));
     expect(emptyHtml).not.toContain("添加并导入");
+  });
+
+  it("asks before the draft dialog's own close or cancel drops a filled-in draft", () => {
+    const draft = documentOf("- {name: ts, type: tailscale}\n");
+    const render = (overrides: Record<number, unknown>) => {
+      reset();
+      stateMock.enabled = true;
+      stateMock.callIndex = 0;
+      stateMock.overrides = overrides;
+      stateMock.setters = [];
+      const onCancel = vi.fn();
+      try {
+        renderToStaticMarkup(React.createElement(TailscaleDraftDialog, { draft, knownStateDirs: [], onApply: vi.fn(), onCancel }));
+        return onCancel;
+      } finally {
+        stateMock.enabled = false;
+      }
+    };
+
+    const filledIn = render({ 0: { ...draft.initial, name: "office" } });
+    mocks.dialogs[0].onOpenChange(false);
+    button("取消").onClick();
+    expect(filledIn).not.toHaveBeenCalled();
+    expect(stateMock.setters[3]).toHaveBeenNthCalledWith(1, "close");
+    expect(stateMock.setters[3]).toHaveBeenNthCalledWith(2, "close");
+
+    const untouched = render({});
+    mocks.dialogs[0].onOpenChange(false);
+    expect(untouched).toHaveBeenCalledTimes(1);
   });
 });
 

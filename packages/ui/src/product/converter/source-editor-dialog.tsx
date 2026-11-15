@@ -68,7 +68,6 @@ function YamlSourceEditor({
           knownStateDirs={tailscaleStateDirs}
           applyLabel="应用"
           cancelLabel="关闭"
-          confirmDiscard
           onApply={onApplyContent}
           onCancel={onClose}
           onSwitchToRaw={(content) => {

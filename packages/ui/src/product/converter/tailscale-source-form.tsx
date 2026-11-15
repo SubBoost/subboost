@@ -34,7 +34,7 @@ const PENDING_ACTION_LABELS: Record<PendingAction, { apply: string; discard: str
 };
 
 export type TailscaleSourceFormHandle = {
-  /** Leaves through onCancel, asking first when confirmDiscard is set and edits are unapplied. */
+  /** Leaves through onCancel, asking first when edits are unapplied. */
   requestClose: () => void;
 };
 
@@ -47,8 +47,6 @@ export type TailscaleSourceFormProps = {
   onCancel: () => void;
   /** Text of the button that leaves without applying. */
   cancelLabel?: string;
-  /** Ask before leaving with unapplied edits, as when editing an existing source. */
-  confirmDiscard?: boolean;
   /** Receives applied content, or null when nothing needs to be written before raw editing. */
   onSwitchToRaw?: (appliedContent: string | null) => void;
   ref?: React.Ref<TailscaleSourceFormHandle>;
@@ -130,7 +128,6 @@ export function TailscaleSourceForm({
   onApply,
   onCancel,
   cancelLabel = "取消",
-  confirmDiscard = false,
   onSwitchToRaw,
   ref,
 }: TailscaleSourceFormProps) {
@@ -176,7 +173,7 @@ export function TailscaleSourceForm({
   };
 
   const requestClose = () => {
-    if (confirmDiscard && dirty) setPendingAction("close");
+    if (dirty) setPendingAction("close");
     else onCancel();
   };
   React.useImperativeHandle(ref, () => ({ requestClose }));
