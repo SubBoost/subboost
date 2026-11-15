@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useUIStore } from "@subboost/ui/store/ui-store";
 import { useSubscriptionLink } from "./use-subscription-link";
 import { makeAdapter, makeOptions, response } from "./use-subscription-link.test-helpers";
 
@@ -102,6 +103,7 @@ describe("useSubscriptionLink", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetHookState();
+    useUIStore.setState({ savedDraftSignature: null });
     mocks.bag.storeState = {
       proxyGroupAdvanced: { auto: { includeRegex: "Fast" } },
       proxyGroupAdvancedModeEnabled: true,
@@ -291,6 +293,7 @@ describe("useSubscriptionLink", () => {
     expect(clearUser).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(mocks.bag.interactions.subscriptionLinkSaved).not.toHaveBeenCalled();
+    expect(useUIStore.getState().savedDraftSignature).toBeNull();
   });
 
   it("allows adapter-specific decimal auto-update intervals", async () => {
@@ -569,6 +572,8 @@ describe("useSubscriptionLink", () => {
     expect(mocks.bag.interactions.subscriptionLinkSaved).toHaveBeenCalledWith(
       expect.objectContaining({ flow: "update", result: "success" })
     );
+    // The saved content no longer triggers the leave-page warning.
+    expect(useUIStore.getState().savedDraftSignature).toEqual(expect.any(String));
 
     resetHookState();
     const validationAdapter = makeAdapter({ saveSubscription: vi.fn(async () => response(400, { error: "bad input" })) });

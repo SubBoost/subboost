@@ -13,12 +13,17 @@ interface UIState {
   editingSubscription: EditingSubscription | null;
   setEditingSubscription: (subscription: EditingSubscription | null) => void;
   clearEditingSubscription: () => void;
+  // 最近一次加载或保存订阅时的配置快照（只在内存）；离开页面时配置与它相同就不再提示未保存
+  savedDraftSignature: string | null;
+  setSavedDraftSignature: (signature: string | null) => void;
 }
 
 export const useUIStore = create<UIState>()((set) => ({
   editingSubscription: null,
   setEditingSubscription: (subscription) => set({ editingSubscription: subscription }),
   clearEditingSubscription: () => set({ editingSubscription: null }),
+  savedDraftSignature: null,
+  setSavedDraftSignature: (signature) => set({ savedDraftSignature: signature }),
 }));
 
 

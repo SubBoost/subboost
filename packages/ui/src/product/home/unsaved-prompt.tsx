@@ -1,27 +1,52 @@
 "use client";
 
 import * as React from "react";
-import { useShallow } from "zustand/react/shallow";
 import { isSourcePendingImport } from "@subboost/ui/product/subscription/source-import-state";
-import { useConfigStore } from "@subboost/ui/store/config-store";
+import { useConfigStore, type ConfigState } from "@subboost/ui/store/config-store";
+import { useUIStore } from "@subboost/ui/store/ui-store";
 
-/** Warns before a browser refresh or close would discard imported work. */
+// Derived or in-progress state. Everything else counts, so a newly added setting is
+// treated as unsaved until saved rather than silently dropped on leaving.
+const DERIVED_DRAFT_FIELDS = new Set<string>([
+  "draftRevision",
+  "parseErrors",
+  "isLoading",
+  "generatedYaml",
+  "generatedYamlError",
+  "history",
+  "historyIndex",
+]);
+
+/** The editor's config as one comparable string. */
+export function getDraftSignature(state: Partial<ConfigState>): string {
+  const draft: Record<string, unknown> = {};
+  for (const key of Object.keys(state).sort()) {
+    const value = (state as Record<string, unknown>)[key];
+    if (typeof value !== "function" && !DERIVED_DRAFT_FIELDS.has(key)) draft[key] = value;
+  }
+  return JSON.stringify(draft);
+}
+
+/** Records the editor content as saved, so leaving without further changes does not warn. */
+export function markDraftSaved(signature = getDraftSignature(useConfigStore.getState())) {
+  useUIStore.getState().setSavedDraftSignature(signature);
+}
+
+function hasUnsavedWork(state: ConfigState): boolean {
+  if (state.sources.some(isSourcePendingImport)) return true;
+  if (state.nodes.length === 0) return false;
+  return useUIStore.getState().savedDraftSignature !== getDraftSignature(state);
+}
+
+/** Warns before a browser refresh or close would discard imported work that is not saved. */
 export function UnsavedPrompt() {
-  const { nodes, sources } = useConfigStore(
-    useShallow((state) => ({ nodes: state.nodes, sources: state.sources }))
-  );
-  const hasUnsavedChanges = React.useMemo(
-    () => nodes.length > 0 || sources.some(isSourcePendingImport),
-    [nodes, sources]
-  );
-
   React.useEffect(() => {
     if (typeof navigator !== "undefined" && (navigator as { webdriver?: boolean }).webdriver) {
       return;
     }
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!hasUnsavedChanges) return;
+      if (!hasUnsavedWork(useConfigStore.getState())) return;
       event.preventDefault();
       event.returnValue = "您有未保存的配置更改，确定要离开吗？";
       return event.returnValue;
@@ -29,7 +54,7 @@ export function UnsavedPrompt() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, []);
 
   return null;
 }

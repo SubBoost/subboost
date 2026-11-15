@@ -37,6 +37,7 @@ import {
   type ProductMode,
 } from "@subboost/ui/product/interactions";
 import { copyTextToClipboard } from "@subboost/ui/lib/clipboard";
+import { getDraftSignature, markDraftSaved } from "@subboost/ui/product/home/unsaved-prompt";
 
 type EditingSubscription = {
   id: string;
@@ -300,6 +301,8 @@ export function useSubscriptionLink({
     setIsCreatingSubscription(true);
     const draftRevision = useConfigStore.getState().draftRevision;
     const isCurrentDraft = () => useConfigStore.getState().draftRevision === draftRevision;
+    // Taken before the request, so edits made while saving still count as unsaved.
+    const savedDraftSignature = getDraftSignature(useConfigStore.getState());
 
     try {
       const nodeNameFilter: NodeNameFilterConfig = useConfigStore.getState().nodeNameFilter;
@@ -451,6 +454,7 @@ export function useSubscriptionLink({
             smartNodeMatchingEnabled,
           });
         }
+        markDraftSaved(savedDraftSignature);
         trackSubscriptionMutation("success");
       } else {
         trackSubscriptionMutation(response.status >= 500 ? "runtimeError" : "validationError");

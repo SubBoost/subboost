@@ -23,6 +23,7 @@ import { useConfigStore } from "@subboost/ui/store/config-store";
 import { initialState } from "@subboost/ui/store/config-store/definitions";
 import { captureAuthConfigHandoff } from "@subboost/ui/store/config-store/auth-handoff";
 import { toast } from "@subboost/ui/components/ui/toaster";
+import { markDraftSaved } from "./unsaved-prompt";
 import {
   ensureNodeOriginName,
   ensureNodesHaveValidSourceIds,
@@ -592,6 +593,7 @@ export function useEditingSubscriptionLoader({
             autoUpdateInterval,
             smartNodeMatchingEnabled: (cfg as any).smartNodeMatchingEnabled !== false,
           });
+          markDraftSaved();
           setSubscriptionName(sub.name || "");
           setSubscriptionUrl("");
           setCopied(false);

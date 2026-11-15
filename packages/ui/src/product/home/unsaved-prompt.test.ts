@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  storeState: { nodes: [] as any[], sources: [] as any[] },
+  storeState: {} as any,
   isSourcePendingImport: vi.fn(),
   listeners: new Map<string, EventListener>(),
 }));
@@ -12,19 +12,24 @@ vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
     ...actual,
-    useMemo: (factory: () => unknown) => factory(),
     useEffect: (effect: () => void | (() => void)) => effect(),
   };
 });
-vi.mock("zustand/react/shallow", () => ({ useShallow: (selector: unknown) => selector }));
 vi.mock("@subboost/ui/product/subscription/source-import-state", () => ({
   isSourcePendingImport: mocks.isSourcePendingImport,
 }));
 vi.mock("@subboost/ui/store/config-store", () => ({
-  useConfigStore: (selector: (state: typeof mocks.storeState) => unknown) => selector(mocks.storeState),
+  useConfigStore: { getState: () => mocks.storeState },
 }));
 
-import { UnsavedPrompt } from "./unsaved-prompt";
+import { useUIStore } from "@subboost/ui/store/ui-store";
+import { UnsavedPrompt, markDraftSaved } from "./unsaved-prompt";
+
+const WARNING = "您有未保存的配置更改，确定要离开吗？";
+
+function draft(overrides: Record<string, unknown> = {}) {
+  return { nodes: [], sources: [], generatedYaml: "", appliedTemplateId: "minimal", ...overrides };
+}
 
 function stubBrowser(webdriver = false) {
   mocks.listeners.clear();
@@ -35,33 +40,63 @@ function stubBrowser(webdriver = false) {
   });
 }
 
+function leave() {
+  const event = { preventDefault: vi.fn(), returnValue: "" } as any;
+  mocks.listeners.get("beforeunload")?.(event);
+  return event;
+}
+
 describe("UnsavedPrompt", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
-    mocks.storeState = { nodes: [], sources: [] };
+    mocks.storeState = draft();
     mocks.isSourcePendingImport.mockImplementation((source: any) => Boolean(source.pending));
+    useUIStore.setState({ savedDraftSignature: null });
     stubBrowser(false);
   });
 
-  it("registers beforeunload and warns when imported work exists", () => {
-    mocks.storeState = { nodes: [{ name: "node-1" }], sources: [] };
+  it("warns when imported work has never been saved", () => {
+    mocks.storeState = draft({ nodes: [{ name: "node-1" }], generatedYaml: "proxies: [node-1]" });
     expect(renderToStaticMarkup(React.createElement(UnsavedPrompt))).toBe("");
 
-    const event = { preventDefault: vi.fn(), returnValue: "" } as any;
-    mocks.listeners.get("beforeunload")?.(event);
+    const event = leave();
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(event.returnValue).toBe("您有未保存的配置更改，确定要离开吗？");
+    expect(event.returnValue).toBe(WARNING);
+  });
+
+  it("leaves quietly right after a save and warns again once the config changes", () => {
+    const saved = draft({ nodes: [{ name: "node-1" }], generatedYaml: "proxies: [node-1]", proxyGroupAdvancedModeEnabled: false });
+    mocks.storeState = saved;
+    renderToStaticMarkup(React.createElement(UnsavedPrompt));
+    markDraftSaved();
+    expect(leave().preventDefault).not.toHaveBeenCalled();
+
+    // Derived output, history and actions are not part of what a save stores.
+    mocks.storeState = { ...saved, generatedYaml: "regenerated", history: [{}], historyIndex: 1, generateConfig: () => {} };
+    expect(leave().preventDefault).not.toHaveBeenCalled();
+
+    mocks.storeState = { ...saved, nodes: [{ name: "node-1" }, { name: "node-2" }] };
+    expect(leave().returnValue).toBe(WARNING);
+
+    // A saved setting that never reaches the generated YAML still counts.
+    mocks.storeState = { ...saved, proxyGroupAdvancedModeEnabled: true };
+    expect(leave().returnValue).toBe(WARNING);
+  });
+
+  it("still warns while a source import is pending, even after a save", () => {
+    mocks.storeState = draft({ sources: [{ id: "a", pending: true }] });
+    markDraftSaved();
+    renderToStaticMarkup(React.createElement(UnsavedPrompt));
+    expect(leave().returnValue).toBe(WARNING);
   });
 
   it("does not warn without pending work and skips automation environments", () => {
     renderToStaticMarkup(React.createElement(UnsavedPrompt));
-    const event = { preventDefault: vi.fn(), returnValue: "" } as any;
-    mocks.listeners.get("beforeunload")?.(event);
-    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(leave().preventDefault).not.toHaveBeenCalled();
 
     stubBrowser(true);
-    mocks.storeState = { nodes: [{ name: "node-1" }], sources: [] };
+    mocks.storeState = draft({ nodes: [{ name: "node-1" }] });
     renderToStaticMarkup(React.createElement(UnsavedPrompt));
     expect(mocks.listeners.has("beforeunload")).toBe(false);
   });

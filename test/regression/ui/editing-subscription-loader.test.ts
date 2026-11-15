@@ -198,6 +198,7 @@ describe("useEditingSubscriptionLoader branch coverage", () => {
   });
 
   it("hydrates an empty valid subscription when arrays and config are absent", async () => {
+    useUIStore.setState({ savedDraftSignature: null });
     const { reset, generateConfig } = resetStoreState({
       enabledProxyGroups: ["select", "auto"],
       ruleOrder: ["existing"],
@@ -232,6 +233,8 @@ describe("useEditingSubscriptionLoader branch coverage", () => {
         smartNodeMatchingEnabled: true,
       })
     );
+    // Leaving a just-loaded subscription without changes does not warn about unsaved work.
+    expect(useUIStore.getState().savedDraftSignature).toEqual(expect.any(String));
   });
 
   it("normalizes sparse config sources, module overrides, order lists, and listener ports", async () => {
