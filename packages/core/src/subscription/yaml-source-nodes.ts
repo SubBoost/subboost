@@ -311,6 +311,7 @@ export function appendYamlSourceNode(document: YamlSourceDocument, node: Mapping
     const lead = offset > 0 && content[offset - 1] !== "\n" ? eol : "";
     return verified(document, null, node, content.slice(0, offset) + lead + presentItem(node, indent, eol) + content.slice(offset));
   }
-  const head = content.trimEnd();
-  return verified(document, null, node, `${head ? head + eol : ""}proxies:${eol}${presentItem(node, "  ", eol)}`);
+  // Keep the text verbatim, trailing blanks included: they may belong to a block scalar.
+  const head = !content || content.endsWith("\n") ? content : content + eol;
+  return verified(document, null, node, `${head}proxies:${eol}${presentItem(node, "  ", eol)}`);
 }

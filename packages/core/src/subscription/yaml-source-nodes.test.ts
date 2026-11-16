@@ -100,6 +100,13 @@ describe("YAML source nodes", () => {
     expect(appendYamlSourceNode(read("proxies:   # empty\nrules: []\n"), proxy("a"))).toBe(
       "proxies:   # empty\n  - name: a\n    type: direct\nrules: []\n"
     );
+    // Trailing spaces and blank lines stay; under `|+` the blank lines are part of the value.
+    expect(appendYamlSourceNode(read("rules: []\n# note  \n\n\n"), proxy("a"))).toBe(
+      "rules: []\n# note  \n\n\nproxies:\n  - name: a\n    type: direct\n"
+    );
+    expect(appendYamlSourceNode(read("note: |+\r\n  kept\r\n\r\n"), proxy("a"))).toBe(
+      "note: |+\r\n  kept\r\n\r\nproxies:\r\n  - name: a\r\n    type: direct\r\n"
+    );
   });
 
   it("explains layouts it cannot change in place", () => {
