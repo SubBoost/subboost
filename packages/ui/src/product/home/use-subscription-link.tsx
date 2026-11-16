@@ -144,14 +144,14 @@ export function useSubscriptionLink({
   const [autoUpdateEnabled, setAutoUpdateEnabled] = React.useState(false);
   const [autoUpdateHours, setAutoUpdateHours] = React.useState(autoUpdatePolicy.defaultHours);
   const [smartNodeMatchingEnabled, setSmartNodeMatchingEnabled] = React.useState(true);
-  // The dialog settings as they were when it opened; changes count as unsaved until the save succeeds.
-  const [openedSettings, setOpenedSettings] = React.useState("");
-  const dialogSettings = JSON.stringify([subscriptionName, autoUpdateEnabled, autoUpdateHours, smartNodeMatchingEnabled]);
-  useUnappliedInputGuard(subscriptionDialog && !subscriptionUrl && dialogSettings !== openedSettings);
   const [isCreatingSubscription, setIsCreatingSubscription] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [saveRequirementDialog, setSaveRequirementDialog] = React.useState(false);
   const [subscriptionFlowMode, setSubscriptionFlowMode] = React.useState<ProductMode>("quick");
+  // The dialog settings as they were when it opened; changes count as unsaved until the save succeeds.
+  const [openedSettings, setOpenedSettings] = React.useState("");
+  const dialogSettings = JSON.stringify([subscriptionName, autoUpdateEnabled, autoUpdateHours, smartNodeMatchingEnabled]);
+  useUnappliedInputGuard(subscriptionDialog && !subscriptionUrl && dialogSettings !== openedSettings);
   const interactions = useProductInteractionAdapter();
 
   const isEditingExistingSubscription = Boolean(editingSubscription);

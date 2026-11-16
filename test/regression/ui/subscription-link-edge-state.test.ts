@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => {
     ),
     useProductInteractionAdapter: vi.fn(() => bag.interactions),
     useCallback: vi.fn((callback: unknown) => callback),
+    useEffect: vi.fn(),
     useMemo: vi.fn((factory: () => unknown) => factory()),
     useState: vi.fn((initial: unknown) => {
       const index = bag.stateIndex;
@@ -51,6 +52,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("react", () => ({
   useCallback: mocks.useCallback,
+  useEffect: mocks.useEffect,
   useMemo: mocks.useMemo,
   useState: mocks.useState,
 }));
