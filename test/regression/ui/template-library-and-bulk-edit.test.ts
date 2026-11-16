@@ -133,6 +133,7 @@ vi.mock("@subboost/ui/components/ui/dialog", () => ({
     return props.children;
   },
   DialogContent: (props: any) => props.children,
+  DialogBody: (props: any) => props.children,
   DialogHeader: (props: any) => props.children,
   DialogTitle: (props: any) => props.children,
 }));

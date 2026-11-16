@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { Button } from "@subboost/ui/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
 import { Input } from "@subboost/ui/components/ui/input";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { formatNodeNameFromTemplate } from "@subboost/core/node-name-template";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 import type { ParsedNode } from "@subboost/core/types/node";
 
 type NodeNameParts = {
@@ -41,6 +42,7 @@ export function NodeManagementBulkEditDialog({
 }) {
   // 批量编辑（方案 B）
   const interactions = useProductInteractionAdapter();
+  useUnappliedInputGuard(open);
   const [nameRulesInclude, setNameRulesInclude] = React.useState("");
   const [nameRulesExclude, setNameRulesExclude] = React.useState("");
   const [nameRulesFind, setNameRulesFind] = React.useState("");
@@ -160,12 +162,12 @@ export function NodeManagementBulkEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-3xl">
+      <DialogContent className="flex w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>批量编辑</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           <div className="text-[11px] text-fg-40">
             仅修改节点名中的 {"{name}"} 部分，不改变导入源 tag；筛选基于完整节点名（含 tag）。
           </div>
@@ -405,33 +407,33 @@ export function NodeManagementBulkEditDialog({
               </div>
             )}
           </div>
+        </DialogBody>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" onClick={() => onOpenChange(false)} className="h-8">
-              取消
-            </Button>
-            <Button
-              onClick={() => {
-                if (nameRulesPlan.hasError) return;
-                if (nameRulesPlan.renames.length > 0) {
-                  bulkRenameNodes(nameRulesPlan.renames);
-                  toast({
-                    title: `已批量重命名 ${nameRulesPlan.renames.length} 个节点`,
-                    description:
-                      nameRulesPlan.skippedCount > 0
-                        ? `跳过 ${nameRulesPlan.skippedCount} 个无法解析的节点`
-                        : undefined,
-                    variant: "success",
-                  });
-                }
-                onOpenChange(false);
-              }}
-              disabled={nameRulesPlan.hasError}
-              className="h-8"
-            >
-              完成
-            </Button>
-          </div>
+        <div className="flex shrink-0 justify-end gap-2">
+          <Button variant="secondary" onClick={() => onOpenChange(false)} className="h-8">
+            取消
+          </Button>
+          <Button
+            onClick={() => {
+              if (nameRulesPlan.hasError) return;
+              if (nameRulesPlan.renames.length > 0) {
+                bulkRenameNodes(nameRulesPlan.renames);
+                toast({
+                  title: `已批量重命名 ${nameRulesPlan.renames.length} 个节点`,
+                  description:
+                    nameRulesPlan.skippedCount > 0
+                      ? `跳过 ${nameRulesPlan.skippedCount} 个无法解析的节点`
+                      : undefined,
+                  variant: "success",
+                });
+              }
+              onOpenChange(false);
+            }}
+            disabled={nameRulesPlan.hasError}
+            className="h-8"
+          >
+            完成
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

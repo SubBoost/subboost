@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -61,6 +62,7 @@ describe("Radix UI wrappers", () => {
             { className: "dialog-extra" },
             React.createElement(DialogHeader, { className: "header-extra" }, React.createElement(DialogTitle, null, "Title")),
             React.createElement(DialogDescription, null, "Description"),
+            React.createElement(DialogBody, { className: "body-extra" }, "Body"),
             React.createElement(DialogFooter, { className: "footer-extra" }, "Footer")
           )
         ),
@@ -80,6 +82,9 @@ describe("Radix UI wrappers", () => {
     expect(html).toContain("关闭");
     expect(html).toContain("header-extra");
     expect(html).toContain("footer-extra");
+    // The body scrolls on short screens; header and footer keep their height.
+    expect(html).toMatch(/class="[^"]*overflow-y-auto[^"]*body-extra"/);
+    expect(html).toMatch(/class="flex shrink-0[^"]*header-extra"/);
     expect(html).toContain("switch-extra");
     expect(html).toContain("tabs-list-extra");
     expect(html).toContain("tabs-content-extra");

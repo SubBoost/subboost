@@ -67,18 +67,11 @@ vi.mock("./input-source-editor-dialog", () => ({
     return null;
   },
 }));
-vi.mock("@subboost/ui/product/converter/tailscale-draft-dialog", () => ({
-  TailscaleDraftDialog: (props: any) => {
-    mocks.captures.tailscaleDraftDialog = props;
-    return null;
-  },
-}));
 
 import { InputSection } from "./input-section";
 
-// The controller's state order: add menu, expanded source, editor snapshot, Tailscale draft.
+// The controller's state order: add menu, expanded source, editor snapshot.
 const EXPANDED_STATE_INDEX = 1;
-const DRAFT_STATE_INDEX = 3;
 
 const urlSource = { id: "s1", type: "url", content: "https://local.subboost.test/sub", nameTemplate: DEFAULT_NODE_NAME_TEMPLATE };
 const nodesSource = { id: "s2", type: "nodes", content: "ss://node", parsed: false, parsing: false };
@@ -97,7 +90,7 @@ function renderSection(overrides: Record<number, unknown> = {}) {
   }
 }
 
-describe("advanced mode InputSection Tailscale draft lifecycle", () => {
+describe("advanced mode InputSection Tailscale editing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.captures = { addSourceMenus: [] };
@@ -112,63 +105,9 @@ describe("advanced mode InputSection Tailscale draft lifecycle", () => {
     mocks.userStore = { user: { isAdmin: false, quota: { maxImportSourcesPerType: 2 } } };
   });
 
-  it("opens a local draft without creating a source and cancels without persisting", () => {
-    const { setters } = renderSection({ 0: true });
-    mocks.captures.addSourceMenus[0].onAddTailscale();
-    expect(setters[0]).toHaveBeenCalledWith(false);
-    const draft = (setters[DRAFT_STATE_INDEX] as any).lastValue;
-    expect(draft.initial).toMatchObject({ name: "tailscale", stateDir: expect.stringMatching(/^tailscale\/subboost-/) });
-    expect(mocks.store.setSources).not.toHaveBeenCalled();
-
-    renderSection({ [DRAFT_STATE_INDEX]: draft });
-    expect(mocks.captures.tailscaleDraftDialog.draft).toBe(draft);
-    mocks.captures.tailscaleDraftDialog.onCancel();
-    expect(stateMock.setters[DRAFT_STATE_INDEX]).toHaveBeenCalledWith(null);
-    expect(mocks.store.setSources).not.toHaveBeenCalled();
-    expect(mocks.store.parseSingleSource).not.toHaveBeenCalled();
-  });
-
-  it("generates a distinct directory for each new draft", () => {
-    const { setters } = renderSection();
-    mocks.captures.addSourceMenus[0].onAddTailscale();
-    const first = (setters[DRAFT_STATE_INDEX] as any).lastValue.initial.stateDir;
-    const again = renderSection();
-    mocks.captures.addSourceMenus[0].onAddTailscale();
-    expect((again.setters[DRAFT_STATE_INDEX] as any).lastValue.initial.stateDir).not.toBe(first);
-  });
-
-  it("applies a draft as one ordinary YAML source and imports it once", () => {
-    const now = vi.spyOn(Date, "now").mockReturnValue(777);
-    try {
-      renderSection({ [DRAFT_STATE_INDEX]: { content: "x", initial: {} } });
-      mocks.captures.tailscaleDraftDialog.onApply("proxies:\n  - {name: ts, type: tailscale}\n");
-      expect(mocks.store.setSources).toHaveBeenCalledTimes(1);
-      expect(mocks.store.setSources).toHaveBeenCalledWith([
-        urlSource,
-        nodesSource,
-        { id: "777", type: "yaml", content: "proxies:\n  - {name: ts, type: tailscale}\n", nameTemplate: DEFAULT_NODE_NAME_TEMPLATE },
-      ]);
-      expect(mocks.store.parseSingleSource).toHaveBeenCalledTimes(1);
-      expect(mocks.store.parseSingleSource).toHaveBeenCalledWith("777");
-      expect(stateMock.setters[DRAFT_STATE_INDEX]).toHaveBeenCalledWith(null);
-      expect(mocks.interactions.sourceAdded).toHaveBeenCalledWith({ mode: "advanced", sourceType: "yaml", sourceCount: 3 });
-    } finally {
-      now.mockRestore();
-    }
-  });
-
-  it("respects the YAML source quota when starting and applying", () => {
-    mocks.userStore = { user: { isAdmin: false, quota: { maxImportSourcesPerType: 1 } } };
-    mocks.store.sources = [urlSource, { ...nodesSource, id: "y1", type: "yaml" }];
-    const { setters } = renderSection();
-    mocks.captures.addSourceMenus[0].onAddTailscale();
-    expect(mocks.toast).toHaveBeenCalledWith({ title: "每种导入方式最多 1 个", variant: "warning" });
-    expect(setters[DRAFT_STATE_INDEX]).not.toHaveBeenCalled();
-
-    renderSection({ [DRAFT_STATE_INDEX]: { content: "x", initial: {} } });
-    mocks.captures.tailscaleDraftDialog.onApply("- {name: ts, type: tailscale}");
-    expect(mocks.store.setSources).not.toHaveBeenCalled();
-    expect(mocks.store.parseSingleSource).not.toHaveBeenCalled();
+  it("adds Tailscale nodes inside the YAML editor rather than as a separate source", () => {
+    renderSection();
+    expect(mocks.captures.addSourceMenus[0]).not.toHaveProperty("onAddTailscale");
   });
 
   it("applies editor form content once and closes the editor", () => {

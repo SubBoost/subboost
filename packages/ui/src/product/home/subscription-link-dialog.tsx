@@ -12,6 +12,7 @@ import { SmartNodeMatchingHelp } from "@subboost/ui/components/subscription/smar
 import { SubscriptionQrCode } from "@subboost/ui/product/subscription/subscription-qr-code";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -67,7 +68,7 @@ export function SubscriptionLinkDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex flex-col overflow-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LinkIcon className="h-5 w-5 text-indigo-400" />
@@ -85,7 +86,7 @@ export function SubscriptionLinkDialog({
         </DialogHeader>
 
         {!subscriptionUrl ? (
-          <div className="space-y-4 py-4">
+          <DialogBody className="space-y-4 py-4">
             <FormField label="订阅名称">
               <Input
                 placeholder="例如：我的配置"
@@ -152,9 +153,9 @@ export function SubscriptionLinkDialog({
                 )}
               </ul>
             </div>
-          </div>
+          </DialogBody>
         ) : (
-          <div className="space-y-4 py-4">
+          <DialogBody className="space-y-4 py-4">
             <SubscriptionQrCode url={subscriptionUrl} />
             <div className="space-y-2">
               <p className="text-sm font-medium">订阅链接</p>
@@ -183,7 +184,7 @@ export function SubscriptionLinkDialog({
                 {isEditingExistingSubscription ? "订阅链接保持不变，可在仪表盘查看" : "您可以在仪表盘中管理所有订阅"}
               </p>
             </div>
-          </div>
+          </DialogBody>
         )}
 
         <DialogFooter>

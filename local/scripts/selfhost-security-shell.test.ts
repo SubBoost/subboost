@@ -61,19 +61,24 @@ JSON
   `);
 }
 
-function firstUpdateScenario(scenario: "matching" | "different" | "missing", binding = "", hostIp: string | null = binding || null, succeeds = scenario === "matching", noParser = false, oldHost: string | null = binding || null, candidatePort = "31000", oldPort = "31000", envPort = "31000") {
+type UpdateScenario = "matching" | "different" | "missing" | "current" | "handoff" | "handoff-fails";
+
+function firstUpdateScenario(scenario: UpdateScenario, binding = "", hostIp: string | null = binding || null, succeeds = ["matching", "current", "handoff"].includes(scenario), noParser = false, oldHost: string | null = binding || null, candidatePort = "31000", oldPort = "31000", envPort = "31000") {
   return runBash(`
     set -Eeuo pipefail
     base="$(mktemp -d)"
     trap 'rm -rf "$base"' EXIT
     mkdir -p "$base/tmp" "$base/home" "$base/bin" "$base/release"
     export TMPDIR="$base/tmp" SUBBOOST_HOME="$base/home" SUBBOOST_BIN="$base/bin/subboost"
-    export SUBBOOST_REQUIRE_MANAGER_UPDATE=1 DOCKER_LOG="$base/docker.log"
+    unset SUBBOOST_MANAGER_HANDOFF; export DOCKER_LOG="$base/docker.log"
+    ${["matching", "different", "missing"].includes(scenario) ? "export SUBBOOST_MANAGER_HANDOFF=1" : ""}
     export SUBBOOST_DOCTOR_HEALTH_ATTEMPTS=1 SUBBOOST_DOCTOR_HEALTH_INTERVAL_SECONDS=0
     cp local/scripts/subboost.sh "$base/manager"
     cp "$base/manager" "$base/release/manager"
     cp local/docker-compose.image.yml "$base/release/compose.yml"
     if [ '${scenario}' = different ]; then printf '# different manager\\n' >> "$base/release/manager"; fi
+    if [ '${scenario}' = handoff ]; then echo 'echo release-manager-finished' >> "$base/release/manager"; fi
+    if [ '${scenario}' = handoff-fails ]; then printf '#!/usr/bin/env bash\\necho RELEASE_STUB_EXECUTED\\nexit 37\\n' > "$base/release/manager"; fi
     cat > "$base/release/release.json" <<'JSON'
 {"image":"new-image","composeUrl":"compose.yml","managerUrl":"manager"}
 JSON
@@ -137,7 +142,7 @@ ENV
     [ -z "$(find "$TMPDIR" -mindepth 1 -print -quit)" ]
     if [ '${succeeds ? "1" : "0"}' = 1 ]; then
       [ "$status" = 0 ]
-      cmp -s "$base/manager" "$SUBBOOST_BIN"
+      cmp -s "$base/release/manager" "$SUBBOOST_BIN"
       grep -qx 'APP_URL=http://local.subboost.test:31000' "$SUBBOOST_HOME/.env"
       grep -qx 'SUBBOOST_PORT=${envPort}' "$SUBBOOST_HOME/.env"
       if [ -n '${binding}' ]; then grep -qx 'SUBBOOST_BIND_ADDRESS=${binding}' "$SUBBOOST_HOME/.env"; else ! grep -q '^SUBBOOST_BIND_ADDRESS=' "$SUBBOOST_HOME/.env"; fi
@@ -624,7 +629,7 @@ exec "$@"
 SH
       chmod +x "$base/bin/cp" "$base/bin/sudo"
       export PATH="$base/bin:$PATH" TMPDIR="$base/tmp" SUBBOOST_HOME="$base/home" SUBBOOST_BIN="$base/manager"
-      unset SUBBOOST_SCRIPT_SOURCE_ONLY SUBBOOST_REQUIRE_MANAGER_UPDATE
+      unset SUBBOOST_SCRIPT_SOURCE_ONLY SUBBOOST_MANAGER_HANDOFF
       printf 'SUBBOOST_IMAGE=fixture\\nSUBBOOST_RELEASE_URL=\\n' > "$base/home/.env"
       : > "$base/home/docker-compose.yml"
       for pair in HUP:129 INT:130 TERM:143; do
@@ -638,18 +643,35 @@ SH
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   }, 30_000);
 
-  it("updates an existing installation by running the downloaded manager first", () => {
-    const result = firstUpdateScenario("matching");
+  it.each(["current", "matching"] as const)("updates in place when the running manager is the %s release manager", (scenario) => {
+    const result = firstUpdateScenario(scenario);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain("update-status=0");
     expect(result.stdout).toContain("legacy-settings-preserved");
+    expect(result.stdout).not.toContain("Handing this update");
     expect(result.stdout).not.toContain("LEGACY_MANAGER_EXECUTED");
   }, 40_000);
 
-  it.each(["different", "missing"] as const)("stops the first update when release assets are %s", (scenario) => {
+  it("hands the update to a differing release manager so its own steps run", () => {
+    const result = firstUpdateScenario("handoff");
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("Handing this update to the release manager");
+    expect(result.stdout).toContain("release-manager-finished");
+    expect(result.stdout).toContain("legacy-settings-preserved");
+  }, 40_000);
+
+  it("returns a failed handoff before touching Docker or installed files", () => {
+    const result = firstUpdateScenario("handoff-fails");
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("RELEASE_STUB_EXECUTED");
+    expect(result.stdout).toContain("update-status=37");
+    expect(result.stdout).toContain("stopped-before-docker");
+  }, shellTimeout(20_000));
+
+  it.each(["different", "missing"] as const)("stops a handed-off update when release assets are %s", (scenario) => {
     const result = firstUpdateScenario(scenario);
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain("stopped-before-docker");
-    expect(result.stderr).toContain(scenario === "different" ? "does not match" : "secure manager update aborted");
+    expect(result.stderr).toContain(scenario === "different" ? "does not match" : "manager handoff aborted");
   }, shellTimeout(20_000));
 });

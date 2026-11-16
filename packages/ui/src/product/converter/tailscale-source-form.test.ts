@@ -1,7 +1,8 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseTailscaleSourceDocument, type TailscaleSourceDocument } from "@subboost/core/subscription/tailscale-yaml-source";
+import { readTailscaleFormValues, type TailscaleFormValues } from "@subboost/core/subscription/tailscale-yaml-source";
+import { readYamlSource } from "@subboost/core/subscription/yaml-source-nodes";
 
 const mocks = vi.hoisted(() => ({
   buttons: [] as any[],
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   chips: [] as any[],
   dialogs: [] as any[],
   dialogContents: [] as any[],
+  tabs: [] as any[],
 }));
 
 const stateMock = vi.hoisted(() => ({
@@ -109,20 +111,34 @@ vi.mock("@subboost/ui/components/ui/dialog", () => ({
     mocks.dialogContents.push(props);
     return React.createElement("section", null, props.children);
   },
+  DialogBody: (props: any) => React.createElement("div", null, props.children),
   DialogHeader: (props: any) => React.createElement("header", null, props.children),
   DialogTitle: (props: any) => React.createElement("h2", null, props.children),
 }));
 vi.mock("@subboost/ui/components/ui/switch", () => ({ Switch: () => null }));
+// Content follows the latest Tabs value, as Radix unmounts inactive pages.
+vi.mock("@subboost/ui/components/ui/tabs", () => ({
+  Tabs: (props: any) => {
+    mocks.tabs.push(props);
+    return React.createElement("div", null, props.children);
+  },
+  TabsList: (props: any) => React.createElement("div", null, props.children),
+  TabsTrigger: (props: any) => React.createElement("button", null, props.children),
+  TabsContent: (props: any) =>
+    props.value === mocks.tabs[mocks.tabs.length - 1]?.value ? React.createElement("div", null, props.children) : null,
+}));
+
 
 import { TailscaleSourceForm } from "./tailscale-source-form";
 import { SourceEditorDialog } from "./source-editor-dialog";
-import { TailscaleDraftDialog } from "./tailscale-draft-dialog";
 import { AddSourceMenu } from "./source-controls";
 
-function documentOf(content: string): TailscaleSourceDocument {
-  const result = parseTailscaleSourceDocument(content);
+function valuesOf(content: string, index = 0): TailscaleFormValues {
+  const read = readYamlSource(content);
+  if (!read.ok) throw new Error(read.reason);
+  const result = readTailscaleFormValues(read.document.entries[index].node);
   if (!result.ok) throw new Error(result.reason);
-  return result.document;
+  return result.values;
 }
 
 function reset() {
@@ -132,6 +148,7 @@ function reset() {
   mocks.chips = [];
   mocks.dialogs = [];
   mocks.dialogContents = [];
+  mocks.tabs = [];
 }
 
 function button(label: string) {
@@ -140,398 +157,363 @@ function button(label: string) {
   return found;
 }
 
-function renderForm(
-  content: string,
-  extra: Partial<React.ComponentProps<typeof TailscaleSourceForm>> = {},
-  stateOverrides: Record<number, unknown> = {}
-) {
+function withState<T>(overrides: Record<number, unknown>, render: () => T): T {
   reset();
   stateMock.enabled = true;
   stateMock.callIndex = 0;
-  stateMock.overrides = stateOverrides;
+  stateMock.overrides = overrides;
   stateMock.setters = [];
-  const handlers = { onApply: vi.fn(), onCancel: vi.fn(), onSwitchToRaw: vi.fn() };
   try {
-    const html = renderToStaticMarkup(React.createElement(TailscaleSourceForm, {
-      document: documentOf(content),
-      knownStateDirs: [],
-      applyLabel: "应用",
-      ...handlers,
-      ...extra,
-    }));
-    return { html, handlers, setters: stateMock.setters };
+    return render();
   } finally {
     stateMock.enabled = false;
   }
+}
+
+const TS = "- {name: ts, type: tailscale}\n";
+
+function renderForm(
+  initial: TailscaleFormValues,
+  extra: Partial<React.ComponentProps<typeof TailscaleSourceForm>> = {},
+  stateOverrides: Record<number, unknown> = {}
+) {
+  const handlers = { onApply: vi.fn(), toContent: vi.fn((values: TailscaleFormValues) => `content:${values.name}`) };
+  const html = withState(stateOverrides, () => renderToStaticMarkup(React.createElement(TailscaleSourceForm, {
+    initial,
+    knownStateDirs: [],
+    applyLabel: "应用",
+    secondaryAction: React.createElement("button", null, "完成"),
+    ...handlers,
+    ...extra,
+  })));
+  return { html, handlers, setters: stateMock.setters };
 }
 
 describe("TailscaleSourceForm", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("groups login, routing and advanced fields and masks the auth key", () => {
-    const { html } = renderForm("- {name: ts, type: tailscale, auth-key: tskey-auth-placeholder, accept-routes: false}\n");
+    const { html } = renderForm(valuesOf("- {name: ts, type: tailscale, auth-key: tskey-auth-placeholder, accept-routes: false}\n"));
     expect(html).toContain("登录");
     expect(html).toContain("路由偏好");
     expect(html).toContain("高级设置");
+    expect(html).toContain("<button>完成</button>");
     expect(html).toContain("认证密钥 auth-key（可选）");
     expect(html).toContain("持有订阅链接或配置文件的人都能读取");
     // Routing caveats live in the heading's help popover.
     expect(mocks.buttons.some((props) => props["aria-label"] === "路由偏好说明")).toBe(true);
     expect(html).toContain("不会把本设备发布为出口节点");
-    expect(html).toContain("公网 URL 测速中可能显示失败");
-    expect(html).toContain("不一定会重置客户端已保存的运行时偏好");
-    expect(html).not.toContain("只校验本地配置格式");
-    expect(html).not.toContain("不为 Tailscale 启用 UDP");
     // Choice-group headings are not labels: they have no single control to point at.
     expect(html).toMatch(/<p[^>]*>接受子网路由 accept-routes<\/p>/);
-    expect(html).not.toMatch(/<label[^>]*>接受子网路由/);
     expect(mocks.inputs.find((props) => props.value === "tskey-auth-placeholder")?.type).toBe("password");
     const selected = mocks.chips.filter((chip) => chip.selected).map((chip) => chip.label);
     // Render order: accept-routes, exit-node-allow-lan-access, ephemeral, udp.
     expect(selected).toEqual(["禁用", "默认", "默认", "默认"]);
   });
 
-  it("applies an unchanged form with the original bytes", () => {
-    const content = "# keep me\n- name: ts  # trailing\n  type: tailscale\n";
-    const { handlers } = renderForm(content);
+  it("applies valid values through toContent and keeps invalid ones out", () => {
+    const valid = renderForm(valuesOf(TS));
     button("应用").onClick();
-    expect(handlers.onApply).toHaveBeenCalledWith(content);
+    expect(valid.handlers.toContent).toHaveBeenCalledWith(expect.objectContaining({ name: "ts" }));
+    expect(valid.handlers.onApply).toHaveBeenCalledWith("content:ts");
+
+    const invalid = renderForm(valuesOf("- {name: '', type: tailscale}\n"));
+    button("应用").onClick();
+    expect(invalid.handlers.toContent).not.toHaveBeenCalled();
+    expect(invalid.handlers.onApply).not.toHaveBeenCalled();
   });
 
-  it("does not apply an invalid draft", () => {
-    const { handlers } = renderForm("- {name: '', type: tailscale}\n");
+  it("shows why the YAML could not be written", () => {
+    const { handlers, setters } = renderForm(valuesOf(TS), {
+      toContent: () => {
+        throw new Error("本 YAML 中已有同名节点");
+      },
+    });
     button("应用").onClick();
     expect(handlers.onApply).not.toHaveBeenCalled();
+    expect(setters[2]).toHaveBeenCalledWith("本 YAML 中已有同名节点");
   });
 
-  it("switches to raw without writing when nothing changed", () => {
-    const { handlers } = renderForm("- {name: ts, type: tailscale}\n");
-    button("切换到 YAML").onClick();
-    expect(handlers.onSwitchToRaw).toHaveBeenCalledWith(null);
-    button("取消").onClick();
-    expect(handlers.onCancel).toHaveBeenCalledTimes(1);
+  it("explains a write failure that carries no message", () => {
+    const { setters } = renderForm(valuesOf(TS), {
+      toContent: () => {
+        throw "boom";
+      },
+    });
+    button("应用").onClick();
+    expect(setters[2]).toHaveBeenCalledWith("无法生成 Tailscale YAML");
   });
 
   it("warns about a duplicate known state directory without blocking", () => {
-    const { html, handlers } = renderForm("- {name: ts, type: tailscale}\n", { knownStateDirs: ["./tailscale"] });
+    const { html, handlers } = renderForm(valuesOf(TS), { knownStateDirs: ["./tailscale"] });
     expect(html).toContain("可能共享登录状态");
     button("应用").onClick();
     expect(handlers.onApply).toHaveBeenCalledTimes(1);
   });
 
   describe("leaving with unapplied edits", () => {
-    const content = "- {name: ts, type: tailscale}\n";
-    const edited = () => ({ 0: { ...documentOf(content).initial, name: "office" } });
+    const edited = () => ({ 0: { ...valuesOf(TS), name: "office" } });
 
-    it("asks before discarding when confirmDiscard is set", () => {
+    it("asks before a leave request drops edits", () => {
       const ref = { current: null as any };
-      const { handlers, setters } = renderForm(content, { cancelLabel: "关闭", confirmDiscard: true, ref }, edited());
-      button("关闭").onClick();
-      expect(setters[3]).toHaveBeenCalledWith("close");
-      ref.current.requestClose();
-      expect(setters[3]).toHaveBeenCalledTimes(2);
-      expect(handlers.onCancel).not.toHaveBeenCalled();
+      const { setters } = renderForm(valuesOf(TS), { ref }, edited());
+      const leave = { apply: vi.fn(), discard: vi.fn() };
+      ref.current.requestClose(leave);
+      expect(setters[3]).toHaveBeenCalledWith(true);
+      expect(leave.discard).not.toHaveBeenCalled();
     });
 
-    it("leaves at once when nothing changed or no confirmation is wanted", () => {
-      const clean = renderForm(content, { cancelLabel: "关闭", confirmDiscard: true });
-      button("关闭").onClick();
-      expect(clean.handlers.onCancel).toHaveBeenCalledTimes(1);
+    it("leaves at once when nothing changed", () => {
+      const ref = { current: null as any };
+      const clean = renderForm(valuesOf(TS), { ref });
+      const leave = { apply: vi.fn(), discard: vi.fn() };
+      ref.current.requestClose(leave);
+      expect(leave.discard).toHaveBeenCalledTimes(1);
       expect(clean.setters[3]).not.toHaveBeenCalled();
-
-      const draft = renderForm(content, {}, edited());
-      button("取消").onClick();
-      expect(draft.handlers.onCancel).toHaveBeenCalledTimes(1);
-      expect(draft.setters[3]).not.toHaveBeenCalled();
     });
 
-    it("applies, discards or keeps editing from the close confirmation", () => {
-      const { html, handlers, setters } = renderForm(content, { confirmDiscard: true }, { ...edited(), 3: "close" });
+    it("applies, discards or keeps editing through the requested exit", () => {
+      const ref = { current: null as any };
+      const { html, handlers, setters } = renderForm(valuesOf(TS), { ref }, { ...edited(), 3: true });
       expect(html).toContain("表单有未应用的修改");
-      expect(mocks.buttons.some((props) => props.children === "应用并切换")).toBe(false);
+      const leave = { apply: vi.fn(), discard: vi.fn() };
+      ref.current.requestClose(leave);
 
-      button("应用并关闭").onClick();
-      expect(handlers.onApply).toHaveBeenCalledWith(expect.stringContaining("office"));
-      expect(handlers.onSwitchToRaw).not.toHaveBeenCalled();
+      button("应用修改").onClick();
+      expect(leave.apply).toHaveBeenCalledWith("content:office");
+      expect(handlers.onApply).not.toHaveBeenCalled();
 
-      button("放弃修改并关闭").onClick();
-      expect(handlers.onCancel).toHaveBeenCalledTimes(1);
-      expect(handlers.onSwitchToRaw).not.toHaveBeenCalled();
+      button("放弃修改").onClick();
+      expect(leave.discard).toHaveBeenCalledTimes(1);
 
       button("继续编辑").onClick();
-      expect(setters[3]).toHaveBeenCalledWith(null);
+      expect(setters[3]).toHaveBeenCalledWith(false);
+    });
+
+    it("keeps the confirmation when the pending edits are invalid", () => {
+      const ref = { current: null as any };
+      renderForm(valuesOf(TS), { ref }, { 0: { ...valuesOf(TS), name: " " }, 3: true });
+      const leave = { apply: vi.fn(), discard: vi.fn() };
+      ref.current.requestClose(leave);
+      button("应用修改").onClick();
+      expect(leave.apply).not.toHaveBeenCalled();
     });
   });
 
-  it("updates fields, clears field errors, and handles dirty raw switching and serialization errors", () => {
-    const doc = documentOf("- {name: ts, type: tailscale}\n");
-    const dirtyValues = { ...doc.initial, name: "office", hostname: "dev", authKey: "k", controlUrl: "https://local.subboost.test", exitNode: "203.0.113.10", stateDir: "tailscale/dev" };
-    const { html, handlers, setters } = renderForm(
-      "- {name: ts, type: tailscale}\n",
-      {},
-      { 0: dirtyValues, 1: { name: "请输入节点名称" }, 2: "生成失败", 3: "raw" }
-    );
-    expect(html).toContain("表单有未应用的修改");
-    expect(html).toContain("生成失败");
-
-    for (const input of mocks.inputs) {
-      input.onChange?.({ target: { value: "next-val" } });
-    }
-    for (const chip of mocks.chips) {
-      chip.onClick?.();
-    }
+  it("updates fields and clears only the errors of edited fields", () => {
+    const { setters } = renderForm(valuesOf(TS), {}, { 1: { name: "请输入节点名称" }, 2: "生成失败" });
+    for (const input of mocks.inputs) input.onChange?.({ target: { value: "next-val" } });
+    for (const chip of mocks.chips) chip.onClick?.();
     expect(setters[0]).toHaveBeenCalled();
-    expect(setters[1]).toHaveBeenCalled();
     expect(setters[2]).toHaveBeenCalledWith(null);
 
-    button("切换到 YAML").onClick();
-    expect(setters[3]).toHaveBeenCalledWith("raw");
-
-    button("应用并切换").onClick();
-    expect(handlers.onSwitchToRaw).toHaveBeenCalledWith(expect.stringContaining("office"));
-
-    button("放弃修改并切换").onClick();
-    expect(handlers.onSwitchToRaw).toHaveBeenCalledWith(null);
-
-    button("继续编辑").onClick();
-    expect(setters[3]).toHaveBeenCalledWith(null);
-
-    //Without onSwitchToRaw, the switch button is omitted; calling handleSwitchToRaw is a no-op; invalid dirty values do not switch.
-    const invalidDirty = renderForm(
-      "- {name: ts, type: tailscale}\n",
-      { onSwitchToRaw: undefined },
-      { 0: { ...doc.initial, controlUrl: "not-a-url" }, 3: "raw" }
-    );
-    expect(mocks.buttons.some((b) => b.children === "切换到 YAML")).toBe(false);
-    button("应用并切换").onClick();
-    expect(invalidDirty.handlers.onApply).not.toHaveBeenCalled();
-
-    // Update a field that does not currently have an error so the no-error branch of setErrors runs.
-    const cleanFieldUpdate = renderForm("- {name: ts, type: tailscale}\n", {}, { 1: { controlUrl: "err" } });
+    const other = renderForm(valuesOf(TS), {}, { 1: { controlUrl: "err" } });
     mocks.inputs[0].onChange?.({ target: { value: "valid-name" } });
-    expect((cleanFieldUpdate.setters[1] as any).lastValue).toEqual({ controlUrl: "err" });
-
-    // Serialization exception surfaces in applyError.
-    const brokenDoc: TailscaleSourceDocument = { content: "proxies: [\n", initial: doc.initial };
-    reset();
-    stateMock.enabled = true;
-    stateMock.callIndex = 0;
-    stateMock.overrides = { 0: dirtyValues };
-    stateMock.setters = [];
-    try {
-      renderToStaticMarkup(React.createElement(TailscaleSourceForm, {
-        document: brokenDoc,
-        knownStateDirs: [],
-        applyLabel: "应用",
-        onApply: vi.fn(),
-        onCancel: vi.fn(),
-      }));
-      button("应用").onClick();
-      expect(stateMock.setters[2]).toHaveBeenCalledWith(expect.any(String));
-    } finally {
-      stateMock.enabled = false;
-    }
+    expect((other.setters[1] as any).lastValue).toEqual({ controlUrl: "err" });
   });
 });
 
-describe("AddSourceMenu Tailscale item", () => {
-  it("renders the Tailscale item in full and compact modes when onAddTailscale is provided", () => {
-    const onAdd = vi.fn();
-    const onAddTailscale = vi.fn();
+describe("AddSourceMenu", () => {
+  it("offers Tailscale only inside the YAML editor, not as its own source type", () => {
     reset();
-    const full = renderToStaticMarkup(React.createElement(AddSourceMenu, {
-      open: true,
-      onOpenChange: vi.fn(),
-      onAdd,
-      onAddTailscale,
-    }));
-    expect(full).toContain("Tailscale 节点");
-    expect(full).toContain("用表单添加 Tailscale / Headscale 出站");
-    expect(full).not.toContain("保存为 YAML 源");
-    mocks.buttons.at(-1)?.onClick();
-    expect(onAddTailscale).toHaveBeenCalledTimes(1);
-
-    reset();
-    const compact = renderToStaticMarkup(React.createElement(AddSourceMenu, {
-      open: true,
-      onOpenChange: vi.fn(),
-      onAdd,
-      onAddTailscale,
-      compact: true,
-    }));
-    expect(compact).toContain("Tailscale 节点");
-    expect(compact).not.toContain("用表单添加 Tailscale / Headscale 出站");
-
-    reset();
-    const withoutTailscale = renderToStaticMarkup(React.createElement(AddSourceMenu, {
-      open: true,
-      onOpenChange: vi.fn(),
-      onAdd,
-    }));
-    expect(withoutTailscale).not.toContain("Tailscale 节点");
-  });
-
-  it("renders the draft dialog when a draft is present and cancels when closed", () => {
-    reset();
-    const onApply = vi.fn();
-    const onCancel = vi.fn();
-    const draft = documentOf("- {name: ts, type: tailscale}\n");
-    const html = renderToStaticMarkup(React.createElement(TailscaleDraftDialog, {
-      draft,
-      knownStateDirs: [],
-      onApply,
-      onCancel,
-    }));
-    expect(html).toContain("添加 Tailscale 节点");
-    expect(html).toContain("添加并导入");
-    expect(html).toContain("取消");
-    // The same form keeps the same width when adding and when editing a source.
-    expect(mocks.dialogContents[0].className).toContain("sm:max-w-4xl");
-    mocks.dialogs[0].onOpenChange(true);
-    expect(onCancel).not.toHaveBeenCalled();
-    mocks.dialogs[0].onOpenChange(false);
-    expect(onCancel).toHaveBeenCalledTimes(1);
-
-    reset();
-    const emptyHtml = renderToStaticMarkup(React.createElement(TailscaleDraftDialog, {
-      draft: null,
-      knownStateDirs: [],
-      onApply,
-      onCancel,
-    }));
-    expect(emptyHtml).not.toContain("添加并导入");
+    const html = renderToStaticMarkup(React.createElement(AddSourceMenu, { open: true, onOpenChange: vi.fn(), onAdd: vi.fn() }));
+    expect(html).toContain("YAML 配置");
+    expect(html).not.toContain("Tailscale");
   });
 });
 
-describe("SourceEditorDialog YAML modes", () => {
+describe("SourceEditorDialog", () => {
   // The label above the content editor, distinct from the dialog title.
   const CONTENT_LABEL = '<p class="text-xs text-fg-60">YAML 配置</p>';
-  const props = (source: any, onApplyContent: any) => ({
-    source,
-    previewName: "Node",
-    onClose: vi.fn(),
-    onUpdateContent: vi.fn(),
-    onUpdateMeta: vi.fn(),
-    onApplyContent,
-    tailscaleStateDirs: [],
+  const MIXED = "# home\nproxies:\n  - {name: hk, type: ss, server: 203.0.113.1, port: 443, cipher: aes-128-gcm, password: p}\n  - name: ts\n    type: tailscale\n";
+  const yamlSource = (content: string) => ({ id: "y", type: "yaml", content });
+  const DRAFT = { ...valuesOf(TS), name: "office", stateDir: "tailscale/a" };
+  // State order: page, selection, draft, then the form's values, errors, applyError, confirming.
+  const onPage = (selection: "new" | number, extra: Record<number, unknown> = {}) => ({ 0: "tailscale", 1: selection, 2: DRAFT, ...extra });
+  const edited = () => ({ ...valuesOf(MIXED, 1), hostname: "laptop" });
+
+  function renderEditor(source: any, overrides: Record<number, unknown> = {}) {
+    const props = {
+      source,
+      previewName: "Node",
+      onClose: vi.fn(),
+      onUpdateContent: vi.fn(),
+      onUpdateMeta: vi.fn(),
+      onApplyContent: vi.fn(),
+      tailscaleStateDirs: [],
+    };
+    const html = withState(overrides, () => renderToStaticMarkup(React.createElement(SourceEditorDialog, props)));
+    return { html, props, setters: stateMock.setters, tabs: mocks.tabs[0] };
+  }
+
+  const chip = (text: string) => {
+    const found = mocks.chips.find((props) => renderToStaticMarkup(React.createElement(React.Fragment, null, props.label)).includes(text));
+    if (!found) throw new Error(`missing chip ${text}`);
+    return found;
+  };
+
+  it("opens on the YAML page, with Tailscale on its own page", () => {
+    const { html, tabs } = renderEditor(yamlSource(MIXED));
+    expect(tabs.value).toBe("yaml");
+    expect(html).toContain(CONTENT_LABEL);
+    expect(html).toContain("标签（tag）");
+    expect(html).toContain(">Tailscale</button>");
+    expect(html).not.toContain("Tailscale / Headscale");
+    expect(mocks.buttons.some((props) => props.children === "完成")).toBe(true);
+    // Text editors take a fixed share of the screen; the text area absorbs the rest.
+    expect(mocks.dialogContents[0].className).toContain("h-[85dvh]");
   });
 
-  it("opens compatible YAML in the Tailscale form and switches between form and raw modes", () => {
-    reset();
-    const onUpdateContent = vi.fn();
-    const html = renderToStaticMarkup(React.createElement(SourceEditorDialog, {
-      ...props({ id: "y", type: "yaml", content: "- {name: ts, type: tailscale}\n" }, vi.fn()),
-      onUpdateContent,
-    }));
-    expect(html).toContain("路由偏好");
-    expect(mocks.textareas).toHaveLength(0);
-
-    // Switch to raw without changes, then with changes.
-    button("切换到 YAML").onClick();
-    expect(onUpdateContent).not.toHaveBeenCalled();
-
-    // Render in raw mode when form is available, and switch back to form mode.
-    reset();
-    stateMock.enabled = true;
-    stateMock.callIndex = 0;
-    stateMock.overrides = { 0: "raw" };
-    stateMock.setters = [];
-    try {
-      const rawHtml = renderToStaticMarkup(React.createElement(SourceEditorDialog, {
-        ...props({ id: "y", type: "yaml", content: "- {name: ts, type: tailscale}\n" }, vi.fn()),
-        onUpdateContent,
-      }));
-      expect(rawHtml).toContain("切换到 Tailscale 表单");
-      button("切换到 Tailscale 表单").onClick();
-      expect(stateMock.setters[0]).toHaveBeenCalledWith("form");
-    } finally {
-      stateMock.enabled = false;
-    }
-
-    // Switching to raw with applied content updates the source content before entering raw mode.
-    const doc = documentOf("- {name: ts, type: tailscale}\n");
-    reset();
-    stateMock.enabled = true;
-    stateMock.callIndex = 0;
-    stateMock.overrides = { 0: "form", 1: { ...doc.initial, name: "renamed" }, 4: "raw" };
-    stateMock.setters = [];
-    try {
-      renderToStaticMarkup(React.createElement(SourceEditorDialog, {
-        ...props({ id: "y", type: "yaml", content: "- {name: ts, type: tailscale}\n" }, vi.fn()),
-        onUpdateContent,
-      }));
-      button("应用并切换").onClick();
-      expect(onUpdateContent).toHaveBeenCalledWith("y", expect.stringContaining("renamed"));
-      expect(stateMock.setters[0]).toHaveBeenCalledWith("raw");
-    } finally {
-      stateMock.enabled = false;
-    }
+  it("starts the Tailscale page on a new node with a free name", () => {
+    const { tabs, setters } = renderEditor(yamlSource("proxies:\n  - {name: tailscale, type: tailscale}\n"));
+    tabs.onValueChange("tailscale");
+    expect(setters[0]).toHaveBeenCalledWith("tailscale");
+    expect(setters[1]).toHaveBeenCalledWith("new");
+    expect(setters[2]).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "tailscale-2", stateDir: expect.stringMatching(/^tailscale\/subboost-/) })
+    );
   });
 
-  it("keeps unsupported YAML and editors without an apply handler in raw mode", () => {
-    for (const [content, apply] of [
-      ["proxies:\n  - {name: a, type: tailscale}\n  - {name: b, type: tailscale}\n", vi.fn()],
-      ["- {name: ts, type: tailscale}\n", undefined],
-    ] as const) {
-      reset();
-      const html = renderToStaticMarkup(React.createElement(SourceEditorDialog, props({ id: "y", type: "yaml", content }, apply)));
-      expect(html).not.toContain("路由偏好");
-      expect(html).toContain(CONTENT_LABEL);
-      expect(mocks.textareas[0].value).toBe(content);
-    }
+  it("adds a node from the Tailscale page and returns to the YAML", () => {
+    const { html, props, setters } = renderEditor(yamlSource(MIXED), onPage("new"));
+    expect(html).toContain("写入这份 YAML 的 proxies 列表");
+    // The client requirement lives on the page rather than in a separate document.
+    expect(html).toContain("v1.19.25");
+    expect(html).not.toContain(CONTENT_LABEL);
+    expect(chip("新建节点").selected).toBe(true);
+    expect(chip("ts").selected).toBe(false);
+    expect(mocks.buttons.some((props) => props.children === "完成")).toBe(true);
+
+    button("添加到 YAML").onClick();
+    expect(props.onUpdateContent).toHaveBeenCalledWith("y", `${MIXED}  - name: office\n    type: tailscale\n    state-dir: tailscale/a\n`);
+    expect(setters[0]).toHaveBeenCalledWith("yaml");
   });
 
-  describe("closing", () => {
-    const tailscaleSource = { id: "y", type: "yaml", content: "- {name: ts, type: tailscale}\n" };
+  it("edits a node chosen on the page, writing only when something changed", () => {
+    const changed = renderEditor(yamlSource(MIXED), onPage(1, { 3: edited() }));
+    expect(chip("ts").selected).toBe(true);
+    button("应用到 YAML").onClick();
+    expect(changed.props.onUpdateContent).toHaveBeenCalledWith("y", `${MIXED}    hostname: laptop\n`);
+    expect(changed.setters[0]).toHaveBeenCalledWith("yaml");
 
-    function renderEditor(source: any, overrides: Record<number, unknown> = {}) {
-      reset();
-      stateMock.enabled = true;
-      stateMock.callIndex = 0;
-      stateMock.overrides = overrides;
-      stateMock.setters = [];
-      const editorProps = props(source, vi.fn());
-      try {
-        const html = renderToStaticMarkup(React.createElement(SourceEditorDialog, editorProps));
-        return { html, onClose: editorProps.onClose };
-      } finally {
-        stateMock.enabled = false;
-      }
-    }
+    const unchanged = renderEditor(yamlSource(MIXED), onPage(1));
+    button("应用到 YAML").onClick();
+    expect(unchanged.props.onUpdateContent).not.toHaveBeenCalled();
+    expect(unchanged.setters[0]).toHaveBeenCalledWith("yaml");
+  });
 
-    it("leaves the form's own actions in charge and drops the duplicate label and footer", () => {
-      const { html, onClose } = renderEditor(tailscaleSource);
-      expect(html).toContain("路由偏好");
-      expect(html).not.toContain(CONTENT_LABEL);
-      expect(mocks.buttons.some((props) => props.children === "完成")).toBe(false);
-      expect(mocks.buttons.some((props) => props.children === "取消")).toBe(false);
-      button("关闭").onClick();
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+  it("switches nodes and pages at once when the form is clean", () => {
+    const { tabs, setters } = renderEditor(yamlSource(MIXED), onPage(1));
+    chip("新建节点").onClick();
+    expect(setters[1]).toHaveBeenCalledWith("new");
+    expect(setters[2]).toHaveBeenCalledWith(expect.objectContaining({ name: "tailscale" }));
+    tabs.onValueChange("yaml");
+    expect(setters[0]).toHaveBeenCalledWith("yaml");
+  });
 
-    it("asks before the dialog's own close drops unapplied form edits", () => {
-      const doc = documentOf(tailscaleSource.content);
-      const { onClose } = renderEditor(tailscaleSource, { 1: { ...doc.initial, name: "renamed" } });
-      mocks.dialogs[0].onOpenChange(false);
-      expect(onClose).not.toHaveBeenCalled();
-      expect(stateMock.setters[4]).toHaveBeenCalledWith("close");
+  it("asks before another node or page drops unapplied edits", () => {
+    const dirty = renderEditor(yamlSource(MIXED), onPage(1, { 3: edited() }));
+    chip("新建节点").onClick();
+    dirty.tabs.onValueChange("yaml");
+    expect(dirty.setters[6]).toHaveBeenCalledTimes(2);
+    expect(dirty.setters[1]).not.toHaveBeenCalled();
+    expect(dirty.setters[0]).not.toHaveBeenCalled();
 
-      const clean = renderEditor(tailscaleSource);
-      mocks.dialogs[0].onOpenChange(false);
-      expect(clean.onClose).toHaveBeenCalledTimes(1);
-    });
+    // With the confirmation open: applying writes the node, then makes the requested switch.
+    const confirming = renderEditor(yamlSource(MIXED), onPage(1, { 3: edited(), 6: true }));
+    chip("新建节点").onClick();
+    button("应用修改").onClick();
+    expect(confirming.props.onUpdateContent).toHaveBeenCalledWith("y", `${MIXED}    hostname: laptop\n`);
+    expect(confirming.setters[1]).toHaveBeenCalledWith("new");
 
-    it("closes at once from raw mode and from other source types", () => {
-      const raw = renderEditor(tailscaleSource, { 0: "raw" });
-      expect(raw.html).toContain(CONTENT_LABEL);
-      mocks.dialogs[0].onOpenChange(false);
-      expect(raw.onClose).toHaveBeenCalledTimes(1);
-      button("完成").onClick();
-      expect(raw.onClose).toHaveBeenCalledTimes(2);
+    const discarding = renderEditor(yamlSource(MIXED), onPage(1, { 3: edited(), 6: true }));
+    discarding.tabs.onValueChange("yaml");
+    button("放弃修改").onClick();
+    expect(discarding.props.onUpdateContent).not.toHaveBeenCalled();
+    expect(discarding.setters[0]).toHaveBeenCalledWith("yaml");
+  });
 
-      const nodes = renderEditor({ id: "n", type: "nodes", content: "ss://node" });
-      mocks.dialogs[0].onOpenChange(false);
-      expect(nodes.onClose).toHaveBeenCalledTimes(1);
-    });
+  it("asks before closing the dialog drops unapplied edits, and can apply and close", () => {
+    const dirty = renderEditor(yamlSource(MIXED), onPage(1, { 3: edited() }));
+    mocks.dialogs[0].onOpenChange(false);
+    button("完成").onClick();
+    expect(dirty.props.onClose).not.toHaveBeenCalled();
+    expect(dirty.setters[6]).toHaveBeenCalledTimes(2);
+
+    const confirming = renderEditor(yamlSource(MIXED), onPage(1, { 3: edited(), 6: true }));
+    mocks.dialogs[0].onOpenChange(false);
+    button("应用修改").onClick();
+    expect(confirming.props.onApplyContent).toHaveBeenCalledWith(`${MIXED}    hostname: laptop\n`);
+    button("放弃修改").onClick();
+    expect(confirming.props.onClose).toHaveBeenCalledTimes(1);
+
+    const clean = renderEditor(yamlSource(MIXED), onPage(1));
+    mocks.dialogs[0].onOpenChange(false);
+    expect(clean.props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes at once from the YAML page and from other source types", () => {
+    const text = renderEditor(yamlSource(MIXED));
+    mocks.dialogs[0].onOpenChange(false);
+    button("完成").onClick();
+    expect(text.props.onClose).toHaveBeenCalledTimes(2);
+
+    const url = renderEditor({ id: "u", type: "url", content: "https://local.subboost.test/sub" });
+    expect(mocks.tabs).toHaveLength(0);
+    expect(mocks.dialogContents[0].className).not.toContain("h-[85dvh]");
+    mocks.dialogs[0].onOpenChange(false);
+    expect(url.props.onClose).toHaveBeenCalledTimes(1);
+
+    renderEditor({ id: "n", type: "nodes", content: "ss://node" });
+    expect(mocks.dialogContents[0].className).toContain("h-[85dvh]");
+  });
+
+  it("ignores requests for the page or node already shown", () => {
+    const { tabs, setters } = renderEditor(yamlSource(MIXED), onPage("new"));
+    tabs.onValueChange("tailscale");
+    chip("新建节点").onClick();
+    expect(setters[0]).not.toHaveBeenCalled();
+    expect(setters[1]).not.toHaveBeenCalled();
+
+    // A clean form switches straight to an existing node without a new draft.
+    chip("ts").onClick();
+    expect(setters[1]).toHaveBeenCalledWith(1);
+    expect(setters[2]).not.toHaveBeenCalled();
+  });
+
+  it("lists nodes the form cannot read and explains when one is chosen", () => {
+    const ODD = "proxies:\n  - {type: tailscale, state-dir: tailscale/x}\n  - {name: odd, type: tailscale, hostname: [a]}\n";
+    const unnamed = renderEditor(yamlSource(ODD), onPage(0));
+    expect(chip("（未命名）").selected).toBe(true);
+    expect(unnamed.html).toContain("名称");
+
+    const odd = renderEditor(yamlSource(ODD), onPage(1));
+    expect(odd.html).toContain("hostname 不是字符串");
+    // Without a form, the YAML page opens at once.
+    odd.tabs.onValueChange("yaml");
+    expect(odd.setters[0]).toHaveBeenCalledWith("yaml");
+
+    const missing = renderEditor(yamlSource(ODD), onPage(5));
+    expect(missing.html).toContain("找不到该节点");
+  });
+
+  it("starts a fresh draft even when the YAML cannot be read", () => {
+    const { tabs, setters } = renderEditor(yamlSource("x: &a v\n"));
+    tabs.onValueChange("tailscale");
+    expect(setters[2]).toHaveBeenCalledWith(expect.objectContaining({ name: "tailscale" }));
+  });
+
+  it("explains on the page when the form cannot write this YAML", () => {
+    const anchored = renderEditor(yamlSource("x: &a v\nproxies:\n  - {name: ts, type: tailscale, hostname: *a}\n"), onPage("new"));
+    expect(anchored.html).toContain("无法用表单写入这份 YAML");
+    expect(anchored.html).toContain("YAML 锚点");
+    button("完成").onClick();
+    expect(anchored.props.onClose).toHaveBeenCalledTimes(1);
+
+    const inline = renderEditor(yamlSource("proxies: [{name: ts, type: tailscale}]\n"), onPage("new"));
+    expect(inline.html).toContain("行内列表");
+    expect(mocks.buttons.some((props) => props.children === "添加到 YAML")).toBe(false);
+    renderEditor(yamlSource("proxies: [{name: ts, type: tailscale}]\n"), onPage(0));
+    expect(mocks.buttons.some((props) => props.children === "应用到 YAML")).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import { Button } from "@subboost/ui/components/ui/button";
 import { ChoiceChip, ChoiceGroup } from "@subboost/ui/components/ui/choice-group";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -69,7 +70,7 @@ export function TemplateUploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="flex flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-primary-500" />
@@ -80,7 +81,7 @@ export function TemplateUploadDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <DialogBody className="space-y-4 py-4">
           <FormField label="模板名称" required>
             <Input
               placeholder="例如：流媒体优化配置"
@@ -174,7 +175,7 @@ export function TemplateUploadDialog({
               onCheckedChange={(checked) => onPublicChange(checked)}
             />
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

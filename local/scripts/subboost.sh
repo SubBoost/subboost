@@ -14,6 +14,7 @@ TMP_DIR=""
 say() { printf '%s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 is_root() { [ "$(id -u)" = "0" ]; }
+same_content() { [ "$(cat -- "$1" 2>/dev/null; printf x)" = "$(cat -- "$2" 2>/dev/null; printf x)" ]; }
 
 sudo_do() {
   if is_root; then "$@"; else sudo "$@"; fi
@@ -442,11 +443,12 @@ update_cmd() {
     download_to_temp "$compose_url" "$candidate_compose"
     download_to_temp "$manager_url" "$candidate_manager"
     [ -s "$candidate_manager" ] && bash -n "$candidate_manager" || die "Candidate manager is invalid."
-    if [ "${SUBBOOST_REQUIRE_MANAGER_UPDATE:-0}" = "1" ]; then
-      cmp -s "$candidate_manager" "$0" || die "The release manager does not match the downloaded manager; update aborted."
-    fi
+    # Cross-version contract: a differing release manager runs this update itself as `SUBBOOST_MANAGER_HANDOFF=1 <manager> update`.
+    if [ "${SUBBOOST_MANAGER_HANDOFF:-0}" = "1" ]; then same_content "$candidate_manager" "$0" || die "The release manager does not match the downloaded manager; update aborted."
+    elif [ "${SUBBOOST_SCRIPT_SOURCE_ONLY:-0}" != "1" ] && ! same_content "$candidate_manager" "$0"; then
+      say "Handing this update to the release manager..."; SUBBOOST_MANAGER_HANDOFF=1 bash "$candidate_manager" update; return; fi
   else
-    [ "${SUBBOOST_REQUIRE_MANAGER_UPDATE:-0}" != "1" ] || die "Release manifest unavailable; secure manager update aborted."
+    [ "${SUBBOOST_MANAGER_HANDOFF:-0}" != "1" ] || die "Release manifest unavailable; manager handoff aborted."
     say "Release manifest unavailable; updating current image and compose only."
     cp "$COMPOSE_FILE" "$candidate_compose"
     if [ -f "${SUBBOOST_BIN:-/usr/local/bin/subboost}" ]; then

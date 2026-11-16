@@ -160,6 +160,7 @@ vi.mock("@subboost/ui/components/ui/dialog", () => ({
     return React.createElement("div", { "data-open": props.open }, props.children);
   },
   DialogContent: (props: any) => React.createElement("section", props, props.children),
+  DialogBody: (props: any) => React.createElement("div", props, props.children),
   DialogHeader: (props: any) => React.createElement("header", props, props.children),
   DialogTitle: (props: any) => React.createElement("h2", props, props.children),
 }));

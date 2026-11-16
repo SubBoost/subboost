@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useUIStore } from "@subboost/ui/store/ui-store";
 import { useSubscriptionLink } from "./use-subscription-link";
 import { makeAdapter, makeOptions, response } from "./use-subscription-link.test-helpers";
 
@@ -31,6 +32,8 @@ const mocks = vi.hoisted(() => {
     useConfigStore,
     useProductInteractionAdapter: vi.fn(() => bag.interactions),
     useCallback: vi.fn((callback: unknown) => callback),
+    // Effects never run; the last call's dependencies show what the unapplied-input guard sees.
+    useEffect: vi.fn(),
     useMemo: vi.fn((factory: () => unknown) => factory()),
     useState: vi.fn((initial: unknown) => {
       const index = bag.stateIndex;
@@ -48,6 +51,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("react", () => ({
   useCallback: mocks.useCallback,
+  useEffect: mocks.useEffect,
   useMemo: mocks.useMemo,
   useState: mocks.useState,
 }));
@@ -102,6 +106,7 @@ describe("useSubscriptionLink", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetHookState();
+    useUIStore.setState({ savedDraftSignature: null });
     mocks.bag.storeState = {
       proxyGroupAdvanced: { auto: { includeRegex: "Fast" } },
       proxyGroupAdvancedModeEnabled: true,
@@ -182,6 +187,16 @@ describe("useSubscriptionLink", () => {
       mode: "advanced",
       result: "opened",
     });
+
+    // Leaving the page warns only once a dialog setting differs from what it opened with.
+    const guardActive = () => mocks.useEffect.mock.calls.at(-1)?.[1];
+    expect(guardActive()).toEqual([false]);
+    hook.setSubscriptionName("renamed");
+    hook = useRenderedHook({ editingSubscription });
+    expect(guardActive()).toEqual([true]);
+    hook.setSubscriptionName("");
+    hook = useRenderedHook({ editingSubscription });
+    expect(guardActive()).toEqual([false]);
   });
 
   it("opens the save requirement flow and continues after acceptance", async () => {
@@ -291,6 +306,7 @@ describe("useSubscriptionLink", () => {
     expect(clearUser).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(mocks.bag.interactions.subscriptionLinkSaved).not.toHaveBeenCalled();
+    expect(useUIStore.getState().savedDraftSignature).toBeNull();
   });
 
   it("allows adapter-specific decimal auto-update intervals", async () => {
@@ -569,6 +585,8 @@ describe("useSubscriptionLink", () => {
     expect(mocks.bag.interactions.subscriptionLinkSaved).toHaveBeenCalledWith(
       expect.objectContaining({ flow: "update", result: "success" })
     );
+    // The saved content no longer triggers the leave-page warning.
+    expect(useUIStore.getState().savedDraftSignature).toEqual(expect.any(String));
 
     resetHookState();
     const validationAdapter = makeAdapter({ saveSubscription: vi.fn(async () => response(400, { error: "bad input" })) });
