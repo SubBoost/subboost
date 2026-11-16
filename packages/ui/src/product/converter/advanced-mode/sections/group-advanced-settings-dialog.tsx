@@ -23,6 +23,7 @@ import {
 } from "@subboost/core/types/config";
 import { ProxyGroupTypeMenu } from "./proxy-group-type-menu";
 import { normalizeGroupTestUrl } from "@subboost/core/proxy-group-advanced";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 import {
   validateGroupListenerPort,
   type GroupListenerConflictState,
@@ -64,6 +65,8 @@ export function GroupAdvancedSettingsDialog({
   conflictState,
   onSave,
 }: GroupAdvancedSettingsDialogProps) {
+  // The draft is rebuilt on every open, so an open dialog may hold edits not yet applied.
+  useUnappliedInputGuard(open);
   const [draftType, setDraftType] = React.useState<ProxyGroupGroupType>(groupType);
   const [draftStrategy, setDraftStrategy] = React.useState<LoadBalanceStrategy>(
     strategy ?? DEFAULT_LOAD_BALANCE_STRATEGY

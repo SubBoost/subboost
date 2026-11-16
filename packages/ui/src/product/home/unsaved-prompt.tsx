@@ -33,6 +33,7 @@ export function markDraftSaved(signature = getDraftSignature(useConfigStore.getS
 }
 
 function hasUnsavedWork(state: ConfigState): boolean {
+  if (useUIStore.getState().unappliedInputCount > 0) return true;
   if (state.sources.some(isSourcePendingImport)) return true;
   if (state.nodes.length === 0) return false;
   return useUIStore.getState().savedDraftSignature !== getDraftSignature(state);

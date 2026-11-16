@@ -20,6 +20,7 @@ import {
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
 import type { CustomRule, CustomRuleSet, RuleSetMetadata } from "@subboost/core/types/config";
 import { useProductApiAdapter } from "@subboost/ui/product/api-adapter";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 import { resolveRuleSetUrl, useRuleSetOperation } from "./use-rule-set-resolution";
 
 function getStatusClass(item: CustomRuleBatchImportPreviewItem): string {
@@ -71,6 +72,7 @@ export function ProxyGroupsCustomRulesBatchDialog({
   onImportRuleSets?: (rules: CustomRuleSet[]) => void;
 }) {
   const [rawText, setRawText] = React.useState("");
+  useUnappliedInputGuard(open && rawText.trim() !== "");
   const interactions = useProductInteractionAdapter();
   const api = useProductApiAdapter();
   const operation = useRuleSetOperation(JSON.stringify([open, rawText, defaultType, defaultTarget, defaultNoResolve, existingRules, existingRuleSets]));

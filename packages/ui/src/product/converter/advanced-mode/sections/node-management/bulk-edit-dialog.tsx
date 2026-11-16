@@ -8,6 +8,7 @@ import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { toast } from "@subboost/ui/components/ui/toaster";
 import { formatNodeNameFromTemplate } from "@subboost/core/node-name-template";
 import { useProductInteractionAdapter } from "@subboost/ui/product/interactions";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 import type { ParsedNode } from "@subboost/core/types/node";
 
 type NodeNameParts = {
@@ -41,6 +42,7 @@ export function NodeManagementBulkEditDialog({
 }) {
   // 批量编辑（方案 B）
   const interactions = useProductInteractionAdapter();
+  useUnappliedInputGuard(open);
   const [nameRulesInclude, setNameRulesInclude] = React.useState("");
   const [nameRulesExclude, setNameRulesExclude] = React.useState("");
   const [nameRulesFind, setNameRulesFind] = React.useState("");

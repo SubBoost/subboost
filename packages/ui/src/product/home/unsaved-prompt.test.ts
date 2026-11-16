@@ -22,7 +22,7 @@ vi.mock("@subboost/ui/store/config-store", () => ({
   useConfigStore: { getState: () => mocks.storeState },
 }));
 
-import { useUIStore } from "@subboost/ui/store/ui-store";
+import { useUIStore, useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 import { UnsavedPrompt, markDraftSaved } from "./unsaved-prompt";
 
 const WARNING = "您有未保存的配置更改，确定要离开吗？";
@@ -52,7 +52,7 @@ describe("UnsavedPrompt", () => {
     vi.unstubAllGlobals();
     mocks.storeState = draft();
     mocks.isSourcePendingImport.mockImplementation((source: any) => Boolean(source.pending));
-    useUIStore.setState({ savedDraftSignature: null });
+    useUIStore.setState({ savedDraftSignature: null, unappliedInputCount: 0 });
     stubBrowser(false);
   });
 
@@ -89,6 +89,27 @@ describe("UnsavedPrompt", () => {
     markDraftSaved();
     renderToStaticMarkup(React.createElement(UnsavedPrompt));
     expect(leave().returnValue).toBe(WARNING);
+  });
+
+  it("warns while a dialog holds input not yet applied, even when the editor matches the save", () => {
+    mocks.storeState = draft({ nodes: [{ name: "node-1" }] });
+    markDraftSaved();
+    renderToStaticMarkup(React.createElement(UnsavedPrompt));
+    const Dialog = ({ dirty }: { dirty: boolean }) => {
+      useUnappliedInputGuard(dirty);
+      return null;
+    };
+
+    renderToStaticMarkup(React.createElement(Dialog, { dirty: false }));
+    expect(leave().preventDefault).not.toHaveBeenCalled();
+
+    // An empty editor still warns: the dialog may be adding its first node.
+    mocks.storeState = draft();
+    renderToStaticMarkup(React.createElement(Dialog, { dirty: true }));
+    expect(leave().returnValue).toBe(WARNING);
+
+    useUIStore.getState().changeUnappliedInputCount(-1);
+    expect(leave().preventDefault).not.toHaveBeenCalled();
   });
 
   it("does not warn without pending work and skips automation environments", () => {

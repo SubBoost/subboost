@@ -38,6 +38,7 @@ import {
 } from "@subboost/ui/product/interactions";
 import { copyTextToClipboard } from "@subboost/ui/lib/clipboard";
 import { getDraftSignature, markDraftSaved } from "@subboost/ui/product/home/unsaved-prompt";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 
 type EditingSubscription = {
   id: string;
@@ -143,6 +144,10 @@ export function useSubscriptionLink({
   const [autoUpdateEnabled, setAutoUpdateEnabled] = React.useState(false);
   const [autoUpdateHours, setAutoUpdateHours] = React.useState(autoUpdatePolicy.defaultHours);
   const [smartNodeMatchingEnabled, setSmartNodeMatchingEnabled] = React.useState(true);
+  // The dialog settings as they were when it opened; changes count as unsaved until the save succeeds.
+  const [openedSettings, setOpenedSettings] = React.useState("");
+  const dialogSettings = JSON.stringify([subscriptionName, autoUpdateEnabled, autoUpdateHours, smartNodeMatchingEnabled]);
+  useUnappliedInputGuard(subscriptionDialog && !subscriptionUrl && dialogSettings !== openedSettings);
   const [isCreatingSubscription, setIsCreatingSubscription] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [saveRequirementDialog, setSaveRequirementDialog] = React.useState(false);
@@ -190,14 +195,15 @@ export function useSubscriptionLink({
       ? Math.max(autoUpdatePolicy.minHours, autoUpdateIntervalSecondsToHours(currentAutoUpdateInterval))
       : autoUpdatePolicy.defaultHours;
 
-    setSubscriptionName(
-      isEditingExistingSubscription
-        ? editingSubscription?.name || ""
-        : `我的配置 ${formatDateInBeijing(new Date())}`
-    );
+    const nextName = isEditingExistingSubscription
+      ? editingSubscription?.name || ""
+      : `我的配置 ${formatDateInBeijing(new Date())}`;
+    const nextSmartNodeMatchingEnabled = editingSubscription?.smartNodeMatchingEnabled !== false;
+    setSubscriptionName(nextName);
     setAutoUpdateEnabled(nextAutoUpdateEnabled);
     setAutoUpdateHours(nextAutoUpdateHours);
-    setSmartNodeMatchingEnabled(editingSubscription?.smartNodeMatchingEnabled !== false);
+    setSmartNodeMatchingEnabled(nextSmartNodeMatchingEnabled);
+    setOpenedSettings(JSON.stringify([nextName, nextAutoUpdateEnabled, nextAutoUpdateHours, nextSmartNodeMatchingEnabled]));
     setSubscriptionUrl("");
     setSubscriptionDialog(true);
   }, [autoUpdatePolicy.defaultHours, autoUpdatePolicy.minHours, editingSubscription, isEditingExistingSubscription]);

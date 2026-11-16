@@ -1,3 +1,4 @@
+import * as React from "react";
 import { create } from "zustand";
 
 type EditingSubscription = {
@@ -16,6 +17,9 @@ interface UIState {
   // 最近一次加载或保存订阅时的配置快照（只在内存）；离开页面时配置与它相同就不再提示未保存
   savedDraftSignature: string | null;
   setSavedDraftSignature: (signature: string | null) => void;
+  // 打开着、可能有尚未应用到编辑器的输入的弹窗数；大于 0 时离开页面总会提示
+  unappliedInputCount: number;
+  changeUnappliedInputCount: (delta: 1 | -1) => void;
 }
 
 export const useUIStore = create<UIState>()((set) => ({
@@ -24,6 +28,20 @@ export const useUIStore = create<UIState>()((set) => ({
   clearEditingSubscription: () => set({ editingSubscription: null }),
   savedDraftSignature: null,
   setSavedDraftSignature: (signature) => set({ savedDraftSignature: signature }),
+  unappliedInputCount: 0,
+  changeUnappliedInputCount: (delta) =>
+    set((state) => ({ unappliedInputCount: Math.max(0, state.unappliedInputCount + delta) })),
 }));
 
-
+/**
+ * Counts as unsaved work while `active`: for a dialog whose input stays in local state until it is
+ * applied, so leaving the page still warns when the editor itself matches what was saved.
+ */
+export function useUnappliedInputGuard(active: boolean) {
+  React.useEffect(() => {
+    if (!active) return;
+    const { changeUnappliedInputCount } = useUIStore.getState();
+    changeUnappliedInputCount(1);
+    return () => changeUnappliedInputCount(-1);
+  }, [active]);
+}

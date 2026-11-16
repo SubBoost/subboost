@@ -16,6 +16,7 @@ import { FormField } from "@subboost/ui/components/ui/form-field";
 import { Input } from "@subboost/ui/components/ui/input";
 import { PasswordField } from "@subboost/ui/components/ui/password-field";
 import { HelpPopover } from "@subboost/ui/components/ui/popover";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 
 const TRI_STATE_OPTIONS: Array<{ value: TailscaleTriState; label: string }> = [
   { value: "default", label: "默认" },
@@ -126,6 +127,7 @@ export function TailscaleSourceForm({
   const leaveRef = React.useRef<TailscaleFormLeave | null>(null);
 
   const dirty = isTailscaleFormDirty(initial, values);
+  useUnappliedInputGuard(dirty);
   const duplicateStateDir = hasDuplicateTailscaleStateDir(values.stateDir, knownStateDirs);
 
   const update = <K extends keyof TailscaleFormValues>(field: K, value: TailscaleFormValues[K]) => {

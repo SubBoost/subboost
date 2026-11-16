@@ -24,6 +24,7 @@ import { FormField } from "@subboost/ui/components/ui/form-field";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { Switch } from "@subboost/ui/components/ui/switch";
 import { Textarea } from "@subboost/ui/components/ui/textarea";
+import { useUnappliedInputGuard } from "@subboost/ui/store/ui-store";
 
 type NodeManagementAutoProcessingDialogProps = {
   open: boolean;
@@ -54,6 +55,7 @@ export function NodeManagementAutoProcessingDialog({
 }: NodeManagementAutoProcessingDialogProps) {
   const configText = config.excludeRegexes.join("\n");
   const includeText = (config.includeRegexes ?? []).join("\n");
+  useUnappliedInputGuard(open);
   const [enabled, setEnabled] = React.useState(config.enabled);
   const [includeEnabled, setIncludeEnabled] = React.useState(config.includeEnabled !== false);
   const [excludeEnabled, setExcludeEnabled] = React.useState(config.excludeEnabled !== false);

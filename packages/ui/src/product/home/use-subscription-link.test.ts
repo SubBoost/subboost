@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => {
     useConfigStore,
     useProductInteractionAdapter: vi.fn(() => bag.interactions),
     useCallback: vi.fn((callback: unknown) => callback),
+    // Effects never run; the last call's dependencies show what the unapplied-input guard sees.
+    useEffect: vi.fn(),
     useMemo: vi.fn((factory: () => unknown) => factory()),
     useState: vi.fn((initial: unknown) => {
       const index = bag.stateIndex;
@@ -49,6 +51,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("react", () => ({
   useCallback: mocks.useCallback,
+  useEffect: mocks.useEffect,
   useMemo: mocks.useMemo,
   useState: mocks.useState,
 }));
@@ -184,6 +187,16 @@ describe("useSubscriptionLink", () => {
       mode: "advanced",
       result: "opened",
     });
+
+    // Leaving the page warns only once a dialog setting differs from what it opened with.
+    const guardActive = () => mocks.useEffect.mock.calls.at(-1)?.[1];
+    expect(guardActive()).toEqual([false]);
+    hook.setSubscriptionName("renamed");
+    hook = useRenderedHook({ editingSubscription });
+    expect(guardActive()).toEqual([true]);
+    hook.setSubscriptionName("");
+    hook = useRenderedHook({ editingSubscription });
+    expect(guardActive()).toEqual([false]);
   });
 
   it("opens the save requirement flow and continues after acceptance", async () => {
