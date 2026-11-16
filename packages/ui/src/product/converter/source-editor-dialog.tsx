@@ -167,7 +167,8 @@ function YamlSourceEditor({
           <p className="text-fg-40">客户端需要包含 Tailscale 的 Mihomo 内核：官方构建 v1.19.25 起支持，推荐 v1.19.26 或更新。</p>
         </div>
         {nodes.length > 0 ? (
-          <ChoiceGroup label="选择 Tailscale 节点" className="shrink-0 gap-1">
+          // Many nodes scroll inside about two and a half rows, so the form and its buttons stay in view.
+          <ChoiceGroup label="选择 Tailscale 节点" className="max-h-[5.5rem] shrink-0 gap-1 overflow-y-auto p-0.5">
             <ChoiceChip
               selected={selection === "new"}
               onClick={() => select("new")}
