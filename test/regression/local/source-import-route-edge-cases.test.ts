@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   importSourceUrlDirect: vi.fn(),
   prisma: {
     localAdmin: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
@@ -41,15 +42,14 @@ describe("local source-import route edge behavior", () => {
     });
   });
 
-  it("returns not-found when the authenticated administrator row disappears", async () => {
-    mocks.prisma.localAdmin.findUnique.mockResolvedValue(null);
+  it("returns the instance default when no administrator row exists", async () => {
+    mocks.prisma.localAdmin.findFirst.mockResolvedValue(null);
 
     const response = await GET();
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      error: "Local admin not found.",
-      code: "NOT_FOUND",
+      allowUnsafeSubscriptionSources: false,
     });
   });
 

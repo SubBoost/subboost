@@ -201,4 +201,14 @@ describe("TemplateUploadDialog", () => {
     expect(mocks.switchFields[1]).toEqual(expect.objectContaining({ disabled: true }));
     expect(props.onPublicChange).not.toHaveBeenCalled();
   });
+
+  it("hides the default-template switch when public templates are unsupported", () => {
+    const { html } = renderDialog({
+      userIsAdmin: true,
+      showVisibilityControls: false,
+    });
+
+    expect(html).not.toContain("作为默认模板");
+    expect(mocks.switchFields).toHaveLength(0);
+  });
 });

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAdmin: vi.fn(),
   prisma: {
     localAdmin: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
@@ -49,6 +50,7 @@ describe("local source import settings route", () => {
       status: 401,
       body: { error: "Authentication required.", code: "UNAUTHORIZED" },
     });
+    expect(mocks.prisma.localAdmin.findFirst).not.toHaveBeenCalled();
     expect(mocks.prisma.localAdmin.findUnique).not.toHaveBeenCalled();
     expect(mocks.prisma.localAdmin.update).not.toHaveBeenCalled();
   });
@@ -64,7 +66,7 @@ describe("local source import settings route", () => {
   });
 
   it("returns the persisted setting", async () => {
-    mocks.prisma.localAdmin.findUnique.mockResolvedValueOnce({
+    mocks.prisma.localAdmin.findFirst.mockResolvedValueOnce({
       allowUnsafeSubscriptionSources: true,
     });
 
@@ -72,9 +74,22 @@ describe("local source import settings route", () => {
       status: 200,
       body: { allowUnsafeSubscriptionSources: true },
     });
-    expect(mocks.prisma.localAdmin.findUnique).toHaveBeenCalledWith({
-      where: { id: "admin-1" },
+    expect(mocks.prisma.localAdmin.findFirst).toHaveBeenCalledWith({
+      where: { role: "ADMIN" },
+      orderBy: { createdAt: "asc" },
       select: { allowUnsafeSubscriptionSources: true },
+    });
+  });
+
+  it("returns the administrator's instance-wide value to a regular account", async () => {
+    mocks.getCurrentAdmin.mockResolvedValue({ id: "user-1", username: "friend", role: "USER", isAdmin: false });
+    mocks.prisma.localAdmin.findFirst.mockResolvedValueOnce({
+      allowUnsafeSubscriptionSources: true,
+    });
+
+    await expect(readJson(await GET())).resolves.toEqual({
+      status: 200,
+      body: { allowUnsafeSubscriptionSources: true },
     });
   });
 
