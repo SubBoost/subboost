@@ -26,6 +26,7 @@
 - **Rule management**: Reorder rules for deeper customization by advanced users.
 - **DNS leak prevention**: The default `basic and DNS configuration` helps prevent DNS leaks.
 - **Automatic refresh**: Refresh subscriptions on a schedule and intelligently match nodes during refresh.
+- **Multiple accounts**: Self-hosted instances support multiple accounts; the administrator can create accounts for friends in settings, and each account's subscriptions and templates are isolated from the others.
 
 ## Interface Preview
 

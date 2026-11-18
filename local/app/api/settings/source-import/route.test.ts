@@ -35,7 +35,7 @@ function patchRequest(body: string) {
 describe("local source import settings route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentAdmin.mockResolvedValue({ id: "admin-1", username: "admin" });
+    mocks.getCurrentAdmin.mockResolvedValue({ id: "admin-1", username: "admin", role: "ADMIN", isAdmin: true });
   });
 
   it("requires the local administrator for reads and writes", async () => {
@@ -50,6 +50,16 @@ describe("local source import settings route", () => {
       body: { error: "Authentication required.", code: "UNAUTHORIZED" },
     });
     expect(mocks.prisma.localAdmin.findUnique).not.toHaveBeenCalled();
+    expect(mocks.prisma.localAdmin.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects settings writes from a regular account", async () => {
+    mocks.getCurrentAdmin.mockResolvedValue({ id: "user-1", username: "friend", role: "USER", isAdmin: false });
+
+    await expect(readJson(await PATCH(patchRequest(JSON.stringify({ allowUnsafeSubscriptionSources: true }))))).resolves.toEqual({
+      status: 403,
+      body: { error: "Only the administrator can manage accounts.", code: "FORBIDDEN" },
+    });
     expect(mocks.prisma.localAdmin.update).not.toHaveBeenCalled();
   });
 

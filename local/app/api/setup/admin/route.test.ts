@@ -115,7 +115,7 @@ describe("local setup admin route", () => {
     expect(result.body).toEqual({ success: true, user: { id: "admin-1", username: "ry" } });
     expect(mocks.hash).toHaveBeenCalledWith("long-password", 12);
     expect(mocks.create).toHaveBeenCalledWith({
-      data: { username: "ry", passwordHash: "hash", lastLoginAt: expect.any(Date) },
+      data: { username: "ry", passwordHash: "hash", role: "ADMIN", lastLoginAt: expect.any(Date) },
       select: { id: true, username: true },
     });
     expect(mocks.signSession).toHaveBeenCalledWith({ adminId: "admin-1", username: "ry" });

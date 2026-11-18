@@ -31,7 +31,7 @@ function request(pathname: string, body: unknown) {
 describe("local source-import route edge behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentAdmin.mockResolvedValue({ id: "admin-1", username: "admin" });
+    mocks.getCurrentAdmin.mockResolvedValue({ id: "admin-1", username: "admin", role: "ADMIN", isAdmin: true });
     mocks.importSourceUrlDirect.mockResolvedValue({
       ok: true,
       content: "ss://node",

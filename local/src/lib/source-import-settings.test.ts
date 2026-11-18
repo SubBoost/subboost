@@ -28,6 +28,8 @@ describe("local source import settings", () => {
 
     await expect(getAllowUnsafeSubscriptionSources()).resolves.toBe(true);
     expect(mocks.findFirst).toHaveBeenCalledWith({
+      where: { role: "ADMIN" },
+      orderBy: { createdAt: "asc" },
       select: { allowUnsafeSubscriptionSources: true },
     });
   });

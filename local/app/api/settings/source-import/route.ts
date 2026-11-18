@@ -1,4 +1,4 @@
-import { withCurrentAdmin } from "@local/lib/api-auth";
+import { withAccountAdmin, withCurrentAdmin } from "@local/lib/api-auth";
 import { apiError, json, jsonBodyError, LOCAL_JSON_BODY_LIMITS, readJsonBody } from "@local/lib/http";
 import { prisma } from "@local/lib/prisma";
 
@@ -15,7 +15,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  return withCurrentAdmin(async (admin) => {
+  // The switch guards the whole instance against SSRF through local and LAN
+  // subscription sources, so only the administrator may change it.
+  return withAccountAdmin(async (admin) => {
     const parsedBody = await readJsonBody(request, LOCAL_JSON_BODY_LIMITS.small);
     if (!parsedBody.ok) return jsonBodyError(parsedBody);
     const body = parsedBody.value;
