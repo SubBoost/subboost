@@ -11,6 +11,10 @@ model LocalAdmin {
   id           String    @id @default(cuid())
   username     String    @unique
   passwordHash String
+  // "ADMIN" is the first account created during setup and manages other
+  // accounts; every account created afterwards is a regular "USER" account.
+  // Anything other than "ADMIN" is treated as a regular account.
+  role         String    @default("USER")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?

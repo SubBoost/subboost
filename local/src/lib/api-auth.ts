@@ -16,3 +16,15 @@ export async function withCurrentAdmin(handler: AdminResponseHandler): Promise<R
   if (!admin) return localAdminRequiredResponse();
   return handler(admin);
 }
+
+export function localAccountAdminRequiredResponse(): Response {
+  return apiError("Only the administrator can manage accounts.", "FORBIDDEN", 403);
+}
+
+/** Runs the handler only for the first (administrator) account. */
+export async function withAccountAdmin(handler: AdminResponseHandler): Promise<Response> {
+  const admin = await getCurrentAdmin();
+  if (!admin) return localAdminRequiredResponse();
+  if (!admin.isAdmin) return localAccountAdminRequiredResponse();
+  return handler(admin);
+}

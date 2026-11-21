@@ -22,7 +22,7 @@ export async function GET() {
           avatarUrl: null,
           trustLevel: 4,
           aiAssistantEnabled: false,
-          isAdmin: false,
+          isAdmin: admin.isAdmin,
           isBanned: false,
           active: true,
           silenced: false,

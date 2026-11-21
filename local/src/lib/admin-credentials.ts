@@ -8,6 +8,13 @@ export const LOCAL_ADMIN_CREDENTIAL_MESSAGES = {
   passwordMismatch: "两次输入的密码不一致，请重新确认",
 } as const;
 
+export const LOCAL_ACCOUNT_MANAGEMENT_MESSAGES = {
+  usernameExists: "用户名已存在",
+  userNotFound: "账号不存在",
+  cannotDeleteSelf: "不能删除当前登录的账号",
+  cannotDeleteAdmin: "不能删除管理员账号",
+} as const;
+
 type LocalAdminCredentialInput = {
   username: string;
   password: string;

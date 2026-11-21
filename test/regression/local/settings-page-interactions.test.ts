@@ -48,6 +48,8 @@ vi.mock("lucide-react", () => ({
   Network: () => React.createElement("span", null, "network"),
   ServerCog: () => React.createElement("span", null, "server"),
   ShieldCheck: () => React.createElement("span", null, "shield"),
+  Trash2: () => React.createElement("span", null, "trash"),
+  Users: () => React.createElement("span", null, "users"),
 }));
 
 vi.mock("@subboost/ui/components/ui/button", () => ({

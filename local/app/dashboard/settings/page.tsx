@@ -7,6 +7,7 @@ import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { useUserStore } from "@subboost/ui/store/user-store";
+import { LocalAccountManagement } from "@local/components/local-account-management";
 
 export default function SettingsPage() {
   const { user, fetchUser, logout } = useUserStore();
@@ -127,14 +128,16 @@ export default function SettingsPage() {
           <CardContent className="space-y-2">
             <SwitchField
               label="允许本机和局域网订阅"
-              description="开启后，本机、局域网及其他保留地址都可作为订阅源。仅在信任来源时开启。"
+              description="开启后，本机、局域网及其他保留地址都可作为订阅源。仅在信任来源时开启。仅管理员可以修改。"
               checked={allowUnsafeSubscriptionSources}
-              disabled={!user || sourceImportLoading || sourceImportSaving}
+              disabled={!user?.isAdmin || sourceImportLoading || sourceImportSaving}
               onCheckedChange={(checked) => void handleUnsafeSourceToggle(checked)}
             />
             {sourceImportError && <p className="text-xs text-red-300">{sourceImportError}</p>}
           </CardContent>
         </Card>
+
+        {user?.isAdmin ? <LocalAccountManagement /> : null}
 
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 space-y-0">
