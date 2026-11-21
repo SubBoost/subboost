@@ -8,6 +8,7 @@ DEFAULT_BACKUP_RETENTION_COUNT="10"
 SUBBOOST_HOME="${SUBBOOST_HOME:-$DEFAULT_HOME}"
 ENV_FILE="$SUBBOOST_HOME/.env"
 COMPOSE_FILE="$SUBBOOST_HOME/docker-compose.yml"
+WEB_UPDATE_COMPOSE="$SUBBOOST_HOME/docker-compose.web-update.yml"
 BACKUP_DIR="$SUBBOOST_HOME/backups"
 TMP_DIR=""
 
@@ -67,7 +68,9 @@ compose_files() {
   shift 2
   [ -f "$compose_file" ] || die "Missing $compose_file"
   [ -f "$env_file" ] || die "Missing $env_file"
-  (cd "$SUBBOOST_HOME" && docker_cmd compose --project-directory "$SUBBOOST_HOME" --env-file "$env_file" -f "$compose_file" "$@")
+  local -a files=(-f "$compose_file")
+  if [ -f "$WEB_UPDATE_COMPOSE" ]; then files+=(-f "$WEB_UPDATE_COMPOSE"); fi
+  (cd "$SUBBOOST_HOME" && docker_cmd compose --project-directory "$SUBBOOST_HOME" --env-file "$env_file" "${files[@]}" "$@")
 }
 
 compose_files_with_image() {
@@ -449,6 +452,7 @@ update_cmd() {
       say "Handing this update to the release manager..."; SUBBOOST_MANAGER_HANDOFF=1 bash "$candidate_manager" update; return; fi
   else
     [ "${SUBBOOST_MANAGER_HANDOFF:-0}" != "1" ] || die "Release manifest unavailable; manager handoff aborted."
+    [ "${SUBBOOST_WEB_UPDATE:-0}" != "1" ] || die "Release manifest unavailable; web update aborted."
     say "Release manifest unavailable; updating current image and compose only."
     cp "$COMPOSE_FILE" "$candidate_compose"
     if [ -f "${SUBBOOST_BIN:-/usr/local/bin/subboost}" ]; then
@@ -458,6 +462,19 @@ update_cmd() {
   fi
   [ -n "$manager_url" ] && manager_present=1
   [ -n "$image" ] || die "SUBBOOST_IMAGE is missing."
+  if [ -f "$WEB_UPDATE_COMPOSE" ]; then
+    local update_lock
+    exec {update_lock}>"$SUBBOOST_HOME/.update.lock"
+    flock -n "$update_lock" || die "A SubBoost update is already running."
+  fi
+  if [ "${SUBBOOST_WEB_UPDATE:-0}" = "1" ]; then
+    app_id="$(service_container_id app)"
+    [ -n "$app_id" ] || die "Cannot identify the current app container."
+    if [ "$(docker_cmd inspect -f '{{.Config.Image}}' "$app_id")" = "$image" ]; then
+      say "SubBoost already runs the configured release."
+      return
+    fi
+  fi
   read_env_file > "$candidate_env"
   cp "$candidate_env" "$old_env"
   cp "$COMPOSE_FILE" "$old_compose"
@@ -651,6 +668,63 @@ doctor_cmd() {
   say "Doctor: OK"
 }
 
+enable_web_update_cmd() {
+  is_root || die "Run sudo subboost enable-web-update."
+  [ "$SUBBOOST_HOME" = "$DEFAULT_HOME" ] && [ -x /usr/local/bin/subboost ] ||
+    die "Web updates require the default installed SubBoost manager and path."
+  command -v systemctl >/dev/null && command -v systemd-tmpfiles >/dev/null &&
+    command -v flock >/dev/null || die "Web updates require systemd and flock."
+  load_env
+  compose config >/dev/null
+
+  cat > /etc/tmpfiles.d/subboost-web-update.conf <<'EOF'
+d /run/subboost-web-update 0755 root root -
+d /run/subboost-web-update/state 0755 root root -
+f /run/subboost-web-update/state/status 0644 root root - idle
+d /run/subboost-web-update/request 0700 1000 1000 -
+EOF
+  systemd-tmpfiles --create /etc/tmpfiles.d/subboost-web-update.conf
+
+  cat > /etc/systemd/system/subboost-web-update.path <<'EOF'
+[Unit]
+Description=Watch for a SubBoost web update request
+After=systemd-tmpfiles-setup.service
+
+[Path]
+PathExists=/run/subboost-web-update/request/pending
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  cat > /etc/systemd/system/subboost-web-update.service <<'EOF'
+[Unit]
+Description=Update SubBoost using the installed manager
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0022
+Environment=SUBBOOST_WEB_UPDATE=1
+ExecCondition=/usr/bin/test -f /run/subboost-web-update/request/pending
+ExecStartPre=/bin/sh -ec 'echo running > /run/subboost-web-update/state/status.new; mv /run/subboost-web-update/state/status.new /run/subboost-web-update/state/status'
+ExecStart=/usr/local/bin/subboost update
+ExecStopPost=/bin/sh -ec 'rm -f /run/subboost-web-update/request/pending; if [ "$$SERVICE_RESULT" = success ]; then echo succeeded; else echo failed; fi > /run/subboost-web-update/state/status.new; mv /run/subboost-web-update/state/status.new /run/subboost-web-update/state/status'
+EOF
+  cat > "$WEB_UPDATE_COMPOSE" <<'EOF'
+services:
+  app:
+    volumes:
+      - /run/subboost-web-update/request:/run/subboost-web-update/request
+      - /run/subboost-web-update/state:/run/subboost-web-update/state:ro
+EOF
+  chmod 644 /etc/tmpfiles.d/subboost-web-update.conf /etc/systemd/system/subboost-web-update.{path,service} "$WEB_UPDATE_COMPOSE"
+  systemctl daemon-reload
+  systemctl enable --now subboost-web-update.path
+  compose up -d --no-deps app
+  say "Web updates enabled in the administrator settings."
+}
+
 menu_cmd() {
   say "SubBoost"
   say "1) Status"
@@ -688,6 +762,7 @@ main() {
     backup) backup_cmd ;;
     restart) restart_cmd ;;
     doctor) doctor_cmd ;;
+    enable-web-update) enable_web_update_cmd ;;
     *) die "Unknown command: $command" ;;
   esac
 }

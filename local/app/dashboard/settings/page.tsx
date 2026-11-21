@@ -7,6 +7,7 @@ import { Button } from "@subboost/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@subboost/ui/components/ui/card";
 import { SwitchField } from "@subboost/ui/components/ui/switch-field";
 import { useUserStore } from "@subboost/ui/store/user-store";
+import { LocalUpdateCard } from "@local/components/local-update-card";
 
 export default function SettingsPage() {
   const { user, fetchUser, logout } = useUserStore();
@@ -94,6 +95,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        {user && <LocalUpdateCard />}
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 space-y-0">
             <div className="rounded-lg bg-indigo-500/20 p-2 text-indigo-300">
