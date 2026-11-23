@@ -5,6 +5,7 @@ import { HelpCircle, Plus } from "lucide-react";
 import { DEFAULT_NODE_NAME_TEMPLATE } from "@subboost/core/node-name-template";
 import {
   createTailscaleStateDir,
+  inspectAutoEditableTailscaleYaml,
   newTailscaleFormValues,
   readTailscaleFormValues,
   writeTailscaleNode,
@@ -47,6 +48,11 @@ type TailscaleView =
 
 const CHIP_CLASS = "min-h-8 px-2.5 py-1 text-xs";
 
+const YAML_EDITOR_PLACEHOLDER =
+  "proxies:\n  - name: 节点名称\n    type: vmess # 也支持 tailscale 等协议（可切换到上方 Tailscale 页签表单配置）\n    ...";
+
+const MAX_AUTO_DETECT_TAILSCALE_YAML_LENGTH = 64 * 1024;
+
 function newTailscaleDraft(content: string): TailscaleFormValues {
   const read = readYamlSource(content);
   const taken = read.ok ? read.document.entries.map((entry) => entry.name) : [];
@@ -64,8 +70,24 @@ function tailscaleView(read: YamlSourceReadResult, selection: TailscaleSelection
   if (!entry) return { kind: "blocked", reason: "找不到该节点" };
   const values = readTailscaleFormValues(entry.node);
   if (!values.ok) return { kind: "blocked", reason: values.reason };
-  if (document.replaceBlockedReason) return { kind: "blocked", reason: document.replaceBlockedReason };
+  const reason = document.replaceBlockedReason ?? entry.replaceBlockedReason;
+  if (reason) return { kind: "blocked", reason };
   return { kind: "form", target: { index: selection, initial: values.values }, initial: values.values };
+}
+
+function detectInitialTailscaleState(content: string): {
+  selection: number;
+  draft: TailscaleFormValues;
+} | null {
+  if (content.length > MAX_AUTO_DETECT_TAILSCALE_YAML_LENGTH) return null;
+  if (!/tailscale|\\/i.test(content)) return null;
+
+  const inspected = inspectAutoEditableTailscaleYaml(content);
+  if (!inspected) return null;
+  return {
+    selection: inspected.firstIndex,
+    draft: newTailscaleFormValues(inspected.names, createTailscaleStateDir()),
+  };
 }
 
 /**
@@ -88,9 +110,14 @@ function YamlSourceEditor({
   onDone: () => void;
   tailscaleStateDirs: readonly unknown[];
 }) {
-  const [page, setPage] = React.useState<EditorPage>("yaml");
-  const [selection, setSelection] = React.useState<TailscaleSelection>("new");
-  const [draft, setDraft] = React.useState<TailscaleFormValues | null>(null);
+  let initialTailscale: ReturnType<typeof detectInitialTailscaleState> | undefined;
+  const getInitialTailscale = () =>
+    initialTailscale === undefined
+      ? (initialTailscale = detectInitialTailscaleState(source.content))
+      : initialTailscale;
+  const [page, setPage] = React.useState<EditorPage>(() => (getInitialTailscale() !== null ? "tailscale" : "yaml"));
+  const [selection, setSelection] = React.useState<TailscaleSelection>(() => getInitialTailscale()?.selection ?? "new");
+  const [draft, setDraft] = React.useState<TailscaleFormValues | null>(() => getInitialTailscale()?.draft ?? null);
   // Parsed only on the Tailscale page, where the text cannot change underneath the form.
   const read = React.useMemo(() => (page === "tailscale" ? readYamlSource(source.content) : null), [page, source.content]);
 
@@ -153,7 +180,7 @@ function YamlSourceEditor({
             <Textarea
               value={source.content}
               onChange={(event) => onUpdateContent(source.id, event.target.value)}
-              placeholder={sourceTypeInfo[source.type].placeholder}
+              placeholder={YAML_EDITOR_PLACEHOLDER}
               className="min-h-0 flex-1 text-xs font-mono"
             />
           </div>

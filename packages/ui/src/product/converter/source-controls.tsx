@@ -42,7 +42,7 @@ export function SourceTypeChoices({
             key={type}
             selected={value === type}
             onClick={() => onChange(type)}
-            title={info.label}
+            title={type === "yaml" ? "YAML 配置（支持 Tailscale）" : info.label}
             label={
               <>
                 <Icon className="h-3.5 w-3.5" aria-hidden="true" />

@@ -10,6 +10,8 @@ describe("quick mode constants", () => {
       placeholder: "https://example.com/sub?token=xxx",
     });
     expect(sourceTypeInfo.yaml.placeholder).toContain("proxies:");
+    expect(sourceTypeInfo.yaml.placeholder).toContain("Tailscale");
+    expect(sourceTypeInfo.yaml.description).toContain("Tailscale");
     expect(sourceTypeInfo.nodes.placeholder).toContain("hysteria2");
   });
 

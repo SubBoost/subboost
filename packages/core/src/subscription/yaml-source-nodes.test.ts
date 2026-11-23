@@ -64,13 +64,22 @@ describe("YAML source nodes", () => {
   });
 
   it("rewrites only the edited entry and keeps every other byte", () => {
-    const out = replaceYamlSourceNode(read(MIXED), 1, proxy("office"));
-    expect(out).toBe(MIXED.replace("  - name: ts   # mine\n    type: tailscale\n", "  - name: office\n    type: direct\n"));
+    const editable = MIXED.replace("   # mine", "").replace("  # flow", "");
+    const out = replaceYamlSourceNode(read(editable), 1, proxy("office"));
+    expect(out).toBe(editable.replace("  - name: ts\n    type: tailscale\n", "  - name: office\n    type: direct\n"));
     // Flow entries stay flow; the trailing comment of the last entry's neighbour survives.
-    const first = replaceYamlSourceNode(read(MIXED), 0, proxy("hk2", COLLECTION_STYLE.FLOW));
-    expect(first).toBe(MIXED.replace(/ {2}- \{name: hk.*# flow\n/, "  - {name: hk2, type: direct}\n"));
+    const first = replaceYamlSourceNode(read(editable), 0, proxy("hk2", COLLECTION_STYLE.FLOW));
+    expect(first).toBe(editable.replace(/ {2}- \{name: hk[^\n]*\n/, "  - {name: hk2, type: direct}\n"));
     const last = replaceYamlSourceNode(read(MIXED), 2, proxy("jp2"));
     expect(last).toBe(MIXED.replace("  - name: jp\n    type: direct\n", "  - name: jp2\n    type: direct\n"));
+  });
+
+  it("protects comments inside a rewritten range and keeps other entries editable", () => {
+    const document = read(MIXED);
+    expect(() => replaceYamlSourceNode(document, 0, proxy("hk2", COLLECTION_STYLE.FLOW))).toThrow(/注释/);
+    expect(() => replaceYamlSourceNode(document, 1, proxy("ts2"))).toThrow(/注释/);
+    expect(document.entries[2].replaceBlockedReason).toBeNull();
+    expect(() => replaceYamlSourceNode(read("# root comment\nname: a\ntype: direct\n"), 0, proxy("b"))).toThrow(/注释/);
   });
 
   it("keeps the source's line endings and a missing final newline", () => {

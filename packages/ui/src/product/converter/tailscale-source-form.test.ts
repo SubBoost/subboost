@@ -28,7 +28,11 @@ vi.mock("react", async (importOriginal) => {
     useState: (initial: unknown) => {
       if (!stateMock.enabled) return actual.useState(initial);
       const index = stateMock.callIndex++;
-      const value = Object.prototype.hasOwnProperty.call(stateMock.overrides, index) ? stateMock.overrides[index] : initial;
+      const value = Object.prototype.hasOwnProperty.call(stateMock.overrides, index)
+        ? stateMock.overrides[index]
+        : typeof initial === "function"
+          ? (initial as () => unknown)()
+          : initial;
       const setter = vi.fn((next: unknown) => {
         const resolved = typeof next === "function" ? (next as (prev: unknown) => unknown)(value) : next;
         (setter as any).lastValue = resolved;
@@ -314,11 +318,14 @@ describe("TailscaleSourceForm", () => {
 });
 
 describe("AddSourceMenu", () => {
-  it("offers Tailscale only inside the YAML editor, not as its own source type", () => {
+  it("keeps Tailscale under the YAML source description rather than as its own source type", () => {
     reset();
     const html = renderToStaticMarkup(React.createElement(AddSourceMenu, { open: true, onOpenChange: vi.fn(), onAdd: vi.fn() }));
+    expect(mocks.buttons.filter((item) => item.children === "menu-item")).toHaveLength(3);
+    expect(html).toContain("订阅链接");
     expect(html).toContain("YAML 配置");
-    expect(html).not.toContain("Tailscale");
+    expect(html).toContain("支持通过「高级编辑」表单配置 Tailscale 节点");
+    expect(html).toContain("节点链接");
   });
 });
 
@@ -356,6 +363,8 @@ describe("SourceEditorDialog", () => {
     const { html, tabs } = renderEditor(yamlSource(MIXED));
     expect(tabs.value).toBe("yaml");
     expect(html).toContain(CONTENT_LABEL);
+    expect(mocks.textareas[0]?.placeholder).toContain("Tailscale 页签");
+    expect(mocks.textareas[0]?.placeholder).not.toContain("高级编辑");
     expect(html).toContain("标签（tag）");
     expect(html).toContain(">Tailscale</button>");
     expect(html).not.toContain("Tailscale / Headscale");
@@ -364,8 +373,57 @@ describe("SourceEditorDialog", () => {
     expect(mocks.dialogContents[0].className).toContain("h-[85dvh]");
   });
 
+  it("opens directly on the Tailscale page for editable Tailscale-only YAML and falls back when unreadable", () => {
+    for (const content of [
+      TS,
+      "name: ts\ntype: tailscale\n",
+      'name: ts\ntype: "tail\\x73cale"\n',
+      "proxies:\n  - {name: ts, type: tailscale}\n  - {name: backup, type: tailscale}\n",
+    ]) {
+      const { html, tabs } = renderEditor(yamlSource(content));
+      expect(tabs.value).toBe("tailscale");
+      expect(html).toContain("写入这份 YAML 的 proxies 列表");
+      expect(chip("ts").selected).toBe(true);
+      expect(mocks.buttons.some((props) => props.children === "应用到 YAML")).toBe(true);
+    }
+
+    for (const content of [
+      "proxies: [{name: ts, type: tailscale}]\n",
+      "type: tailscale\nhostname: office\n",
+      "name: ts\ntype: tailscale\ncontrol-url: ftp://invalid.example\n",
+      "proxies:\n  - name: ts\n    type: tailscale\n    hostname: office\n  - name: ts\n    type: tailscale\n    hostname: home\n",
+      "proxies:\n  - name: ts\n    type: tailscale\n    note: |\n      hello\n      # body\n",
+      "port: 7890\nport: 7891\nproxies:\n  - name: ts\n    type: tailscale\n",
+      "proxies:\n  - name: ts\n    type: tailscale\n    extra:\n      a: 1\n      a: 2\n",
+      "proxies:\n  - {name: odd, type: tailscale, hostname: [a]}\n",
+      "proxies:\n  - name: editable\n    type: tailscale\n    state-dir: tailscale/editable\n  - name: unsupported\n    type: tailscale\n    hostname: [a]\n",
+    ]) {
+      const { tabs } = renderEditor(yamlSource(content));
+      expect(tabs.value).toBe("yaml");
+    }
+  });
+
+  it("uses current YAML to choose the initial page and skips detection for large YAML", () => {
+    const parsedTailscale = { ...yamlSource(TS), parsed: true, lastParsedContent: TS };
+    expect(renderEditor(parsedTailscale).tabs.value).toBe("tailscale");
+    expect(renderEditor({ ...parsedTailscale, content: MIXED }).tabs.value).toBe("yaml");
+
+    const largeSsYaml = `proxies:\n${"  - {name: hk, type: ss, server: 203.0.113.1, port: 443, cipher: aes-128-gcm, password: p}\n".repeat(800)}`;
+    expect(largeSsYaml.length).toBeGreaterThan(64 * 1024);
+    expect(renderEditor(yamlSource(largeSsYaml)).tabs.value).toBe("yaml");
+    expect(renderEditor(yamlSource(`${largeSsYaml}# tailscale\n`)).tabs.value).toBe("yaml");
+  });
+
+  it("keeps a commented node in YAML and explains why the form cannot edit it", () => {
+    const source = yamlSource("proxies:\n  - name: ts\n    type: tailscale\n    state-dir: tailscale/ts # Keep this\n");
+    expect(renderEditor(source).tabs.value).toBe("yaml");
+    const { html } = renderEditor(source, onPage(0));
+    expect(html).toContain("此节点的 YAML 注释无法通过表单保留");
+    expect(html).not.toContain("应用到 YAML");
+  });
+
   it("starts the Tailscale page on a new node with a free name", () => {
-    const { tabs, setters } = renderEditor(yamlSource("proxies:\n  - {name: tailscale, type: tailscale}\n"));
+    const { tabs, setters } = renderEditor(yamlSource("proxies:\n  - {name: tailscale, type: tailscale}\n"), { 0: "yaml" });
     tabs.onValueChange("tailscale");
     expect(setters[0]).toHaveBeenCalledWith("tailscale");
     expect(setters[1]).toHaveBeenCalledWith("new");

@@ -18,8 +18,8 @@ export const sourceTypeInfo: Record<SourceType, SourceTypeInfo> = {
   yaml: {
     label: "YAML 配置",
     icon: FileCode,
-    placeholder: "proxies:\n  - name: 节点名称\n    type: vmess\n    ...",
-    description: "粘贴完整的 Clash YAML 配置文件",
+    placeholder: "proxies:\n  - name: 节点名称\n    type: vmess # 也支持 tailscale 等协议（右上角「高级编辑」支持表单配置 Tailscale）\n    ...",
+    description: "粘贴 Clash YAML 配置，支持通过「高级编辑」表单配置 Tailscale 节点",
   },
   nodes: {
     label: "节点链接",
