@@ -13,7 +13,6 @@ import {
   type TailscaleNodeTarget,
 } from "@subboost/core/subscription/tailscale-yaml-source";
 import { readYamlSource, type YamlSourceReadResult } from "@subboost/core/subscription/yaml-source-nodes";
-import type { ParsedNode } from "@subboost/core/types/node";
 import { Button } from "@subboost/ui/components/ui/button";
 import { ChoiceChip, ChoiceGroup } from "@subboost/ui/components/ui/choice-group";
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@subboost/ui/components/ui/dialog";
@@ -38,8 +37,6 @@ export type SourceEditorDialogProps = {
   onApplyContent: (content: string) => void;
   /** state-dir values of Tailscale nodes owned by other sources. */
   tailscaleStateDirs?: readonly unknown[];
-  /** Already-parsed nodes for this source, used to avoid re-parsing non-Tailscale YAML on open. */
-  sourceNodes?: readonly ParsedNode[];
 };
 
 type EditorPage = "yaml" | "tailscale";
@@ -73,30 +70,15 @@ function tailscaleView(read: YamlSourceReadResult, selection: TailscaleSelection
   if (!entry) return { kind: "blocked", reason: "找不到该节点" };
   const values = readTailscaleFormValues(entry.node);
   if (!values.ok) return { kind: "blocked", reason: values.reason };
-  if (document.replaceBlockedReason) return { kind: "blocked", reason: document.replaceBlockedReason };
+  const reason = document.replaceBlockedReason ?? entry.replaceBlockedReason;
+  if (reason) return { kind: "blocked", reason };
   return { kind: "form", target: { index: selection, initial: values.values }, initial: values.values };
 }
 
-function detectInitialTailscaleState(
-  source: SubscriptionSource,
-  sourceNodes?: readonly ParsedNode[],
-): {
+function detectInitialTailscaleState(content: string): {
   selection: number;
   draft: TailscaleFormValues;
 } | null {
-  const { content } = source;
-  if (!content.trim()) return null;
-
-  const contentMatchesLastParse =
-    source.lastParsedContent === undefined ||
-    source.lastParsedContent === content ||
-    source.lastParsedContent.trim() === content.trim();
-  const hasCurrentParsedNodes =
-    sourceNodes !== undefined && sourceNodes.length > 0 && Boolean(source.parsed) && !source.parsing && contentMatchesLastParse;
-  if (hasCurrentParsedNodes && sourceNodes.some((node) => node.type !== "tailscale")) {
-    return null;
-  }
-
   if (content.length > MAX_AUTO_DETECT_TAILSCALE_YAML_LENGTH) return null;
   if (!/tailscale|\\/i.test(content)) return null;
 
@@ -119,7 +101,6 @@ function YamlSourceEditor({
   onUpdateContent,
   onDone,
   tailscaleStateDirs,
-  sourceNodes,
 }: {
   source: SubscriptionSource;
   meta: React.ReactNode;
@@ -128,12 +109,11 @@ function YamlSourceEditor({
   /** Closes the dialog, asking first when the form has unapplied edits. */
   onDone: () => void;
   tailscaleStateDirs: readonly unknown[];
-  sourceNodes?: readonly ParsedNode[];
 }) {
   let initialTailscale: ReturnType<typeof detectInitialTailscaleState> | undefined;
   const getInitialTailscale = () =>
     initialTailscale === undefined
-      ? (initialTailscale = detectInitialTailscaleState(source, sourceNodes))
+      ? (initialTailscale = detectInitialTailscaleState(source.content))
       : initialTailscale;
   const [page, setPage] = React.useState<EditorPage>(() => (getInitialTailscale() !== null ? "tailscale" : "yaml"));
   const [selection, setSelection] = React.useState<TailscaleSelection>(() => getInitialTailscale()?.selection ?? "new");
@@ -275,7 +255,6 @@ export function SourceEditorDialog({
   onUpdateMeta,
   onApplyContent,
   tailscaleStateDirs = [],
-  sourceNodes,
 }: SourceEditorDialogProps) {
   // Set only while the Tailscale form is shown; the form decides whether closing needs confirmation.
   const formRef = React.useRef<TailscaleSourceFormHandle | null>(null);
@@ -430,7 +409,6 @@ export function SourceEditorDialog({
             onUpdateContent={onUpdateContent}
             onDone={requestClose}
             tailscaleStateDirs={tailscaleStateDirs}
-            sourceNodes={sourceNodes}
           />
         ) : (
           footer

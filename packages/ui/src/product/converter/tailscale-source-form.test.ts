@@ -339,7 +339,7 @@ describe("SourceEditorDialog", () => {
   const onPage = (selection: "new" | number, extra: Record<number, unknown> = {}) => ({ 0: "tailscale", 1: selection, 2: DRAFT, ...extra });
   const edited = () => ({ ...valuesOf(MIXED, 1), hostname: "laptop" });
 
-  function renderEditor(source: any, overrides: Record<number, unknown> = {}, extraProps: Record<string, unknown> = {}) {
+  function renderEditor(source: any, overrides: Record<number, unknown> = {}) {
     const props = {
       source,
       previewName: "Node",
@@ -348,7 +348,6 @@ describe("SourceEditorDialog", () => {
       onUpdateMeta: vi.fn(),
       onApplyContent: vi.fn(),
       tailscaleStateDirs: [],
-      ...extraProps,
     };
     const html = withState(overrides, () => renderToStaticMarkup(React.createElement(SourceEditorDialog, props)));
     return { html, props, setters: stateMock.setters, tabs: mocks.tabs[0] };
@@ -404,29 +403,23 @@ describe("SourceEditorDialog", () => {
     }
   });
 
-  it("skips synchronous parsing for parsed non-Tailscale sources and large YAML", () => {
-    const parsedNonTailscale = {
-      id: "y",
-      type: "yaml",
-      content: "name: ts\ntype: tailscale\n",
-      parsed: true,
-      parsing: false,
-      lastParsedContent: "name: ts\ntype: tailscale\n",
-    };
-    expect(renderEditor(parsedNonTailscale, {}, { sourceNodes: [{ name: "hk", type: "ss" }] }).tabs.value).toBe("yaml");
-    expect(renderEditor(parsedNonTailscale, {}, { sourceNodes: [] }).tabs.value).toBe("tailscale");
-    expect(
-      renderEditor(
-        { ...parsedNonTailscale, lastParsedContent: "proxies:\n  - {name: hk, type: ss}\n" },
-        {},
-        { sourceNodes: [{ name: "hk", type: "ss" }] }
-      ).tabs.value
-    ).toBe("tailscale");
+  it("uses current YAML to choose the initial page and skips detection for large YAML", () => {
+    const parsedTailscale = { ...yamlSource(TS), parsed: true, lastParsedContent: TS };
+    expect(renderEditor(parsedTailscale).tabs.value).toBe("tailscale");
+    expect(renderEditor({ ...parsedTailscale, content: MIXED }).tabs.value).toBe("yaml");
 
     const largeSsYaml = `proxies:\n${"  - {name: hk, type: ss, server: 203.0.113.1, port: 443, cipher: aes-128-gcm, password: p}\n".repeat(800)}`;
     expect(largeSsYaml.length).toBeGreaterThan(64 * 1024);
     expect(renderEditor(yamlSource(largeSsYaml)).tabs.value).toBe("yaml");
     expect(renderEditor(yamlSource(`${largeSsYaml}# tailscale\n`)).tabs.value).toBe("yaml");
+  });
+
+  it("keeps a commented node in YAML and explains why the form cannot edit it", () => {
+    const source = yamlSource("proxies:\n  - name: ts\n    type: tailscale\n    state-dir: tailscale/ts # Keep this\n");
+    expect(renderEditor(source).tabs.value).toBe("yaml");
+    const { html } = renderEditor(source, onPage(0));
+    expect(html).toContain("此节点的 YAML 注释无法通过表单保留");
+    expect(html).not.toContain("应用到 YAML");
   });
 
   it("starts the Tailscale page on a new node with a free name", () => {

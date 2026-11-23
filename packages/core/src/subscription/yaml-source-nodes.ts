@@ -27,6 +27,7 @@ export interface YamlSourceEntry {
   readonly name: string;
   readonly type: string;
   readonly node: Node;
+  readonly replaceBlockedReason: string | null;
 }
 
 export type YamlSourceLayout =
@@ -158,8 +159,7 @@ function parseSingleDocument(content: string, events: Event[]): Document | null 
   return root && !(root.kind === "scalar" && root.tag === TAG_NULL) ? documents[0] : null;
 }
 
-function readLayout(content: string): { root: Node | null; layout: YamlSourceLayout; items: Node[] } {
-  const events = parseEvents(content, {});
+function readLayout(content: string, events: Event[]): { root: Node | null; layout: YamlSourceLayout; items: Node[] } {
   const document = parseSingleDocument(content, events);
   if (!document) return { root: null, layout: { kind: "empty" }, items: [] };
   const root = document.contents!;
@@ -205,17 +205,53 @@ function readLayout(content: string): { root: Node | null; layout: YamlSourceLay
   return { root, items: value.items, layout: { kind: "list", inProxies: true, ranges, insert: last ? { offset: last.end, indent: last.indent } : null } };
 }
 
+/** Hashes inside scalar event ranges are data, including quoted values and block scalar bodies. */
+function yamlCommentOffsets(content: string, events: Event[]): number[] {
+  const comments: number[] = [];
+  let hash = content.indexOf("#");
+  if (hash < 0) return comments;
+
+  const scalars = events.filter((event) => event.type === EVENT_ID.SCALAR);
+  const lineBreak = /[\r\n]/g;
+  let scalarIndex = 0;
+  while (hash >= 0) {
+    while (scalarIndex < scalars.length && scalars[scalarIndex].valueEnd <= hash) scalarIndex += 1;
+    const scalar = scalars[scalarIndex];
+    if (scalar && scalar.valueStart <= hash) {
+      hash = content.indexOf("#", scalar.valueEnd);
+    } else {
+      comments.push(hash);
+      lineBreak.lastIndex = hash + 1;
+      hash = lineBreak.exec(content) ? content.indexOf("#", lineBreak.lastIndex) : -1;
+    }
+  }
+  return comments;
+}
+
 /** Read a YAML source's proxies for node-level editing; unsupported layouts stay raw-only. */
 export function readYamlSource(content: string): YamlSourceReadResult {
   try {
     checkSubscriptionInput(content);
     // parseEvents bypasses the subscription loader, so apply its syntax budget here.
     checkYamlSyntaxBudget(content);
-    const { root, layout, items } = readLayout(content);
+    const events = parseEvents(content, {});
+    const { root, layout, items } = readLayout(content, events);
+    const rewriteRanges = layout.kind === "single"
+      ? [{ start: 0, end: content.length }]
+      : layout.kind === "list" ? layout.ranges : null;
+    const comments = rewriteRanges?.length ? yamlCommentOffsets(content, events) : [];
+    let commentIndex = 0;
     const entries = items.map((node, index) => {
       const mapping = node.kind === "mapping" ? node : null;
       const field = (key: string) => (mapping ? scalarText(mapping.items[findPairIndex(mapping, key)]?.value) : "");
-      return { index, name: field("name"), type: field("type").trim().toLowerCase(), node };
+      const range = rewriteRanges?.[index];
+      if (range) {
+        while (commentIndex < comments.length && comments[commentIndex] < range.start) commentIndex += 1;
+      }
+      const replaceBlockedReason = range && commentIndex < comments.length && comments[commentIndex] < range.end
+        ? "此节点的 YAML 注释无法通过表单保留，请直接编辑 YAML"
+        : null;
+      return { index, name: field("name"), type: field("type").trim().toLowerCase(), node, replaceBlockedReason };
     });
     const inline = "proxies 使用了行内列表写法，请改成多行列表后再用表单";
     const replaceBlockedReason = layout.kind === "list" && !layout.ranges ? inline : null;
@@ -327,11 +363,12 @@ function rangeMatchesEntry(slice: string, entryValue: unknown): boolean {
 export function replaceYamlSourceNode(document: YamlSourceDocument, index: number, node: MappingNode): string {
   const { content, layout, eol } = document;
   if (document.replaceBlockedReason) throw new Error(document.replaceBlockedReason);
-  const original = document.entries[index]?.node;
-  if (!original) throw new Error("找不到要修改的节点");
+  const entry = document.entries[index];
+  if (!entry) throw new Error("找不到要修改的节点");
+  if (entry.replaceBlockedReason) throw new Error(entry.replaceBlockedReason);
   const originalLoaded = loadedEntries(document)[index];
   // An entry the presenter cannot reproduce would change fields nobody edited.
-  if (!same(loadItem(original), originalLoaded)) throw new Error("该节点的写法无法无损改写，请直接编辑 YAML");
+  if (!same(loadItem(entry.node), originalLoaded)) throw new Error("该节点的写法无法无损改写，请直接编辑 YAML");
 
   if (layout.kind === "single") return verified(document, index, node, presentNodes(node));
   if (layout.kind !== "list" || !layout.ranges) throw new Error("找不到要修改的节点");
@@ -357,7 +394,7 @@ export function replaceYamlSourceNode(document: YamlSourceDocument, index: numbe
  */
 export function verifyYamlSourceNodesRewritable(document: YamlSourceDocument): string | null {
   const { content, entries, layout, eol } = document;
-  if (document.replaceBlockedReason || entries.length === 0) return null;
+  if (document.replaceBlockedReason || entries.length === 0 || entries.some((entry) => entry.replaceBlockedReason)) return null;
 
   let loadedRoot: unknown;
   try {

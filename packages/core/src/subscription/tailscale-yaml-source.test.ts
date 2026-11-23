@@ -187,6 +187,19 @@ version: "1.10"
     expect(inspectAutoEditableTailscaleYaml("proxies: [{name: ts, type: tailscale}]\n")).toBeNull();
   });
 
+  it("leaves in-entry comments to YAML editing and allows hashes in scalar values", () => {
+    const content = "proxies:\n  - name: ts\n    type: tailscale\n    # Keep the existing state directory.\n    state-dir: tailscale/ts # Used by this identity.\n    hostname: old\n";
+    expect(inspectAutoEditableTailscaleYaml(content)).toBeNull();
+    const existing = target(content);
+    expect(() => writeTailscaleNode(content, existing, { ...existing.initial, hostname: "new" })).toThrow(/注释/);
+
+    const scalarContent = 'proxies:\n  - name: "ts #1"\n    type: tailscale\n    note: |\n      # Part of the value\n      keep this line too\n    hostname: old\n';
+    expect(inspectAutoEditableTailscaleYaml(scalarContent)).toEqual({ firstIndex: 0, names: ["ts #1"] });
+    const scalarTarget = target(scalarContent);
+    const updated = writeTailscaleNode(scalarContent, scalarTarget, { ...scalarTarget.initial, hostname: "new" });
+    expect(load(updated).proxies[0]).toEqual({ ...load(scalarContent).proxies[0], hostname: "new" });
+  });
+
   it("preserves indented trailing comments when clearing an optional field after a block scalar", () => {
     const content = [
       "proxies:",

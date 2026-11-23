@@ -187,7 +187,6 @@ export function InputSection({
         onUpdateMeta={updateSourceMeta}
         onApplyContent={applyExpandedSourceContent}
         tailscaleStateDirs={expandedSourceTailscaleStateDirs}
-        sourceNodes={expandedSource ? (nodesBySourceId.get(expandedSource.id) ?? []) : undefined}
       />
     </div>
   );

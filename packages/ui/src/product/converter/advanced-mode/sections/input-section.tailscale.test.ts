@@ -119,7 +119,6 @@ describe("advanced mode InputSection Tailscale editing", () => {
     ];
     renderSection({ [EXPANDED_STATE_INDEX]: "y1" });
     expect(mocks.captures.editor.tailscaleStateDirs).toEqual(["tailscale/other"]);
-    expect(mocks.captures.editor.sourceNodes).toEqual([mocks.store.nodes[0]]);
     mocks.captures.editor.onApplyContent("- {name: renamed, type: tailscale}\n");
     expect(mocks.store.setSources).toHaveBeenCalledTimes(1);
     expect(mocks.markSourceAsPendingImport).toHaveBeenCalledWith(expect.objectContaining({ id: "y1", content: "- {name: renamed, type: tailscale}\n" }));
