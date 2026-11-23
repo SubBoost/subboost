@@ -84,6 +84,7 @@ describe("Radix UI wrappers", () => {
     expect(html).toContain("footer-extra");
     // The body scrolls on short screens; header and footer keep their height.
     expect(html).toMatch(/class="[^"]*overflow-y-auto[^"]*body-extra"/);
+    expect(html).toMatch(/class="[^"]*-ml-1[^"]*-mr-2[^"]*pl-1[^"]*pr-2[^"]*body-extra"/);
     expect(html).toMatch(/class="flex shrink-0[^"]*header-extra"/);
     expect(html).toContain("switch-extra");
     expect(html).toContain("tabs-list-extra");

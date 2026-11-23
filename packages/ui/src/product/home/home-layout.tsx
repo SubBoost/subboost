@@ -202,16 +202,16 @@ export function HomeLayout({
                   </TabsList>
                 </div>
               </CardHeader>
-              <CardContent className={`pt-0 relative lg:flex-1 lg:overflow-hidden ${DESKTOP_PANEL_CONTENT_MIN_HEIGHT_CLASS}`}>
+              <CardContent className={`pt-0 relative lg:flex-1 lg:overflow-hidden lg:-mx-1 lg:-my-0.5 ${DESKTOP_PANEL_CONTENT_MIN_HEIGHT_CLASS}`}>
                 <TabsContent
                   value="quick"
-                  className="mt-0 flex flex-col data-[state=inactive]:hidden lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar lg:pr-1"
+                  className="mt-0 flex flex-col data-[state=inactive]:hidden lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar lg:px-1 lg:py-0.5"
                 >
                   <QuickMode templateUpload={templateUpload} />
                 </TabsContent>
                 <TabsContent
                   value="advanced"
-                  className="mt-0 data-[state=inactive]:hidden lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar lg:pr-1"
+                  className="mt-0 data-[state=inactive]:hidden lg:absolute lg:inset-0 lg:overflow-y-auto custom-scrollbar lg:px-1 lg:py-0.5"
                 >
                   <AdvancedMode />
                 </TabsContent>
