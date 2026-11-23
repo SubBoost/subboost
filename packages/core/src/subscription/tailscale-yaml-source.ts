@@ -1,7 +1,7 @@
 import { COLLECTION_STYLE, SCALAR_STYLE, type MappingNode, type Node, type ScalarNode } from "js-yaml";
 import { isValidTailscaleControlUrl, tailscaleStateDirComparisonKey } from "../mihomo/tailscale";
 import { parseClashYaml } from "../parser/clash-yaml";
-import { appendYamlSourceNode, readYamlSource, replaceYamlSourceNode } from "./yaml-source-nodes";
+import { appendYamlSourceNode, readYamlSource, replaceYamlSourceNode, verifyYamlSourceNodesRewritable } from "./yaml-source-nodes";
 
 /** Explicit three-state value: Default omits the YAML key. */
 export type TailscaleTriState = "default" | "true" | "false";
@@ -216,6 +216,48 @@ export function writeTailscaleNode(content: string, target: TailscaleNodeTarget 
     throw new Error("导入器无法识别写入后的 Tailscale 节点");
   }
   return output;
+}
+
+/**
+ * Checks whether a YAML source consists solely of valid, uniquely named Tailscale nodes that
+ * can all be safely rewritten through `writeTailscaleNode`, returning their names and first index.
+ */
+export function inspectAutoEditableTailscaleYaml(
+  content: string,
+): { firstIndex: number; names: string[] } | null {
+  if (!content.trim()) return null;
+  const read = readYamlSource(content);
+  if (!read.ok || read.document.replaceBlockedReason) return null;
+  const { entries } = read.document;
+  if (entries.length === 0) return null;
+
+  const seenNames = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type !== "tailscale") return null;
+    const values = readTailscaleFormValues(entry.node);
+    if (!values.ok || Object.keys(validateTailscaleForm(values.values)).length > 0) return null;
+    if (seenNames.has(values.values.name)) return null;
+    seenNames.add(values.values.name);
+  }
+
+  const rewritten = verifyYamlSourceNodesRewritable(read.document);
+  if (rewritten === null) return null;
+
+  const before = parseClashYaml(content);
+  const after = parseClashYaml(rewritten);
+  if (
+    after.errors.length > before.errors.length ||
+    after.nodes.length !== before.nodes.length ||
+    before.nodes.length !== entries.length ||
+    !after.nodes.every((node) => node.type === "tailscale")
+  ) {
+    return null;
+  }
+
+  return {
+    firstIndex: entries[0].index,
+    names: Array.from(seenNames),
+  };
 }
 
 /** Values for a new node: a free name and a generated state directory. */

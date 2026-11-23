@@ -3,6 +3,7 @@ import * as yaml from "js-yaml";
 import {
   createTailscaleStateDir,
   hasDuplicateTailscaleStateDir,
+  inspectAutoEditableTailscaleYaml,
   isTailscaleFormDirty,
   newTailscaleFormValues,
   readTailscaleFormValues,
@@ -146,5 +147,84 @@ version: "1.10"
     expect(hasDuplicateTailscaleStateDir(".", ["./"])).toBe(true);
     expect(hasDuplicateTailscaleStateDir(".", ["", undefined, "tailscale"])).toBe(false);
     expect(hasDuplicateTailscaleStateDir("tailscale/a", ["tailscale/b", "/tailscale/a"])).toBe(false);
+  });
+
+  it("matches writeTailscaleNode editability in inspectAutoEditableTailscaleYaml", () => {
+    expect(inspectAutoEditableTailscaleYaml("name: ts\ntype: tailscale\n")).toEqual({ firstIndex: 0, names: ["ts"] });
+    expect(inspectAutoEditableTailscaleYaml('name: ts\ntype: "tail\\x73cale"\n')).toEqual({ firstIndex: 0, names: ["ts"] });
+    expect(inspectAutoEditableTailscaleYaml("proxies:\n  - {name: ts, type: tailscale}\n  - {name: backup, type: tailscale}\n")).toEqual({
+      firstIndex: 0,
+      names: ["ts", "backup"],
+    });
+    expect(
+      inspectAutoEditableTailscaleYaml("proxies:\n  - name: ts\n    type: tailscale\n  # keep comment\n  - name: backup\n    type: tailscale\n"),
+    ).toEqual({
+      firstIndex: 0,
+      names: ["ts", "backup"],
+    });
+
+    const hashTailWithHostname = "proxies:\n  - name: ts\n    type: tailscale\n    hostname: old\n    note: |\n      hello\n      # body\n";
+    const hashTailBlock = "proxies:\n  - name: ts\n    type: tailscale\n    note: |\n      hello\n      # body\n";
+    const hashTailExplicit = "proxies:\n  - name: ts\n    type: tailscale\n    note: |1\n       hello\n       # body\n";
+    expect(() =>
+      writeTailscaleNode(hashTailWithHostname, target(hashTailWithHostname), { ...target(hashTailWithHostname).initial, hostname: "office" }),
+    ).toThrow();
+    expect(inspectAutoEditableTailscaleYaml(hashTailWithHostname)).toBeNull();
+    expect(() => writeTailscaleNode(hashTailBlock, target(hashTailBlock), { ...target(hashTailBlock).initial, name: "ts-2" })).toThrow();
+    expect(inspectAutoEditableTailscaleYaml(hashTailBlock)).toBeNull();
+    expect(inspectAutoEditableTailscaleYaml(hashTailExplicit)).toBeNull();
+
+    const duplicateRootKey = "port: 7890\nport: 7891\nproxies:\n  - name: ts\n    type: tailscale\n";
+    const duplicateNestedKey = "proxies:\n  - name: ts\n    type: tailscale\n    extra:\n      a: 1\n      a: 2\n";
+    expect(() => writeTailscaleNode(duplicateRootKey, target(duplicateRootKey), { ...target(duplicateRootKey).initial, hostname: "office" })).toThrow();
+    expect(() => writeTailscaleNode(duplicateNestedKey, target(duplicateNestedKey), { ...target(duplicateNestedKey).initial, hostname: "office" })).toThrow();
+    expect(inspectAutoEditableTailscaleYaml(duplicateRootKey)).toBeNull();
+    expect(inspectAutoEditableTailscaleYaml(duplicateNestedKey)).toBeNull();
+
+    expect(inspectAutoEditableTailscaleYaml("proxies:\n  - name: ts\n    type: tailscale\n  - name: ts\n    type: tailscale\n")).toBeNull();
+    expect(inspectAutoEditableTailscaleYaml("type: tailscale\nhostname: office\n")).toBeNull();
+    expect(inspectAutoEditableTailscaleYaml("name: ts\ntype: tailscale\ncontrol-url: ftp://invalid.example\n")).toBeNull();
+    expect(inspectAutoEditableTailscaleYaml("proxies: [{name: ts, type: tailscale}]\n")).toBeNull();
+  });
+
+  it("preserves indented trailing comments when clearing an optional field after a block scalar", () => {
+    const content = [
+      "proxies:",
+      "  - name: ts",
+      "    type: tailscale",
+      "    note: |",
+      "      hello",
+      "    hostname: old",
+      "      # deeply indented comment",
+      "",
+    ].join("\n");
+    expect(inspectAutoEditableTailscaleYaml(content)).toEqual({ firstIndex: 0, names: ["ts"] });
+    const out = writeTailscaleNode(content, target(content), { ...target(content).initial, hostname: "" });
+    expect(out).toContain("# deeply indented comment");
+    expect(load(out)).toEqual({
+      proxies: [{ name: "ts", type: "tailscale", note: "hello\n" }],
+    });
+
+    const nestedWithNext = [
+      "proxies:",
+      "  - name: ts",
+      "    type: tailscale",
+      "    extra:",
+      "      note: |",
+      "        hello",
+      "    hostname: old",
+      "      # keep before next node",
+      "  - name: backup",
+      "    type: tailscale",
+      "",
+    ].join("\n");
+    const outNested = writeTailscaleNode(nestedWithNext, target(nestedWithNext), { ...target(nestedWithNext).initial, hostname: "" });
+    expect(outNested).toContain("# keep before next node");
+    expect(load(outNested)).toEqual({
+      proxies: [
+        { name: "ts", type: "tailscale", extra: { note: "hello\n" } },
+        { name: "backup", type: "tailscale" },
+      ],
+    });
   });
 });

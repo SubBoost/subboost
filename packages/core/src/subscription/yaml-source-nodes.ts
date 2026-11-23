@@ -1,6 +1,7 @@
 import {
   COLLECTION_STYLE,
   EVENT_ID,
+  SCALAR_STYLE,
   eventsToAst,
   parseEvents,
   present,
@@ -285,21 +286,129 @@ function verified(document: YamlSourceDocument, index: number | null, node: Node
   return output;
 }
 
+function quoteTrailingBlockScalar(node: Node): Node | null {
+  if (node.kind === "scalar") {
+    if (node.style !== SCALAR_STYLE.LITERAL_BLOCK && node.style !== SCALAR_STYLE.FOLDED_BLOCK) return null;
+    return { ...node, style: SCALAR_STYLE.DOUBLE_QUOTED };
+  }
+  if (node.kind === "mapping" && node.style === COLLECTION_STYLE.BLOCK && node.items.length > 0) {
+    const last = node.items[node.items.length - 1];
+    const nextValue = quoteTrailingBlockScalar(last.value);
+    if (!nextValue) return null;
+    const items = [...node.items];
+    items[items.length - 1] = { key: last.key, value: nextValue };
+    return { ...node, items };
+  }
+  if (node.kind === "sequence" && node.style === COLLECTION_STYLE.BLOCK && node.items.length > 0) {
+    const nextItem = quoteTrailingBlockScalar(node.items[node.items.length - 1]);
+    if (!nextItem) return null;
+    const items = [...node.items];
+    items[items.length - 1] = nextItem;
+    return { ...node, items };
+  }
+  return null;
+}
+
+function spliceListItem(content: string, range: YamlItemRange, node: Node, eol: string): string {
+  let text = presentItem(node, range.indent, eol);
+  if (!content.slice(range.start, range.end).endsWith("\n")) text = text.slice(0, -eol.length);
+  return content.slice(0, range.start) + text + content.slice(range.end);
+}
+
+function rangeMatchesEntry(slice: string, entryValue: unknown): boolean {
+  try {
+    return same(loadSubscriptionYaml(slice), [entryValue]);
+  } catch {
+    return false;
+  }
+}
+
 /** Rewrite one entry in place; every other byte of the source stays as written. */
 export function replaceYamlSourceNode(document: YamlSourceDocument, index: number, node: MappingNode): string {
   const { content, layout, eol } = document;
   if (document.replaceBlockedReason) throw new Error(document.replaceBlockedReason);
   const original = document.entries[index]?.node;
   if (!original) throw new Error("找不到要修改的节点");
+  const originalLoaded = loadedEntries(document)[index];
   // An entry the presenter cannot reproduce would change fields nobody edited.
-  if (!same(loadItem(original), loadedEntries(document)[index])) throw new Error("该节点的写法无法无损改写，请直接编辑 YAML");
+  if (!same(loadItem(original), originalLoaded)) throw new Error("该节点的写法无法无损改写，请直接编辑 YAML");
 
   if (layout.kind === "single") return verified(document, index, node, presentNodes(node));
   if (layout.kind !== "list" || !layout.ranges) throw new Error("找不到要修改的节点");
   const range = layout.ranges[index];
-  let text = presentItem(node, range.indent, eol);
-  if (!content.slice(range.start, range.end).endsWith("\n")) text = text.slice(0, -eol.length);
-  return verified(document, index, node, content.slice(0, range.start) + text + content.slice(range.end));
+  const primary = spliceListItem(content, range, node, eol);
+  try {
+    return verified(document, index, node, primary);
+  } catch (error) {
+    // Clearing a trailing field can expose an earlier block scalar right above an indented trailing
+    // comment; double-quoting that block scalar keeps the comment outside the scalar only when the
+    // replaced range itself contained the whole original entry.
+    const slice = content.slice(range.start, range.end);
+    const quoted = rangeMatchesEntry(slice, originalLoaded) ? quoteTrailingBlockScalar(node) : null;
+    if (quoted) return verified(document, index, node, spliceListItem(content, range, quoted, eol));
+    throw error;
+  }
+}
+
+/**
+ * Re-present every entry in place without changing its fields, verifying that the full document
+ * loads cleanly, each entry and its source range round-trip losslessly, and the spliced YAML keeps
+ * exact semantics. Returns the rewritten YAML on success, or null when rewriting is unsafe.
+ */
+export function verifyYamlSourceNodesRewritable(document: YamlSourceDocument): string | null {
+  const { content, entries, layout, eol } = document;
+  if (document.replaceBlockedReason || entries.length === 0) return null;
+
+  let loadedRoot: unknown;
+  try {
+    loadedRoot = loadSubscriptionYaml(content);
+  } catch {
+    return null;
+  }
+
+  const loadedList =
+    layout.kind === "single"
+      ? [loadedRoot]
+      : layout.kind === "list"
+        ? (layout.inProxies ? (loadedRoot as Record<string, unknown>).proxies : loadedRoot)
+        : null;
+  if (!Array.isArray(loadedList) || loadedList.length !== entries.length) return null;
+
+  for (let index = 0; index < entries.length; index += 1) {
+    try {
+      if (!same(loadItem(entries[index].node), loadedList[index])) return null;
+    } catch {
+      return null;
+    }
+  }
+
+  let output: string;
+  if (layout.kind === "single") {
+    output = presentNodes(entries[0].node);
+  } else if (layout.kind === "list" && layout.ranges && layout.ranges.length === entries.length) {
+    let cursor = 0;
+    const parts: string[] = [];
+    for (let index = 0; index < entries.length; index += 1) {
+      const range = layout.ranges[index];
+      const slice = content.slice(range.start, range.end);
+      if (!rangeMatchesEntry(slice, loadedList[index])) return null;
+      let text = presentItem(entries[index].node, range.indent, eol);
+      if (!slice.endsWith("\n")) text = text.slice(0, -eol.length);
+      parts.push(content.slice(cursor, range.start), text);
+      cursor = range.end;
+    }
+    parts.push(content.slice(cursor));
+    output = parts.join("");
+  } else {
+    return null;
+  }
+
+  try {
+    const written = loadSubscriptionYaml(output);
+    return written !== undefined && same(written, loadedRoot) ? output : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Append a new entry after the last one, creating the proxies list when there is none. */
