@@ -89,7 +89,7 @@ const DialogBody = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("custom-scrollbar -mr-2 min-h-0 flex-1 overflow-y-auto pr-2", className)}
+    className={cn("custom-scrollbar -ml-1 -mr-2 min-h-0 flex-1 overflow-y-auto pl-1 pr-2", className)}
     {...props}
   />
 );

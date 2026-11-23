@@ -79,7 +79,8 @@ vi.mock("@subboost/ui/components/ui/tabs", () => ({
     mocks.tabs.push(props);
     return React.createElement("div", { "data-tabs-value": props.value ?? props.defaultValue }, props.children);
   },
-  TabsContent: (props: any) => React.createElement("div", { "data-tabs-content": props.value }, props.children),
+  TabsContent: (props: any) =>
+    React.createElement("div", { "data-tabs-content": props.value, className: props.className }, props.children),
   TabsList: (props: any) => React.createElement("div", props, props.children),
   TabsTrigger: (props: any) => React.createElement("button", props, props.children),
 }));
@@ -310,5 +311,17 @@ describe("HomeLayout", () => {
     expect(html).toContain("基础和 DNS 配置有错误");
     expect(html).toContain("dns is invalid");
     expect(mocks.yamlHighlight).toBeUndefined();
+  });
+
+  it("pads the configuration scroll panes inside negative card gutters so focus rings are not clipped", () => {
+    const html = renderToStaticMarkup(React.createElement(HomeLayout, baseProps));
+    const configSection = html.slice(html.indexOf('id="config"'), html.indexOf('id="preview"'));
+    const quickPane = configSection.match(/<div[^>]*data-tabs-content="quick"[^>]*>/)?.[0];
+    const advancedPane = configSection.match(/<div[^>]*data-tabs-content="advanced"[^>]*>/)?.[0];
+
+    expect(configSection).toMatch(/class="[^"]*lg:-mx-1[^"]*lg:-my-0\.5[^"]*"/);
+    expect(quickPane).toMatch(/class="[^"]*lg:px-1[^"]*lg:py-0\.5[^"]*"/);
+    expect(advancedPane).toMatch(/class="[^"]*lg:px-1[^"]*lg:py-0\.5[^"]*"/);
+    expect(configSection).not.toContain("lg:pr-1");
   });
 });
