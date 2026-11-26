@@ -70,6 +70,28 @@ describe("local web updates", () => {
     expect(responses.map((response) => response.status).sort()).toEqual([202, 409]);
   });
 
+  it("reports a pending request and rejects a second one before the host starts", async () => {
+    mocks.lstat.mockResolvedValue({});
+    expect(await (await GET()).json()).toEqual({ status: "queued" });
+    expect((await POST(postRequest())).status).toBe(409);
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("allows another update after the host reports failure", async () => {
+    mocks.readFile.mockResolvedValue("failed\n");
+    expect(await (await GET()).json()).toEqual({ status: "failed" });
+    expect((await POST(postRequest())).status).toBe(202);
+  });
+
+  it.each(["readFile", "lstat", "writeFile"] as const)(
+    "propagates %s permission errors when queuing an update",
+    async (operation) => {
+      const denied = Object.assign(new Error("Permission denied"), { code: "EACCES" });
+      mocks[operation].mockRejectedValueOnce(denied);
+      await expect(POST(postRequest())).rejects.toBe(denied);
+    },
+  );
+
   it("reads the host status after a restart and rejects a request while running", async () => {
     mocks.readFile.mockResolvedValue("running\n");
     expect(await (await GET()).json()).toEqual({ status: "running" });
