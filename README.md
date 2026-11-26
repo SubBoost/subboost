@@ -39,6 +39,8 @@
 - Deployment docs: [Advanced deployment - compiles from source, slower with higher requirements](https://docs.subboost.org/deploy/advanced)
 - Configuration guide: [Clash configuration simple enough for a paramecium: configure precise routing and chained proxies from the UI in one click](https://ryanvan.com/t/topic/59?u=ryan)
 
+One-click installations on Linux with systemd can opt in to web updates. After installing a release that includes the feature, run `sudo subboost enable-web-update` once on the host. Subsequent updates are available under **Account Settings → System Update** for the local administrator. Set `APP_URL` to the address used in the browser. The host's existing updater handles backups, health checks, and rollback, while the application container only queues requests.
+
 ## Development Notes
 
 Developers can start a local development environment from source:

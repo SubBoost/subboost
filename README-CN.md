@@ -39,6 +39,8 @@
 - 部署文档：[高级部署 - 编译源码构建，速度慢配置要求高](https://docs.subboost.org/deploy/advanced)
 - 配置教程：[草履虫也能学会的 Clash 配置：UI 界面一键配置精确分流、链式代理](https://ryanvan.com/t/topic/59?u=ryan)
 
+使用一键部署的 Linux/systemd 实例可选用网页更新。升级到包含此功能的发行版后，在宿主机运行一次 `sudo subboost enable-web-update`，之后从管理员的 **账户设置 → 系统更新** 更新。请将 `APP_URL` 设置为浏览器实际使用的地址。宿主机使用现有更新器执行备份、健康检查和回滚，应用容器仅提交更新请求。
+
 ## 开发说明
 
 开发者可以从源码启动本地开发环境：

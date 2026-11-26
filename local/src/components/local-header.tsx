@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Header, type HeaderBrandBadge } from "@subboost/ui/components/layout/header";
+import { useUserStore } from "@subboost/ui/store/user-store";
 
 type LatestReleaseStatus = {
   hasUpdate?: unknown;
@@ -31,6 +32,7 @@ function buildNewReleaseBadge(status: LatestReleaseStatus | null): HeaderBrandBa
 }
 
 export function LocalHeader() {
+  const user = useUserStore((state) => state.user);
   const [newReleaseBadge, setNewReleaseBadge] = React.useState<HeaderBrandBadge | null>(null);
 
   React.useEffect(() => {
@@ -60,5 +62,8 @@ export function LocalHeader() {
     };
   }, []);
 
-  return <Header mode="local" extraBrandBadge={newReleaseBadge} />;
+  const badge = user && newReleaseBadge
+    ? { ...newReleaseBadge, href: "/dashboard/settings#system-update", external: false }
+    : newReleaseBadge;
+  return <Header mode="local" extraBrandBadge={badge} />;
 }

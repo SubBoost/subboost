@@ -9,7 +9,7 @@ function shellTimeout(defaultMs: number): number {
   return process.platform === "win32" ? 120_000 : defaultMs;
 }
 
-function runRollbackScenario(restoreFails: boolean) {
+function runRollbackScenario(restoreFails: boolean, webUpdate = false) {
   const script = `
     set -Eeuo pipefail
     home="$(mktemp -d)"
@@ -35,6 +35,7 @@ APP_URL=http://127.0.0.1:31000
 SUBBOOST_PORT=31000
 ENV
     : > "$home/docker-compose.yml"
+    ${webUpdate ? ': > "$home/docker-compose.web-update.yml"; export SUBBOOST_WEB_UPDATE=1' : ""}
     export SUBBOOST_SCRIPT_SOURCE_ONLY=1
     export SUBBOOST_HOME="$home"
     export SUBBOOST_BIN="$home/bin/subboost"
@@ -102,6 +103,14 @@ describe("self-host update rollback lifecycle", () => {
     expect(result.stdout).toContain("Keep app and cron stopped");
     expect(result.stdout).toMatch(/old-compose\.yml.* stop cron app/);
     expect(result.stdout).not.toMatch(/old-compose\.yml.* up -d app/);
+  }, shellTimeout(20_000));
+
+  it("keeps the optional web update mounts during candidate startup and rollback", () => {
+    const result = runRollbackScenario(false, true);
+    expect(result.status, result.error?.message ?? result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/candidate-compose\.yml.*docker-compose\.web-update\.yml.*up -d --no-deps app/);
+    expect(result.stdout).toMatch(/old-compose\.yml.*docker-compose\.web-update\.yml.*up -d app/);
+    expect(result.stdout).toContain("Previous version restored successfully.");
   }, shellTimeout(20_000));
 
   it("never deletes a volume that existed before a failed installation", () => {
